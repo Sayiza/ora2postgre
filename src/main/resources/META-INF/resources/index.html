@@ -1,0 +1,1395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oracle to PostgreSQL Migration Tool</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #fff;
+            color: #000;
+            line-height: 1.6;
+        }
+
+        .header {
+            background: #334;
+            color: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+        }
+
+        .header p {
+            opacity: 0.9;
+            margin-top: 0.5rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border: 1px solid #e0e0e0;
+        }
+
+        .card h2 {
+            color: #444;
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 0.5rem;
+        }
+
+        .singlecolcard {
+            grid-column: 1 / -1;
+        }
+
+        .job-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary {
+            background: #445;
+            color: white;
+        }
+
+        .btn-success {
+            background: #445;
+            color: white;
+        }
+
+        .btn-warning {
+            background: #645;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #645;
+            color: white;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+
+        .status-running { background-color: #ff9800; animation: pulse 1.5s infinite; }
+        .status-completed { background-color: #4CAF50; }
+        .status-failed { background-color: #f44336; }
+        .status-idle { background-color: #9e9e9e; }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .system-status {
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border-left: 4px solid #ddd;
+            min-height: 40px;
+            box-sizing: border-box;
+            min-width: 30%;
+        }
+/*
+        .status-item span:first-child {
+            flex: 0 0 auto;
+            font-weight: 500;
+        }
+
+        .status-item span:last-child {
+            flex: 0 0 120px;
+            text-align: right;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        } */
+
+        .status-item.connected {
+            border-left-color: #4CAF50;
+        }
+
+        .status-item.disconnected {
+            border-left-color: #f44336;
+        }
+
+        .job-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .job-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .job-item:last-child {
+            border-bottom: none;
+        }
+
+        .job-info {
+            flex: 1;
+        }
+
+        .job-type {
+            font-weight: 500;
+            color: #444;
+        }
+
+        .job-time {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 0.2rem;
+        }
+
+        .progress-container {
+            margin-top: 0.5rem;
+            margin-bottom: 0.3rem;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background-color: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #1976d2, #42a5f5);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+            position: relative;
+        }
+
+        .progress-fill.completed {
+            background: linear-gradient(90deg, #4CAF50, #66BB6A);
+        }
+
+        .progress-fill.failed {
+            background: linear-gradient(90deg, #f44336, #e57373);
+        }
+
+        .progress-text {
+            font-size: 0.75rem;
+            color: #666;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 0.2rem;
+        }
+
+        .progress-step {
+            font-size: 0.75rem;
+            color: #888;
+            margin-top: 0.1rem;
+        }
+
+        .progress-eta {
+            font-size: 0.7rem;
+            color: #999;
+            font-style: italic;
+        }
+
+        .data-overview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1rem;
+        }
+
+        .data-item {
+            text-align: center;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+
+        .data-count {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #1976d2;
+        }
+
+        .data-label {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 0.2rem;
+        }
+
+        .log-viewer {
+            grid-column: 1 / -1;
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        .log-controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+            min-width: 0;
+        }
+
+        .log-filter {
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            flex: 1;
+            min-width: 200px;
+            max-width: 300px;
+        }
+
+        .log-content {
+            background: #1e1e1e;
+            color: #f0f0f0;
+            padding: 1rem;
+            border-radius: 6px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.85rem;
+            height: 300px;
+            overflow-x: auto;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            line-height: 1.4;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            box-sizing: border-box;
+            max-width: 100%;
+        }
+
+        .log-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .log-content::-webkit-scrollbar-track {
+            background: #2d2d2d;
+        }
+
+        .log-content::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 4px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #1976d2;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 0.5rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 0.75rem;
+            border-radius: 4px;
+            margin-top: 0.5rem;
+            border-left: 4px solid #f44336;
+        }
+
+        .config-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem;
+            background: #f8f9fa;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+            font-size: 0.9rem;
+        }
+
+        .config-item input[type="text"],
+        .config-item input[type="password"] {
+            flex: 1;
+            padding: 0.4rem;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            font-size: 0.8rem;
+        }
+
+        .config-item input[type="checkbox"] {
+            margin-right: 0.5rem;
+        }
+
+        .config-item span {
+            font-weight: 500;
+            min-width: 120px;
+            color: #444;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+                padding: 1rem;
+            }
+            
+            .job-buttons {
+                grid-template-columns: 1fr;
+            }
+
+            #config-form {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Oracle to PostgreSQL Migration Tool</h1>
+        <p>Monitor and control your database migration process</p>
+    </div>
+
+    <div class="container">
+        <!-- Job Controls -->
+        <div class="card singlecolcard">
+            <h2>Migration Jobs</h2>
+            <div class="job-buttons">
+                <button class="btn btn-primary" onclick="startJob('extract')">
+                    <span class="status-indicator status-idle" id="extract-status"></span>
+                    Extract Oracle
+                </button>
+                <button class="btn btn-primary" onclick="startJob('parse')">
+                    <span class="status-indicator status-idle" id="parse-status"></span>
+                    Parse AST
+                </button>
+                <button class="btn btn-primary" onclick="startJob('export')">
+                    <span class="status-indicator status-idle" id="export-status"></span>
+                    Export Files
+                </button>
+                <button class="btn btn-primary" onclick="startJob('execute-pre')">
+                    <span class="status-indicator status-idle" id="execute-pre-status"></span>
+                    Execute Pre-Transfer
+                </button>
+                <button class="btn btn-primary" onclick="startJob('transferdata')">
+                    <span class="status-indicator status-idle" id="data-status"></span>
+                    Data Transfer
+                </button>
+                <button class="btn btn-primary" onclick="startJob('execute-post')">
+                    <span class="status-indicator status-idle" id="execute-post-status"></span>
+                    Execute Post-Transfer
+                </button>
+                <button class="btn btn-primary" onclick="startJob('full')">
+                    <span class="status-indicator status-idle" id="full-status"></span>
+                    Full Migration
+                </button>
+                <button class="btn btn-danger" onclick="resetSystem()">
+                    Reset System
+                </button>
+            </div>
+        </div>
+
+        <!-- System Status -->
+        <div class="card singlecolcard">
+            <h2>System Health</h2>
+            <div class="system-status" id="system-status">
+                <div class="status-item" id="oracle-status">
+                    <span>Oracle Database</span>
+                    <span>Checking...</span>
+                </div>
+                <div class="status-item" id="postgres-status">
+                    <span>PostgreSQL Database</span>
+                    <span>Checking...</span>
+                </div>
+                <div class="status-item" id="service-status">
+                    <span>Migration Service</span>
+                    <span>Checking...</span>
+                </div>
+            </div>
+            <div style="margin-top: 1rem; text-align: center;">
+                <button class="btn btn-primary" onclick="refreshSystemStatus()">Refresh Health</button>
+            </div>
+        </div>
+
+        <!-- Active Jobs -->
+        <div class="card singlecolcard">
+            <h2>Active Jobs</h2>
+            <div class="job-list" id="job-list">
+                <div style="text-align: center; color: #666; padding: 2rem;">
+                    No active jobs
+                </div>
+            </div>
+            <div style="margin-top: 1rem; text-align: center;">
+                <button class="btn btn-primary" onclick="refreshJobs()">Refresh Jobs</button>
+            </div>
+        </div>
+
+        <!-- Data Overview -->
+        <div class="card">
+            <h2>Data Overview</h2>
+            <div class="data-overview" id="data-overview">
+                <!-- Extraction Phase Data -->
+                <div class="data-item">
+                    <div class="data-count" id="schemas-count">-</div>
+                    <div class="data-label">Schemas</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-count" id="tables-count">-</div>
+                    <div class="data-label">Tables</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-count" id="views-count">-</div>
+                    <div class="data-label">Views</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-count" id="synonyms-count">-</div>
+                    <div class="data-label">Synonyms</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-count" id="objectTypeSpecs-count">-</div>
+                    <div class="data-label">Object Type Specs</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-count" id="objectTypeBodies-count">-</div>
+                    <div class="data-label">Object Type Bodies</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-count" id="packageSpecs-count">-</div>
+                    <div class="data-label">Package Specs</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-count" id="packageBodies-count">-</div>
+                    <div class="data-label">Package Bodies</div>
+                </div>
+                <!-- Parse AST Phase Data -->
+                <div class="data-item">
+                    <div class="data-count" id="parsedViews-count">-</div>
+                    <div class="data-label">Parsed Views</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-count" id="parsedObjectTypes-count">-</div>
+                    <div class="data-label">Parsed Object Types</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-count" id="parsedPackages-count">-</div>
+                    <div class="data-label">Parsed Packages</div>
+                </div>
+                <!-- Row Count Data -->
+                <div class="data-item">
+                    <div class="data-count" id="totalRowCount-count">-</div>
+                    <div class="data-label">Total Rows</div>
+                </div>
+            </div>
+            <div style="margin-top: 1rem; text-align: center;">
+                <button class="btn btn-primary" onclick="refreshDataOverview()">Refresh Data</button>
+            </div>
+        </div>
+
+        <!-- Target Database Overview -->
+        <div class="card">
+            <h2>Target Database Overview</h2>
+            <div class="data-overview" id="target-data-overview">
+                <div class="data-item">
+                    <div class="data-count" id="target-schemas-count">-</div>
+                    <div class="data-label">Schemas</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-count" id="target-tables-count">-</div>
+                    <div class="data-label">Tables</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-count" id="target-views-count">-</div>
+                    <div class="data-label">Views</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-count" id="target-functions-count">-</div>
+                    <div class="data-label">Functions</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-count" id="target-procedures-count">-</div>
+                    <div class="data-label">Procedures</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-count" id="target-types-count">-</div>
+                    <div class="data-label">Types</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-count" id="target-totalRowCount-count">-</div>
+                    <div class="data-label">Total Rows</div>
+                </div>
+            </div>
+            <div style="margin-top: 1rem; text-align: center; display: flex; align-items: center; justify-content: center; gap: 1rem;">
+                <button class="btn btn-primary" onclick="refreshTargetStats()">Refresh Target Stats</button>
+                <small id="target-last-updated" style="color: #666;">Not fetched yet</small>
+            </div>
+        </div>
+
+        <!-- Configuration Settings -->
+        <div class="card singlecolcard">
+            <h2>Configuration Settings</h2>
+            <div id="config-form" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                <!-- Process Flags -->
+                <div>
+                    <h3 style="margin-bottom: 1rem; color: #666; font-size: 1rem;">Process Flags</h3>
+                    <div style="display: grid; gap: 0.5rem;">
+                        <label class="config-item">
+                            <input type="checkbox" id="doAllSchemas"> Extract all schemas
+                        </label>
+                        <label class="config-item">
+                            <span>Only test schemas:</span>
+                            <input type="text" id="doOnlyTestSchema" placeholder="USER_ROBERT,PV">
+                        </label>
+                        <label class="config-item">
+                            <input type="checkbox" id="doTable"> Extract tables
+                        </label>
+                        <label class="config-item">
+                            <input type="checkbox" id="doSynonyms"> Extract synonyms
+                        </label>
+                        <label class="config-item">
+                            <input type="checkbox" id="doData"> Export data
+                        </label>
+                        <label class="config-item">
+                            <input type="checkbox" id="doObjectTypeSpec"> Extract object type specs
+                        </label>
+                        <label class="config-item">
+                            <input type="checkbox" id="doObjectTypeBody"> Extract object type bodies
+                        </label>
+                        <label class="config-item">
+                            <input type="checkbox" id="doPackageSpec"> Extract package specs
+                        </label>
+                        <label class="config-item">
+                            <input type="checkbox" id="doPackageBody"> Extract package bodies
+                        </label>
+                        <label class="config-item">
+                            <input type="checkbox" id="doViewSignature"> Extract view signatures
+                        </label>
+                        <label class="config-item">
+                            <input type="checkbox" id="doViewDdl"> Extract view DDL
+                        </label>
+                        <label class="config-item">
+                            <input type="checkbox" id="doWriteRestControllers"> Generate REST controllers
+                        </label>
+                        <label class="config-item">
+                            <input type="checkbox" id="doWritePostgreFiles"> Write PostgreSQL files
+                        </label>
+                        <label class="config-item">
+                            <input type="checkbox" id="doExecutePostgreFiles"> Execute PostgreSQL files
+                        </label>
+                        <label class="config-item">
+                            <input type="checkbox" id="doRestControllerFunctions"> Generate function endpoints
+                        </label>
+                        <label class="config-item">
+                            <input type="checkbox" id="doRestControllerProcedures"> Generate procedure endpoints
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Connection & Path Settings -->
+                <div>
+                    <h3 style="margin-bottom: 1rem; color: #666; font-size: 1rem;">Connection & Path Settings</h3>
+                    <div style="display: grid; gap: 0.5rem;">
+                        <label class="config-item">
+                            <span>Oracle URL:</span>
+                            <input type="text" id="oracleUrl" placeholder="jdbc:oracle:thin:@server:1521:sid">
+                        </label>
+                        <label class="config-item">
+                            <span>Oracle User:</span>
+                            <input type="text" id="oracleUser" placeholder="username">
+                        </label>
+                        <label class="config-item">
+                            <span>Oracle Password:</span>
+                            <input type="password" id="oraclePassword" placeholder="password">
+                        </label>
+                        <label class="config-item">
+                            <span>PostgreSQL URL:</span>
+                            <input type="text" id="postgreUrl" placeholder="jdbc:postgresql://localhost:5432/postgres">
+                        </label>
+                        <label class="config-item">
+                            <span>PostgreSQL User:</span>
+                            <input type="text" id="postgreUsername" placeholder="postgres">
+                        </label>
+                        <label class="config-item">
+                            <span>PostgreSQL Password:</span>
+                            <input type="password" id="postgrePassword" placeholder="password">
+                        </label>
+                        <label class="config-item">
+                            <span>Java Package Name:</span>
+                            <input type="text" id="javaGeneratedPackageName" placeholder="com.sayiza.oracle2postgre.autogen">
+                        </label>
+                        <label class="config-item">
+                            <span>Target Project Root:</span>
+                            <input type="text" id="pathTargetProjectRoot" placeholder="../co-mig-target4">
+                        </label>
+                        <label class="config-item">
+                            <span>Java Path:</span>
+                            <input type="text" id="pathTargetProjectJava" placeholder="/src/main/java">
+                        </label>
+                        <label class="config-item">
+                            <span>Resources Path:</span>
+                            <input type="text" id="pathTargetProjectResources" placeholder="/src/main/resources">
+                        </label>
+                        <label class="config-item">
+                            <span>PostgreSQL Path:</span>
+                            <input type="text" id="pathTargetProjectPostgre" placeholder="/postgre/autoddl">
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div style="margin-top: 1.5rem; text-align: center; display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+                <button class="btn btn-primary" onclick="loadConfiguration()">Load Saved</button>
+                <button class="btn btn-primary" onclick="loadConfigurationFromServer()">Load from Server</button>
+                <button class="btn btn-success" onclick="saveConfiguration()">Save Configuration</button>
+                <button class="btn btn-warning" onclick="resetConfiguration()">Reset to Defaults</button>
+            </div>
+        </div>
+
+        <!-- Log Viewer -->
+        <div class="card log-viewer">
+            <h2>System Logs</h2>
+            <div class="log-controls">
+                <input type="text" class="log-filter" placeholder="Filter logs..." id="log-filter">
+                <button class="btn btn-primary" onclick="refreshLogs()">Refresh</button>
+                <button class="btn btn-primary" onclick="toggleAutoRefresh()">
+                    <span id="auto-refresh-text">Start Auto-Refresh</span>
+                </button>
+            </div>
+            <div class="log-content" id="log-content">
+                Loading logs...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let autoRefreshInterval = null;
+        let isAutoRefreshEnabled = false;
+        let lastKnownExecuteJobState = null;
+
+        // Initialize the dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            refreshSystemStatus();
+            refreshDataOverview();
+            refreshTargetStats();
+            refreshJobs();
+            refreshLogs();
+            loadConfiguration(); // Load current configuration on startup
+            
+            // Start periodic updates
+            setInterval(refreshSystemStatus, 10000); // Every 10 seconds
+            setInterval(refreshDataOverview, 15000); // Every 15 seconds
+            setInterval(refreshJobs, 4000); // Every 4 seconds
+            // Note: Target stats are only refreshed manually or when execute job completes
+        });
+
+        // API Functions
+        async function startJob(jobType) {
+            try {
+                const response = await fetch(`/migration/${jobType}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showNotification(`${jobType} job started successfully`, 'success');
+                    refreshJobs();
+                } else {
+                    showNotification(`Failed to start ${jobType} job: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showNotification(`Error starting ${jobType} job: ${error.message}`, 'error');
+            }
+        }
+
+        async function resetSystem() {
+            if (!confirm('Are you sure you want to reset the system? This will clear all extracted data.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/migration/reset', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showNotification('System reset successfully', 'success');
+                    refreshDataOverview();
+                    refreshJobs();
+                } else {
+                    showNotification(`Failed to reset system: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showNotification(`Error resetting system: ${error.message}`, 'error');
+            }
+        }
+
+        async function refreshSystemStatus() {
+            try {
+                const response = await fetch('/migration/health');
+                if (response.ok) {
+                    const health = await response.json();
+                    updateSystemStatus(health);
+                    updateServiceStatus(true);
+                } else {
+                    updateServiceStatus(false);
+                }
+            } catch (error) {
+                console.error('Error fetching health status:', error);
+                updateServiceStatus(false);
+                // Also update database statuses as disconnected when service is down
+                updateSystemStatus({
+                    oracle: { connected: false, error: 'Service unavailable' },
+                    postgres: { connected: false, error: 'Service unavailable' }
+                });
+            }
+        }
+
+        async function refreshDataOverview() {
+            try {
+                const response = await fetch('/migration/status');
+                if (response.ok) {
+                    const data = await response.json();
+                    updateDataOverview(data);
+                } else {
+                    // Reset data overview if service is unavailable
+                    updateDataOverview({});
+                }
+            } catch (error) {
+                console.error('Error fetching data overview:', error);
+                updateDataOverview({});
+            }
+        }
+
+        async function refreshJobs() {
+            try {
+                const response = await fetch('/migration/jobs');
+                if (response.ok) {
+                    const jobs = await response.json();
+                    updateJobsList(jobs);
+                    updateJobStatuses(jobs);
+                } else {
+                    // Clear jobs if service is unavailable
+                    updateJobsList([]);
+                    updateJobStatuses([]);
+                }
+            } catch (error) {
+                console.error('Error fetching jobs:', error);
+                updateJobsList([]);
+                updateJobStatuses([]);
+            }
+        }
+
+        async function refreshLogs() {
+            try {
+                const response = await fetch('/migration/logs');
+                if (response.ok) {
+                    const logs = await response.text();
+                    updateLogs(logs);
+                } else {
+                    document.getElementById('log-content').textContent = 'Service unavailable - cannot load logs';
+                }
+            } catch (error) {
+                console.error('Error fetching logs:', error);
+                document.getElementById('log-content').textContent = 'Service unavailable - cannot load logs';
+            }
+        }
+
+        async function refreshTargetStats() {
+            try {
+                const response = await fetch('/migration/target-stats');
+                if (response.ok) {
+                    const result = await response.json();
+                    updateTargetStats(result.stats, result.fetchedAt);
+                } else {
+                    // Reset target stats if service is unavailable  
+                    const errorResult = await response.json().catch(() => ({}));
+                    const errorMessage = errorResult.message || 'Service unavailable';
+                    updateTargetStats({}, 0, errorMessage);
+                }
+            } catch (error) {
+                console.error('Error fetching target stats:', error);
+                updateTargetStats({}, 0, 'Connection error');
+            }
+        }
+
+        // UI Update Functions
+        function updateSystemStatus(health) {
+            const oracleStatus = document.getElementById('oracle-status');
+            const postgresStatus = document.getElementById('postgres-status');
+            
+            if (health.oracle && health.oracle.connected) {
+                oracleStatus.className = 'status-item connected';
+                oracleStatus.lastElementChild.textContent = 'Connected';
+                oracleStatus.lastElementChild.style.color = '#4CAF50';
+            } else {
+                oracleStatus.className = 'status-item disconnected';
+                const errorMsg = health.oracle && health.oracle.error ? health.oracle.error : 'Disconnected';
+                oracleStatus.lastElementChild.textContent = errorMsg;
+                oracleStatus.lastElementChild.style.color = '#f44336';
+            }
+            
+            if (health.postgres && health.postgres.connected) {
+                postgresStatus.className = 'status-item connected';
+                postgresStatus.lastElementChild.textContent = 'Connected';
+                postgresStatus.lastElementChild.style.color = '#4CAF50';
+            } else {
+                postgresStatus.className = 'status-item disconnected';
+                const errorMsg = health.postgres && health.postgres.error ? health.postgres.error : 'Disconnected';
+                postgresStatus.lastElementChild.textContent = errorMsg;
+                postgresStatus.lastElementChild.style.color = '#f44336';
+            }
+        }
+
+        function updateServiceStatus(isOnline) {
+            const serviceStatus = document.getElementById('service-status');
+            
+            if (isOnline) {
+                serviceStatus.className = 'status-item connected';
+                serviceStatus.lastElementChild.textContent = 'Online';
+                serviceStatus.lastElementChild.style.color = '#4CAF50';
+            } else {
+                serviceStatus.className = 'status-item disconnected';
+                serviceStatus.lastElementChild.textContent = 'Offline';
+                serviceStatus.lastElementChild.style.color = '#f44336';
+            }
+        }
+
+        function updateDataOverview(data) {
+            // Extraction Phase Data
+            document.getElementById('schemas-count').textContent = data.schemas || 0;
+            document.getElementById('tables-count').textContent = data.tables || 0;
+            document.getElementById('views-count').textContent = data.views || 0;
+            document.getElementById('synonyms-count').textContent = data.synonyms || 0;
+            document.getElementById('objectTypeSpecs-count').textContent = data.objectTypeSpecs || 0;
+            document.getElementById('objectTypeBodies-count').textContent = data.objectTypeBodies || 0;
+            document.getElementById('packageSpecs-count').textContent = data.packageSpecs || 0;
+            document.getElementById('packageBodies-count').textContent = data.packageBodies || 0;
+            
+            // Parse AST Phase Data
+            document.getElementById('parsedViews-count').textContent = data.parsedViews || 0;
+            document.getElementById('parsedObjectTypes-count').textContent = data.parsedObjectTypes || 0;
+            document.getElementById('parsedPackages-count').textContent = data.parsedPackages || 0;
+            
+            // Row Count Data (format with commas for large numbers)
+            const totalRowCount = data.totalRowCount || 0;
+            document.getElementById('totalRowCount-count').textContent = totalRowCount.toLocaleString();
+        }
+
+        function updateTargetStats(stats, fetchedAt, errorMessage) {
+            // Update target database counts
+            document.getElementById('target-schemas-count').textContent = stats.schemas || 0;
+            document.getElementById('target-tables-count').textContent = stats.tables || 0;
+            document.getElementById('target-views-count').textContent = stats.views || 0;
+            document.getElementById('target-functions-count').textContent = stats.functions || 0;
+            document.getElementById('target-procedures-count').textContent = stats.procedures || 0;
+            document.getElementById('target-types-count').textContent = stats.types || 0;
+            
+            // Update target row count (format with commas for large numbers)
+            const targetTotalRowCount = stats.totalRowCount || 0;
+            document.getElementById('target-totalRowCount-count').textContent = targetTotalRowCount.toLocaleString();
+            
+            // Update last fetched timestamp
+            const lastUpdatedElement = document.getElementById('target-last-updated');
+            if (errorMessage) {
+                lastUpdatedElement.textContent = `Error: ${errorMessage}`;
+                lastUpdatedElement.style.color = '#f44336';
+            } else if (fetchedAt && fetchedAt > 0) {
+                const fetchTime = new Date(fetchedAt);
+                lastUpdatedElement.textContent = `Last fetched: ${fetchTime.toLocaleString()}`;
+                lastUpdatedElement.style.color = '#666';
+            } else {
+                lastUpdatedElement.textContent = 'Not fetched yet';
+                lastUpdatedElement.style.color = '#666';
+            }
+        }
+
+        function updateJobsList(jobs) {
+            const jobList = document.getElementById('job-list');
+            
+            // Convert jobs object to array if needed
+            const jobsArray = Array.isArray(jobs) ? jobs : Object.values(jobs);
+            
+            if (jobsArray.length === 0) {
+                jobList.innerHTML = '<div style="text-align: center; color: #666; padding: 2rem;">No active jobs</div>';
+                return;
+            }
+            
+            // Sort jobs by startedAt in descending order (newest first)
+            const sortedJobs = jobsArray.sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt));
+            
+            jobList.innerHTML = sortedJobs.map(job => {
+                const progressHtml = renderJobProgress(job);
+                return `
+                    <div class="job-item">
+                        <div class="job-info">
+                            <div class="job-type">
+                                <span class="status-indicator status-${job.state.toLowerCase()}"></span>
+                                ${job.jobType.toUpperCase()} Job
+                            </div>
+                            <div class="job-time">
+                                Started: ${new Date(job.startedAt).toLocaleString()}
+                                ${job.completedAt ? `| Completed: ${new Date(job.completedAt).toLocaleString()}` : ''}
+                            </div>
+                            ${progressHtml}
+                            ${job.message ? `<div style="font-size: 0.8rem; color: #666; margin-top: 0.2rem;">${job.message}</div>` : ''}
+                            ${job.error ? `<div class="error-message">${job.error}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderJobProgress(job) {
+            // Only show progress for running jobs or jobs with progress information
+            if (job.state !== 'RUNNING' && !job.overallProgress && !job.currentStep) {
+                return '';
+            }
+
+            const overallProgress = job.overallProgressPercentage || job.overallProgress * 100 || 0;
+            const stepProgress = job.stepProgressPercentage || job.stepProgress * 100 || 0;
+            const currentStep = job.currentStep || '';
+            const currentStepNumber = job.currentStepNumber || 0;
+            const totalSteps = job.totalSteps || 6;
+            const subStepDetails = job.subStepDetails || '';
+            const estimatedCompletion = job.estimatedCompletionTime;
+
+            // Determine progress bar style based on job state
+            let progressFillClass = 'progress-fill';
+            if (job.state === 'COMPLETED') {
+                progressFillClass += ' completed';
+            } else if (job.state === 'FAILED') {
+                progressFillClass += ' failed';
+            }
+
+            // Format estimated completion time
+            let etaText = '';
+            if (estimatedCompletion && job.state === 'RUNNING') {
+                const eta = new Date(estimatedCompletion);
+                const now = new Date();
+                if (eta > now) {
+                    const diffMinutes = Math.round((eta - now) / (1000 * 60));
+                    if (diffMinutes > 0) {
+                        etaText = `<span class="progress-eta">ETA: ${diffMinutes}min</span>`;
+                    }
+                }
+            }
+
+            return `
+                <div class="progress-container">
+                    <div class="progress-bar">
+                        <div class="${progressFillClass}" style="width: ${Math.max(0, Math.min(100, overallProgress))}%"></div>
+                    </div>
+                    <div class="progress-text">
+                        <span>Overall: ${Math.round(overallProgress)}%</span>
+                        ${etaText}
+                    </div>
+                    ${currentStep ? `
+                        <div class="progress-step">
+                            Step ${currentStepNumber}/${totalSteps}: ${currentStep} (${Math.round(stepProgress)}%)
+                        </div>
+                    ` : ''}
+                    ${subStepDetails ? `
+                        <div class="progress-step" style="color: #aaa; font-size: 0.7rem;">
+                            ${subStepDetails}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        function updateJobStatuses(jobs) {
+            // Convert jobs object to array if needed
+            const jobsArray = Array.isArray(jobs) ? jobs : Object.values(jobs);
+            
+            // Reset only job button indicators (not system health items)
+            const jobIndicators = ['extract-status', 'parse-status', 'export-status', 'execute-pre-status', 'execute-post-status', 'full-status'];
+            jobIndicators.forEach(indicatorId => {
+                const indicator = document.getElementById(indicatorId);
+                if (indicator) {
+                    indicator.className = 'status-indicator status-idle';
+                }
+            });
+            
+            // Track execute job state changes
+            let currentExecuteJob = null;
+            
+            // Update based on current jobs
+            jobsArray.forEach(job => {
+                const indicator = document.getElementById(`${job.jobType}-status`);
+                if (indicator && jobIndicators.includes(`${job.jobType}-status`)) {
+                    indicator.className = `status-indicator status-${job.state.toLowerCase()}`;
+                }
+                
+                // Track execute and full migration jobs for target stats refresh
+                if (job.jobType === 'execute-pre' || job.jobType === 'execute-post' || job.jobType === 'full') {
+                    currentExecuteJob = job;
+                }
+            });
+            
+            // Check if execute job just completed successfully
+            if (currentExecuteJob && 
+                currentExecuteJob.state === 'COMPLETED' && 
+                lastKnownExecuteJobState !== 'COMPLETED') {
+                
+                console.log('Execute job completed, refreshing target database stats');
+                refreshTargetStats();
+                showNotification('Execute job completed - target database stats refreshed', 'success');
+            }
+            
+            // Update the last known state
+            if (currentExecuteJob) {
+                lastKnownExecuteJobState = currentExecuteJob.state;
+            } else {
+                lastKnownExecuteJobState = null;
+            }
+        }
+
+        function updateLogs(logs) {
+            const logContent = document.getElementById('log-content');
+            const filter = document.getElementById('log-filter').value.toLowerCase();
+            
+            if (filter) {
+                const filteredLogs = logs.split('\n')
+                    .filter(line => line.toLowerCase().includes(filter))
+                    .join('\n');
+                logContent.textContent = filteredLogs || 'No matching log entries';
+            } else {
+                logContent.textContent = logs || 'No logs available';
+            }
+            
+            // Auto-scroll to bottom
+            logContent.scrollTop = logContent.scrollHeight;
+        }
+
+        function toggleAutoRefresh() {
+            const button = document.getElementById('auto-refresh-text');
+            
+            if (isAutoRefreshEnabled) {
+                clearInterval(autoRefreshInterval);
+                button.textContent = 'Start Auto-Refresh';
+                isAutoRefreshEnabled = false;
+            } else {
+                autoRefreshInterval = setInterval(refreshLogs, 3000); // Every 3 seconds
+                button.textContent = 'Stop Auto-Refresh';
+                isAutoRefreshEnabled = true;
+            }
+        }
+
+        function showNotification(message, type) {
+            // Simple notification system
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 1rem 1.5rem;
+                border-radius: 6px;
+                color: white;
+                font-weight: 500;
+                z-index: 1000;
+                animation: slideIn 0.3s ease;
+                max-width: 400px;
+                background: ${type === 'success' ? '#4CAF50' : '#f44336'};
+            `;
+            
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => document.body.removeChild(notification), 300);
+            }, 5000);
+        }
+
+        // Add CSS for notifications
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes slideOut {
+                from { transform: translateX(0); opacity: 1; }
+                to { transform: translateX(100%); opacity: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Log filter functionality
+        document.getElementById('log-filter').addEventListener('input', function() {
+            refreshLogs();
+        });
+
+        // Configuration Functions
+        async function loadConfiguration() {
+            try {
+                // First, try to load from localStorage
+                const localConfig = localStorage.getItem('migrationConfig');
+                if (localConfig) {
+                    try {
+                        const parsedLocalConfig = JSON.parse(localConfig);
+                        console.log('Loading configuration from localStorage');
+                        populateConfigurationForm(parsedLocalConfig);
+                        
+                        // Sync localStorage config to server to ensure consistency
+                        console.log('Syncing localStorage config to server');
+                        await syncConfigToServer(parsedLocalConfig);
+
+                        refreshSystemStatus();
+                        refreshTargetStats();
+
+                        showNotification('Configuration loaded from local storage and synced to server', 'success');
+                        return;
+                    } catch (e) {
+                        console.warn('Failed to parse localStorage config, falling back to server config');
+                        localStorage.removeItem('migrationConfig');
+                    }
+                }
+                
+                // Fallback to server configuration
+                const response = await fetch('/migration/config');
+                if (response.ok) {
+                    const config = await response.json();
+                    populateConfigurationForm(config);
+                    console.log('Loading configuration from server (fallback)');
+                } else {
+                    showNotification('Failed to load configuration from server', 'error');
+                }
+            } catch (error) {
+                console.error('Error loading configuration:', error);
+                showNotification('Error loading configuration: ' + error.message, 'error');
+            }
+        }
+
+        async function syncConfigToServer(config) {
+            try {
+                const response = await fetch('/migration/config', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(config)
+                });
+                
+                if (response.ok) {
+                    console.log('Successfully synced localStorage config to server');
+                } else {
+                    const result = await response.json();
+                    console.warn('Failed to sync config to server:', result.message);
+                }
+            } catch (error) {
+                console.warn('Error syncing config to server:', error.message);
+                // Don't throw error here as config loading should still work
+            }
+        }
+
+        async function saveConfiguration() {
+            try {
+                const config = getConfigurationFromForm();
+                
+                // Save to server
+                const response = await fetch('/migration/config', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(config)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    // Save to localStorage for persistence across restarts
+                    const fullConfig = result.config || config;
+                    localStorage.setItem('migrationConfig', JSON.stringify(fullConfig));
+                    
+                    showNotification('Configuration saved successfully (server + local storage)', 'success');
+                    // Refresh system health after configuration change
+                    refreshSystemStatus();
+                } else {
+                    showNotification('Failed to save configuration: ' + result.message, 'error');
+                }
+            } catch (error) {
+                console.error('Error saving configuration:', error);
+                showNotification('Error saving configuration: ' + error.message, 'error');
+            }
+        }
+
+        function resetConfiguration() {
+            if (confirm('Are you sure you want to reset configuration to defaults? This will clear local storage and reload server configuration.')) {
+                // Clear localStorage
+                localStorage.removeItem('migrationConfig');
+                
+                // Force load from server
+                loadConfigurationFromServer();
+                showNotification('Configuration reset to server values (local storage cleared)', 'success');
+            }
+        }
+
+        async function loadConfigurationFromServer() {
+            try {
+                const response = await fetch('/migration/config');
+                if (response.ok) {
+                    const config = await response.json();
+                    populateConfigurationForm(config);
+                    showNotification('Configuration loaded from server', 'success');
+                    console.log('Loading configuration from server (forced)');
+                } else {
+                    showNotification('Failed to load configuration from server', 'error');
+                }
+            } catch (error) {
+                console.error('Error loading configuration from server:', error);
+                showNotification('Error loading configuration: ' + error.message, 'error');
+            }
+        }
+
+        function populateConfigurationForm(config) {
+            // Process flags
+            document.getElementById('doAllSchemas').checked = config.doAllSchemas || false;
+            document.getElementById('doOnlyTestSchema').value = config.doOnlyTestSchema || '';
+            document.getElementById('doTable').checked = config.doTable || false;
+            document.getElementById('doSynonyms').checked = config.doSynonyms || false;
+            document.getElementById('doData').checked = config.doData || false;
+            document.getElementById('doObjectTypeSpec').checked = config.doObjectTypeSpec || false;
+            document.getElementById('doObjectTypeBody').checked = config.doObjectTypeBody || false;
+            document.getElementById('doPackageSpec').checked = config.doPackageSpec || false;
+            document.getElementById('doPackageBody').checked = config.doPackageBody || false;
+            document.getElementById('doViewSignature').checked = config.doViewSignature || false;
+            document.getElementById('doViewDdl').checked = config.doViewDdl || false;
+            document.getElementById('doWriteRestControllers').checked = config.doWriteRestControllers || false;
+            document.getElementById('doWritePostgreFiles').checked = config.doWritePostgreFiles || false;
+            document.getElementById('doExecutePostgreFiles').checked = config.doExecutePostgreFiles || false;
+            document.getElementById('doRestControllerFunctions').checked = config.doRestControllerFunctions || false;
+            document.getElementById('doRestControllerProcedures').checked = config.doRestControllerProcedures || false;
+            
+            // Connection settings
+            document.getElementById('oracleUrl').value = config.oracleUrl || '';
+            document.getElementById('oracleUser').value = config.oracleUser || '';
+            document.getElementById('oraclePassword').value = config.oraclePassword || '';
+            document.getElementById('postgreUrl').value = config.postgreUrl || '';
+            document.getElementById('postgreUsername').value = config.postgreUsername || '';
+            document.getElementById('postgrePassword').value = config.postgrePassword || '';
+            
+            // Path settings
+            document.getElementById('javaGeneratedPackageName').value = config.javaGeneratedPackageName || '';
+            document.getElementById('pathTargetProjectRoot').value = config.pathTargetProjectRoot || '';
+            document.getElementById('pathTargetProjectJava').value = config.pathTargetProjectJava || '';
+            document.getElementById('pathTargetProjectResources').value = config.pathTargetProjectResources || '';
+            document.getElementById('pathTargetProjectPostgre').value = config.pathTargetProjectPostgre || '';
+        }
+
+        function getConfigurationFromForm() {
+            return {
+                // Process flags
+                doAllSchemas: document.getElementById('doAllSchemas').checked,
+                doOnlyTestSchema: document.getElementById('doOnlyTestSchema').value.trim(),
+                doTable: document.getElementById('doTable').checked,
+                doSynonyms: document.getElementById('doSynonyms').checked,
+                doData: document.getElementById('doData').checked,
+                doObjectTypeSpec: document.getElementById('doObjectTypeSpec').checked,
+                doObjectTypeBody: document.getElementById('doObjectTypeBody').checked,
+                doPackageSpec: document.getElementById('doPackageSpec').checked,
+                doPackageBody: document.getElementById('doPackageBody').checked,
+                doViewSignature: document.getElementById('doViewSignature').checked,
+                doViewDdl: document.getElementById('doViewDdl').checked,
+                doWriteRestControllers: document.getElementById('doWriteRestControllers').checked,
+                doWritePostgreFiles: document.getElementById('doWritePostgreFiles').checked,
+                doExecutePostgreFiles: document.getElementById('doExecutePostgreFiles').checked,
+                doRestControllerFunctions: document.getElementById('doRestControllerFunctions').checked,
+                doRestControllerProcedures: document.getElementById('doRestControllerProcedures').checked,
+                
+                // Connection settings - only include if not empty to avoid overriding with blank values
+                ...(document.getElementById('oracleUrl').value.trim() && { oracleUrl: document.getElementById('oracleUrl').value.trim() }),
+                ...(document.getElementById('oracleUser').value.trim() && { oracleUser: document.getElementById('oracleUser').value.trim() }),
+                ...(document.getElementById('oraclePassword').value.trim() && { oraclePassword: document.getElementById('oraclePassword').value.trim() }),
+                ...(document.getElementById('postgreUrl').value.trim() && { postgreUrl: document.getElementById('postgreUrl').value.trim() }),
+                ...(document.getElementById('postgreUsername').value.trim() && { postgreUsername: document.getElementById('postgreUsername').value.trim() }),
+                ...(document.getElementById('postgrePassword').value.trim() && { postgrePassword: document.getElementById('postgrePassword').value.trim() }),
+                
+                // Path settings - only include if not empty
+                ...(document.getElementById('javaGeneratedPackageName').value.trim() && { javaGeneratedPackageName: document.getElementById('javaGeneratedPackageName').value.trim() }),
+                ...(document.getElementById('pathTargetProjectRoot').value.trim() && { pathTargetProjectRoot: document.getElementById('pathTargetProjectRoot').value.trim() }),
+                ...(document.getElementById('pathTargetProjectJava').value.trim() && { pathTargetProjectJava: document.getElementById('pathTargetProjectJava').value.trim() }),
+                ...(document.getElementById('pathTargetProjectResources').value.trim() && { pathTargetProjectResources: document.getElementById('pathTargetProjectResources').value.trim() }),
+                ...(document.getElementById('pathTargetProjectPostgre').value.trim() && { pathTargetProjectPostgre: document.getElementById('pathTargetProjectPostgre').value.trim() })
+            };
+        }
+    </script>
+</body>
+</html>
