@@ -5,6 +5,7 @@ import com.sayiza.oracle2postgre.global.Config;
 import com.sayiza.oracle2postgre.oracledb.ObjectTypeExtractor;
 import com.sayiza.oracle2postgre.oracledb.PackageExtractor;
 import com.sayiza.oracle2postgre.oracledb.RowCountExtractor;
+import com.sayiza.oracle2postgre.oracledb.RowCountConfig;
 import com.sayiza.oracle2postgre.oracledb.SchemaExtractor;
 import com.sayiza.oracle2postgre.oracledb.SynonymExtractor;
 import com.sayiza.oracle2postgre.oracledb.TableExtractor;
@@ -72,6 +73,9 @@ public class Main {
   
   @Inject
   ConfigurationService configurationService;
+  
+  @Inject
+  RowCountConfig rowCountConfig;
   
   @Inject
   PostgresStatsService postgresStatsService;
@@ -690,7 +694,7 @@ public class Main {
       
       // Calculate total row count for the extracted schemas
       log.info("Calculating total row count for extracted schemas");
-      long totalRowCount = RowCountExtractor.calculateTotalRowCount(conn, doAllSchema, data.getUserNames());
+      long totalRowCount = RowCountExtractor.calculateTotalRowCount(conn, doAllSchema, data.getUserNames(), rowCountConfig);
       data.setTotalRowCount(totalRowCount);
       
       // Debug logging for extracted data
@@ -793,7 +797,7 @@ public class Main {
       // Sub-step 9: Calculate total row counts
       progressService.updateSubStepProgress(jobId, MigrationStep.EXTRACT, completedSubSteps, "Calculating total row count");
       log.info("Calculating total row count for extracted schemas");
-      long totalRowCount = RowCountExtractor.calculateTotalRowCount(conn, doAllSchema, data.getUserNames());
+      long totalRowCount = RowCountExtractor.calculateTotalRowCount(conn, doAllSchema, data.getUserNames(), rowCountConfig);
       data.setTotalRowCount(totalRowCount);
       completedSubSteps++;
       

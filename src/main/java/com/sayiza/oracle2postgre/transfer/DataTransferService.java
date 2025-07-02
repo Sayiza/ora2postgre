@@ -3,6 +3,8 @@ package com.sayiza.oracle2postgre.transfer;
 import com.sayiza.oracle2postgre.global.Everything;
 import com.sayiza.oracle2postgre.global.Config;
 import com.sayiza.oracle2postgre.oracledb.TableMetadata;
+import com.sayiza.oracle2postgre.oracledb.RowCountConfig;
+import com.sayiza.oracle2postgre.oracledb.SamplingRowCounter;
 import com.sayiza.oracle2postgre.transfer.strategy.ObjectTypeMappingStrategy;
 import com.sayiza.oracle2postgre.transfer.strategy.StreamingCsvStrategy;
 import com.sayiza.oracle2postgre.transfer.strategy.TransferStrategy;
@@ -227,11 +229,128 @@ public class DataTransferService {
     }
     
     private long estimateTotalRows(List<TableMetadata> tables) {
-        // For now, return a basic estimate TODO !
-        // In the future, this could query Oracle statistics or use actual row counts
-        return tables.size() * 1000L; // Rough estimate: 1000 rows per table
+        return estimateTotalRows(tables, null, null);
     }
     
+    /**
+     * Estimates total rows using improved logic based on table metadata and optional configuration.
+     * 
+     * @param tables list of tables to estimate
+     * @param conn Oracle database connection (optional, for more accurate estimates)
+     * @param config row count configuration (optional)
+     * @return estimated total row count
+     */
+    private long estimateTotalRows(List<TableMetadata> tables, Connection conn, RowCountConfig config) {
+        if (tables.isEmpty()) {
+            return 0;
+        }
+        
+        long totalEstimate = 0;
+        
+        for (TableMetadata table : tables) {
+            long tableEstimate = estimateTableRows(table, conn, config);
+            totalEstimate += tableEstimate;
+            
+            log.debug("Estimated rows for {}.{}: {}", table.getSchema(), table.getTableName(), tableEstimate);
+        }
+        
+        log.info("Total estimated rows for {} tables: {}", tables.size(), totalEstimate);
+        return totalEstimate;
+    }
+    
+    /**
+     * Estimates row count for a single table using available metadata and optional database connection.
+     */
+    private long estimateTableRows(TableMetadata table, Connection conn, RowCountConfig config) {
+        try {
+            // Try to use actual row counting if connection is available
+            if (conn != null && config != null) {
+                switch (config.method()) {
+                    case EXACT_COUNT:
+                        return SamplingRowCounter.getExactRowCount(conn, table.getSchema(), table.getTableName());
+                    case SAMPLING:
+                        return SamplingRowCounter.estimateRowCountBySampling(conn, table.getSchema(), table.getTableName(), config.samplingPercentage());
+                    case HYBRID:
+                        // For individual tables in transfer, use sampling for large tables
+                        long segmentEstimate = SamplingRowCounter.estimateRowCountBySegmentSize(conn, table.getSchema(), table.getTableName());
+                        if (segmentEstimate > config.samplingThreshold()) {
+                            return SamplingRowCounter.estimateRowCountBySampling(conn, table.getSchema(), table.getTableName(), config.samplingPercentage());
+                        } else {
+                            return SamplingRowCounter.getExactRowCount(conn, table.getSchema(), table.getTableName());
+                        }
+                    default:
+                        // Fall through to heuristic estimation
+                        break;
+                }
+            }
+            
+            // Fallback to heuristic estimation based on table characteristics
+            return estimateTableRowsHeuristic(table);
+            
+        } catch (Exception e) {
+            log.warn("Failed to estimate row count for {}.{}: {}", table.getSchema(), table.getTableName(), e.getMessage());
+            return estimateTableRowsHeuristic(table);
+        }
+    }
+    
+    /**
+     * Estimates table rows using heuristic approach based on table metadata.
+     */
+    private long estimateTableRowsHeuristic(TableMetadata table) {
+        // Use table name patterns to make educated guesses
+        String tableName = table.getTableName().toLowerCase();
+        
+        // Configuration/reference tables - typically small
+        if (tableName.contains("config") || tableName.contains("setting") || 
+            tableName.contains("lookup") || tableName.contains("ref") ||
+            tableName.startsWith("cfg_") || tableName.endsWith("_config")) {
+            return 100;
+        }
+        
+        // Log/audit tables - typically large
+        if (tableName.contains("log") || tableName.contains("audit") || 
+            tableName.contains("history") || tableName.contains("trace") ||
+            tableName.startsWith("log_") || tableName.endsWith("_log") ||
+            tableName.endsWith("_audit") || tableName.endsWith("_history")) {
+            return 100000;
+        }
+        
+        // Transaction/data tables - medium to large
+        if (tableName.contains("transaction") || tableName.contains("order") ||
+            tableName.contains("payment") || tableName.contains("invoice") ||
+            tableName.contains("data") || tableName.startsWith("t_")) {
+            return 10000;
+        }
+        
+        // User/customer tables - medium size
+        if (tableName.contains("user") || tableName.contains("customer") ||
+            tableName.contains("account") || tableName.contains("person")) {
+            return 5000;
+        }
+        
+        // Junction/mapping tables - small to medium
+        if (tableName.contains("_") && (tableName.contains("map") || 
+            tableName.matches(".*_[a-z]+_[a-z]+.*"))) { // Pattern like table_other_mapping
+            return 1000;
+        }
+        
+        // Default estimate for unknown tables
+        return 2000;
+    }
+    
+    /**
+     * Updates the row estimation method to use improved logic with database connection.
+     * 
+     * @param tables list of tables
+     * @param conn Oracle database connection
+     * @param config row count configuration
+     * @return improved row count estimate
+     * @deprecated This method name is misleading, use estimateTotalRows instead
+     */
+    @Deprecated
+    public long estimateTotalRowsWithConnection(List<TableMetadata> tables, Connection conn, RowCountConfig config) {
+        return estimateTotalRows(tables, conn, config);
+    }
     
     /**
      * Container class for data transfer results and progress information.
