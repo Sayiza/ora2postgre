@@ -8,10 +8,10 @@ This is an Oracle-to-PostgreSQL migration tool that extracts, parses, and transp
 
 1. **PL/SQL to PostgreSQL transpilation** - Business logic transformation for functions, procedures, and views
 2. **REST controller generation** - Minimal JAX-RS endpoints that call PostgreSQL functions directly
-3. **Dynamic SQL transformation service** - Runtime transpilation for DBMS_SQL.PARSE calls
-4. **AI-based CoFramework to Angular transformation** (future)
-5. **AI-based backend transformation** (future)  
-6. **Table/data migration** using external tools like AWS Schema Migrator
+3. **High-performance data transfer system** - Hybrid CSV/SQL approach with progress tracking
+4. **Dynamic SQL transformation service** - Runtime transpilation for DBMS_SQL.PARSE calls
+5. **AI-based CoFramework to Angular transformation** (future)
+6. **AI-based backend transformation** (future)
 
 ## Architecture Philosophy
 
@@ -75,9 +75,12 @@ docker rm -f pgtest; docker run --name pgtest -e POSTGRES_PASSWORD=secret -p 543
 - `POST /migration/extract` - Extract Oracle database metadata
 - `POST /migration/parse` - Parse PL/SQL into AST
 - `POST /migration/export` - Generate PostgreSQL and REST code
-- `POST /migration/execute` - Execute PostgreSQL DDL
+- `POST /migration/execute-pre` - Execute pre-transfer SQL (schema & tables)
+- `POST /migration/execute-post` - Execute post-transfer SQL (constraints & objects)
+- `POST /migration/transferdata` - Transfer table data Oracle → PostgreSQL
 - `POST /migration/full` - Run complete migration pipeline
-- `GET /migration/status/{jobId}` - Check migration job status
+- `GET /migration/status` - Get migration status & statistics
+- `GET /migration/jobs/{jobId}` - Check migration job status
 
 ### Key Architectural Patterns
 
@@ -106,7 +109,9 @@ docker rm -f pgtest; docker run --name pgtest -e POSTGRES_PASSWORD=secret -p 543
 3. **AST Generation** - Parse PL/SQL using ANTLR grammar
 4. **Dependency Resolution** - Build object dependency trees
 5. **Code Generation** - Export PostgreSQL DDL and minimal REST controllers
-6. **SQL Execution** - Apply generated PostgreSQL scripts
+6. **Pre-Transfer SQL Execution** - Create schemas, tables, functions
+7. **Data Transfer** - High-performance Oracle to PostgreSQL data migration
+8. **Post-Transfer SQL Execution** - Apply constraints, indexes, views
 
 ## REST API Processing Pipeline
 
@@ -115,8 +120,10 @@ When called via REST endpoints, the migration follows this flow:
 1. **POST /migration/extract** → Schema and PL/SQL extraction from Oracle
 2. **POST /migration/parse** → ANTLR parsing into AST representations
 3. **POST /migration/export** → Generate PostgreSQL functions + REST controllers
-4. **POST /migration/execute** → Execute PostgreSQL DDL to create functions
-5. **POST /migration/full** → Run all steps in sequence
+4. **POST /migration/execute-pre** → Execute pre-transfer SQL (schema & tables)
+5. **POST /migration/transferdata** → Transfer table data with progress tracking
+6. **POST /migration/execute-post** → Execute post-transfer SQL (constraints & objects)
+7. **POST /migration/full** → Run all steps in sequence
 
 Each step can be called independently or as part of the full pipeline.
 
@@ -129,6 +136,7 @@ The project uses feature flags in `application.properties` to control processing
 - `do.parse=true` - Enable AST parsing
 - `do.write-postgre-files=true` - Generate PostgreSQL DDL
 - `do.execute-postgre-files=true` - Execute generated PostgreSQL scripts
+- `do.data=true` - Enable data transfer (uses new DataTransferService)
 
 ### REST Controller Generation (NEW)
 - `do.write-rest-controllers=true` - Generate REST controllers
@@ -178,10 +186,21 @@ The project uses feature flags in `application.properties` to control processing
 - REST controllers call PostgreSQL functions via JDBC
 - Eliminated code duplication between Java and PostgreSQL
 
-**🚧 Phase 5 - Runtime SQL Transformation** (PLANNED):
+**✅ Phase 5 - Data Transfer System** (COMPLETED):
+- High-performance data transfer with hybrid CSV/SQL strategies
+- Real-time progress tracking and monitoring
+- Memory-efficient streaming for large datasets
+- Strategy pattern for extensible transfer methods
+
+**🚧 Phase 6 - Object Type Special Cases** (IN PROGRESS):
+- Oracle object type to PostgreSQL JSON/JSONB conversion
+- Integration with existing AST infrastructure
+- Enhanced data type mapping for complex structures
+
+**📋 Phase 7 - Runtime SQL Transformation** (PLANNED):
 - POST /transform/sql endpoint for dynamic SQL transformation
 - Uses full Everything context for synonym/schema resolution
-- Target for external applications to call com runtime
+- Target for external applications to call at runtime
 
 ### Current Run Commands
 ```bash
@@ -242,3 +261,52 @@ Oracle functions become PostgreSQL functions with this naming pattern:
 
 **Tests**:
 - `RestControllerGeneratorTest.java` - Demonstrates generated controller output
+
+## Data Transfer System Status
+
+### Current Implementation: High-Performance Data Migration ✅
+
+**Completed Features (Phases 1-3)**:
+- ✅ **Hybrid Transfer Strategy**: CSV streaming for simple tables, SQL generation for complex tables
+- ✅ **Memory-Efficient Processing**: Constant memory usage regardless of table size
+- ✅ **Real-Time Progress Tracking**: Table-level and session-level monitoring
+- ✅ **Intelligent Strategy Selection**: Automatic detection of optimal transfer method
+- ✅ **Complex Data Type Support**: CLOB, BLOB, RAW, timestamps handled properly
+- ✅ **Integration with REST API**: `/migration/transferdata` endpoint with job tracking
+
+**Current Architecture**:
+```
+DataTransferService (Orchestrator)
+├── TableAnalyzer → Strategy Selection
+├── StreamingCsvStrategy → PostgreSQL COPY FROM (simple tables)
+├── SQL Generation Fallback → Complex data types
+├── TransferProgress → Real-time monitoring
+└── TransferResult → Detailed reporting
+```
+
+**Current Focus: Phase 4 - Object Type Special Cases** 🚧
+- **Goal**: Handle Oracle Object Types using existing AST infrastructure
+- **Approach**: Convert Oracle objects to PostgreSQL JSON/JSONB format
+- **Integration**: Leverage `Everything.getObjectTypeSpecAst()` for type definitions
+- **Status**: Ready for implementation
+
+**Implementation Path**:
+1. Enhance TableAnalyzer to detect Oracle object types in table columns
+2. Create ObjectTypeMappingStrategy for tables with user-defined object types
+3. Implement ObjectTypeMapper for Oracle object → JSON conversion
+4. Generate appropriate PostgreSQL DDL with JSONB columns
+
+**Configuration**:
+```properties
+# Data transfer settings
+data.transfer.batch.size=10000
+data.transfer.fetch.size=5000
+data.transfer.strategy.fallback=true
+```
+
+**Key Classes**:
+- `DataTransferService.java` - Main orchestrator
+- `TableAnalyzer.java` - Strategy selection logic
+- `StreamingCsvStrategy.java` - High-performance CSV transfer
+- `TransferProgress.java` - Progress tracking
+- `TransferResult.java` - Results and metrics
