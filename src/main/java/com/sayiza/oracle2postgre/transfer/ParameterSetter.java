@@ -82,6 +82,12 @@ public class ParameterSetter {
                     setAnydataParameter(stmt, paramIndex, rs, columnName);
                     break;
                     
+                // Oracle AQ JMS message types - convert to JSONB
+                case "AQ$_JMS_TEXT_MESSAGE":
+                case "SYS.AQ$_JMS_TEXT_MESSAGE":
+                    setAqJmsMessageParameter(stmt, paramIndex, rs, columnName);
+                    break;
+                    
                 // Extended timestamp types
                 case "TIMESTAMP WITH TIME ZONE":
                 case "TIMESTAMP WITH LOCAL TIME ZONE":
@@ -100,6 +106,8 @@ public class ParameterSetter {
                         setTimestampWithTimeZoneParameter(stmt, paramIndex, rs, columnName);
                     } else if (oracleDataType.startsWith("INTERVAL")) {
                         setIntervalParameter(stmt, paramIndex, rs, columnName);
+                    } else if (oracleDataType.contains("AQ$_JMS_TEXT_MESSAGE")) {
+                        setAqJmsMessageParameter(stmt, paramIndex, rs, columnName);
                     } else {
                         // Handle primitive types and unknown types
                         setPrimitiveParameter(stmt, paramIndex, rs, column, oracleDataType);
@@ -210,6 +218,27 @@ public class ParameterSetter {
             
         } catch (Exception e) {
             throw new SQLException("Failed to convert ANYDATA for column " + columnName, e);
+        }
+    }
+    
+    /**
+     * Sets an AQ$_JMS_TEXT_MESSAGE parameter by converting to JSONB.
+     */
+    private static void setAqJmsMessageParameter(PreparedStatement stmt, int paramIndex, 
+                                               ResultSet rs, String columnName) throws SQLException {
+        try {
+            // Use AqJmsMessageConverter to convert AQ message to JSON
+            String jsonValue = AqJmsMessageConverter.convertToJson(rs, columnName);
+            
+            if (jsonValue != null) {
+                // Set as JSONB parameter (requires PostgreSQL JDBC driver support)
+                stmt.setObject(paramIndex, jsonValue, Types.OTHER);
+            } else {
+                stmt.setNull(paramIndex, Types.OTHER);
+            }
+            
+        } catch (Exception e) {
+            throw new SQLException("Failed to convert AQ JMS message for column " + columnName, e);
         }
     }
     

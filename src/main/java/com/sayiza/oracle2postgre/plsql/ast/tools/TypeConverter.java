@@ -164,6 +164,10 @@ public class TypeConverter {
       case "anydata":
         return "jsonb";
 
+      case "aq$_jms_text_message":
+      case "sys.aq$_jms_text_message":
+        return "jsonb";
+
       case "sdo_geometry":
         return "geometry";
 

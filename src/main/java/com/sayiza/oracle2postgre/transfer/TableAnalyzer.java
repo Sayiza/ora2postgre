@@ -27,7 +27,8 @@ public class TableAnalyzer {
         "CLOB", "NCLOB", "BLOB", "RAW", "LONG RAW", "BFILE",
         "TIMESTAMP WITH TIME ZONE", "TIMESTAMP WITH LOCAL TIME ZONE",
         "INTERVAL YEAR TO MONTH", "INTERVAL DAY TO SECOND",
-        "XMLTYPE", "ANYDATA", "ANYTYPE", "URITYPE"
+        "XMLTYPE", "ANYDATA", "ANYTYPE", "URITYPE",
+        "AQ$_JMS_TEXT_MESSAGE", "SYS.AQ$_JMS_TEXT_MESSAGE"
     );
     
     /**
@@ -151,6 +152,66 @@ public class TableAnalyzer {
         }
         
         return count;
+    }
+    
+    /**
+     * Checks if a table contains any AQ$_JMS_TEXT_MESSAGE columns.
+     * These columns require special JSON conversion handling.
+     * 
+     * @param table The table metadata to analyze
+     * @return true if the table contains any AQ JMS message columns
+     */
+    public static boolean hasAqJmsMessageColumns(TableMetadata table) {
+        if (table.getColumns() == null || table.getColumns().isEmpty()) {
+            return false;
+        }
+        
+        for (ColumnMetadata column : table.getColumns()) {
+            String dataType = NameNormalizer.normalizeDataType(column.getDataType());
+            if (isAqJmsMessageType(dataType)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Counts the number of AQ$_JMS_TEXT_MESSAGE columns in a table.
+     * Useful for estimating the complexity of the migration process.
+     * 
+     * @param table The table metadata to analyze
+     * @return The number of AQ JMS message columns found
+     */
+    public static int countAqJmsMessageColumns(TableMetadata table) {
+        if (table.getColumns() == null || table.getColumns().isEmpty()) {
+            return 0;
+        }
+        
+        int count = 0;
+        for (ColumnMetadata column : table.getColumns()) {
+            String dataType = NameNormalizer.normalizeDataType(column.getDataType());
+            if (isAqJmsMessageType(dataType)) {
+                count++;
+            }
+        }
+        
+        return count;
+    }
+    
+    /**
+     * Checks if a data type is an AQ JMS message type.
+     * 
+     * @param dataType The data type to check
+     * @return true if it's an AQ JMS message type
+     */
+    private static boolean isAqJmsMessageType(String dataType) {
+        if (dataType == null) return false;
+        
+        String normalized = dataType.toUpperCase().trim();
+        return normalized.equals("AQ$_JMS_TEXT_MESSAGE") || 
+               normalized.equals("SYS.AQ$_JMS_TEXT_MESSAGE") ||
+               normalized.contains("AQ$_JMS_TEXT_MESSAGE");
     }
     
     /**
