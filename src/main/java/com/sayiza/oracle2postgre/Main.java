@@ -44,6 +44,14 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
+import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
+import org.eclipse.microprofile.openapi.annotations.tags.Tag;
+import org.eclipse.microprofile.openapi.annotations.media.Content;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -58,6 +66,7 @@ import java.util.Arrays;
 
 @Path("/migration")
 @ApplicationScoped
+@Tag(name = "Migration", description = "Oracle to PostgreSQL database migration operations")
 public class Main {
 
   private static final Logger log = LoggerFactory.getLogger(Main.class);
@@ -86,6 +95,14 @@ public class Main {
   @POST
   @Path("/extract")
   @Produces(MediaType.APPLICATION_JSON)
+  @Operation(
+    summary = "Extract Oracle Database Metadata",
+    description = "Phase 1: Connects to Oracle database and extracts comprehensive metadata including schemas, tables, views, synonyms, PL/SQL code, and row count statistics. This is the first step in the migration pipeline."
+  )
+  @APIResponses({
+    @APIResponse(responseCode = "202", description = "Extraction job started successfully"),
+    @APIResponse(responseCode = "409", description = "Another extraction job is already running")
+  })
   public Response extractData() {
     log.info("Extract data endpoint called");
     
@@ -119,6 +136,14 @@ public class Main {
   @POST
   @Path("/parse")
   @Produces(MediaType.APPLICATION_JSON)
+  @Operation(
+    summary = "Parse PL/SQL Code to AST",
+    description = "Phase 2: Processes extracted PL/SQL source code using ANTLR4 grammar to generate Abstract Syntax Trees for accurate code transformation. Requires successful extraction first."
+  )
+  @APIResponses({
+    @APIResponse(responseCode = "202", description = "Parsing job started successfully"),
+    @APIResponse(responseCode = "409", description = "Another parsing job is already running")
+  })
   public Response parseData() {
     if (jobManager.isJobRunning("parse")) {
       Map<String, String> error = new HashMap<>();
@@ -145,6 +170,14 @@ public class Main {
   @POST
   @Path("/export")
   @Produces(MediaType.APPLICATION_JSON)
+  @Operation(
+    summary = "Generate PostgreSQL Code & REST Controllers",
+    description = "Phase 3: Transforms parsed AST into PostgreSQL functions and minimal JAX-RS REST controllers using PostgreSQL-first architecture. Business logic stays in PostgreSQL, REST controllers are thin API proxies."
+  )
+  @APIResponses({
+    @APIResponse(responseCode = "202", description = "Code generation job started successfully"),
+    @APIResponse(responseCode = "409", description = "Another export job is already running")
+  })
   public Response exportFiles() {
     if (jobManager.isJobRunning("export")) {
       Map<String, String> error = new HashMap<>();
@@ -171,6 +204,14 @@ public class Main {
   @POST
   @Path("/execute-pre")
   @Produces(MediaType.APPLICATION_JSON)
+  @Operation(
+    summary = "Execute Pre-Transfer SQL (Schema & Tables)",
+    description = "Phase 4A: Executes generated PostgreSQL DDL to create schemas, tables, functions, and basic constraints. Prepares database structure for data transfer."
+  )
+  @APIResponses({
+    @APIResponse(responseCode = "202", description = "Pre-transfer execution started successfully"),
+    @APIResponse(responseCode = "409", description = "Another pre-transfer execution is running")
+  })
   public Response executePreTransferSQL() {
     if (jobManager.isJobRunning("execute-pre")) {
       Map<String, String> error = new HashMap<>();
@@ -197,6 +238,14 @@ public class Main {
   @POST
   @Path("/execute-post")
   @Produces(MediaType.APPLICATION_JSON)
+  @Operation(
+    summary = "Execute Post-Transfer SQL (Constraints & Objects)",
+    description = "Phase 4B: Executes remaining PostgreSQL DDL after data transfer including foreign keys, constraints, indexes, and views to finalize database structure."
+  )
+  @APIResponses({
+    @APIResponse(responseCode = "202", description = "Post-transfer execution started successfully"),
+    @APIResponse(responseCode = "409", description = "Another post-transfer execution is running")
+  })
   public Response executePostTransferSQL() {
     if (jobManager.isJobRunning("execute-post")) {
       Map<String, String> error = new HashMap<>();
@@ -223,6 +272,14 @@ public class Main {
   @POST
   @Path("/transferdata")
   @Produces(MediaType.APPLICATION_JSON)
+  @Operation(
+    summary = "Transfer Table Data Oracle → PostgreSQL",
+    description = "Phase 5: Performs high-performance bulk data transfer from Oracle to PostgreSQL with data type conversion, ANYDATA handling, and parallel processing."
+  )
+  @APIResponses({
+    @APIResponse(responseCode = "202", description = "Data transfer job started successfully"),
+    @APIResponse(responseCode = "409", description = "Another data transfer job is running")
+  })
   public Response transferData() {
     if (jobManager.isJobRunning("transferdata")) {
       Map<String, String> error = new HashMap<>();
@@ -249,6 +306,14 @@ public class Main {
   @POST
   @Path("/full")
   @Produces(MediaType.APPLICATION_JSON)
+  @Operation(
+    summary = "🚀 Execute Complete Migration Pipeline",
+    description = "Orchestrates the complete Oracle-to-PostgreSQL migration: Extract → Parse → Export → Execute-Pre → Transfer Data → Execute-Post. Can take hours for large databases. Use /migration/jobs/{jobId} for progress tracking."
+  )
+  @APIResponses({
+    @APIResponse(responseCode = "202", description = "Full migration pipeline started with progress tracking"),
+    @APIResponse(responseCode = "409", description = "Another full migration is already running")
+  })
   public Response runFullMigration() {
     log.info("Full migration endpoint called");
     
@@ -317,6 +382,11 @@ public class Main {
   @GET
   @Path("/status")
   @Produces(MediaType.APPLICATION_JSON)
+  @Operation(
+    summary = "📊 Get Current Migration Status & Statistics",
+    description = "Returns comprehensive statistics about extracted and parsed database objects including tables, views, packages, and total row counts. Provides instant feedback without triggering processing."
+  )
+  @APIResponse(responseCode = "200", description = "Current migration statistics")
   public Response getStatus() {
     Map<String, Object> status = new HashMap<>();
     status.put("schemas", data.getUserNames().size());
@@ -337,7 +407,21 @@ public class Main {
   @GET
   @Path("/jobs/{jobId}")
   @Produces(MediaType.APPLICATION_JSON)
-  public Response getJobStatus(@PathParam("jobId") String jobId) {
+  @Operation(
+    summary = "🔍 Get Detailed Job Status & Progress",
+    description = "Provides comprehensive status information for migration jobs including progress percentage, current step, duration, and error details. Essential for monitoring long-running operations."
+  )
+  @APIResponses({
+    @APIResponse(responseCode = "200", description = "Job status retrieved successfully"),
+    @APIResponse(responseCode = "404", description = "Job not found - invalid or expired jobId")
+  })
+  public Response getJobStatus(
+    @Parameter(
+      description = "Unique job identifier returned from job start endpoints",
+      required = true,
+      example = "full-1699123456792"
+    )
+    @PathParam("jobId") String jobId) {
     JobStatus status = jobManager.getJobStatus(jobId);
     if (status == null) {
       Map<String, String> error = new HashMap<>();
