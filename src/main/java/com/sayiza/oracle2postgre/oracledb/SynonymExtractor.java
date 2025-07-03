@@ -68,8 +68,9 @@ public class SynonymExtractor {
           }
 
           // Determine object type (TABLE, VIEW, etc.) by querying all_objects
+          // todo : evaluate... || !objectType.matches("TABLE|VIEW")
           String objectType = getObjectType(oracleConn, referencedSchema, referencedObjectName);
-          if (objectType == null || !objectType.matches("TABLE|VIEW")) {
+          if (objectType == null ) {
             log.warn("Skipping synonym with unsupported object type: {}.{} -> {}.{} ({})",
                     owner, synonymName, referencedSchema, referencedObjectName, objectType);
             continue;

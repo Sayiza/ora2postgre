@@ -168,6 +168,10 @@ public class TypeConverter {
       case "sys.aq$_jms_text_message":
         return "jsonb";
 
+      case "aq$_sig_prop":
+      case "sys.aq$_sig_prop":
+        return "jsonb";
+
       case "sdo_geometry":
         return "geometry";
 

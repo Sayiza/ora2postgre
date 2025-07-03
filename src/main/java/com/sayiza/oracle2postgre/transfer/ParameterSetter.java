@@ -88,6 +88,12 @@ public class ParameterSetter {
                     setAqJmsMessageParameter(stmt, paramIndex, rs, columnName);
                     break;
                     
+                // Oracle AQ signature property types - convert to JSONB
+                case "AQ$_SIG_PROP":
+                case "SYS.AQ$_SIG_PROP":
+                    setAqSigPropParameter(stmt, paramIndex, rs, columnName);
+                    break;
+                    
                 // Extended timestamp types
                 case "TIMESTAMP WITH TIME ZONE":
                 case "TIMESTAMP WITH LOCAL TIME ZONE":
@@ -108,6 +114,8 @@ public class ParameterSetter {
                         setIntervalParameter(stmt, paramIndex, rs, columnName);
                     } else if (oracleDataType.contains("AQ$_JMS_TEXT_MESSAGE")) {
                         setAqJmsMessageParameter(stmt, paramIndex, rs, columnName);
+                    } else if (oracleDataType.contains("AQ$_SIG_PROP")) {
+                        setAqSigPropParameter(stmt, paramIndex, rs, columnName);
                     } else {
                         // Handle primitive types and unknown types
                         setPrimitiveParameter(stmt, paramIndex, rs, column, oracleDataType);
@@ -239,6 +247,27 @@ public class ParameterSetter {
             
         } catch (Exception e) {
             throw new SQLException("Failed to convert AQ JMS message for column " + columnName, e);
+        }
+    }
+    
+    /**
+     * Sets an AQ$_SIG_PROP parameter by converting to JSONB.
+     */
+    private static void setAqSigPropParameter(PreparedStatement stmt, int paramIndex, 
+                                            ResultSet rs, String columnName) throws SQLException {
+        try {
+            // Use AqSigPropConverter to convert AQ signature property to JSON
+            String jsonValue = AqSigPropConverter.convertToJson(rs, columnName);
+            
+            if (jsonValue != null) {
+                // Set as JSONB parameter (requires PostgreSQL JDBC driver support)
+                stmt.setObject(paramIndex, jsonValue, Types.OTHER);
+            } else {
+                stmt.setNull(paramIndex, Types.OTHER);
+            }
+            
+        } catch (Exception e) {
+            throw new SQLException("Failed to convert AQ signature property for column " + columnName, e);
         }
     }
     

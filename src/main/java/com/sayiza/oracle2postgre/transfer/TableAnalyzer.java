@@ -28,7 +28,8 @@ public class TableAnalyzer {
         "TIMESTAMP WITH TIME ZONE", "TIMESTAMP WITH LOCAL TIME ZONE",
         "INTERVAL YEAR TO MONTH", "INTERVAL DAY TO SECOND",
         "XMLTYPE", "ANYDATA", "ANYTYPE", "URITYPE",
-        "AQ$_JMS_TEXT_MESSAGE", "SYS.AQ$_JMS_TEXT_MESSAGE"
+        "AQ$_JMS_TEXT_MESSAGE", "SYS.AQ$_JMS_TEXT_MESSAGE",
+        "AQ$_SIG_PROP", "SYS.AQ$_SIG_PROP"
     );
     
     /**
@@ -200,6 +201,51 @@ public class TableAnalyzer {
     }
     
     /**
+     * Checks if a table contains any AQ$_SIG_PROP columns.
+     * These columns require special JSON conversion handling.
+     * 
+     * @param table The table metadata to analyze
+     * @return true if the table contains any AQ signature property columns
+     */
+    public static boolean hasAqSigPropColumns(TableMetadata table) {
+        if (table.getColumns() == null || table.getColumns().isEmpty()) {
+            return false;
+        }
+        
+        for (ColumnMetadata column : table.getColumns()) {
+            String dataType = NameNormalizer.normalizeDataType(column.getDataType());
+            if (isAqSigPropType(dataType)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Counts the number of AQ$_SIG_PROP columns in a table.
+     * Useful for estimating the complexity of the migration process.
+     * 
+     * @param table The table metadata to analyze
+     * @return The number of AQ signature property columns found
+     */
+    public static int countAqSigPropColumns(TableMetadata table) {
+        if (table.getColumns() == null || table.getColumns().isEmpty()) {
+            return 0;
+        }
+        
+        int count = 0;
+        for (ColumnMetadata column : table.getColumns()) {
+            String dataType = NameNormalizer.normalizeDataType(column.getDataType());
+            if (isAqSigPropType(dataType)) {
+                count++;
+            }
+        }
+        
+        return count;
+    }
+    
+    /**
      * Checks if a data type is an AQ JMS message type.
      * 
      * @param dataType The data type to check
@@ -212,6 +258,21 @@ public class TableAnalyzer {
         return normalized.equals("AQ$_JMS_TEXT_MESSAGE") || 
                normalized.equals("SYS.AQ$_JMS_TEXT_MESSAGE") ||
                normalized.contains("AQ$_JMS_TEXT_MESSAGE");
+    }
+    
+    /**
+     * Checks if a data type is an AQ signature property type.
+     * 
+     * @param dataType The data type to check
+     * @return true if it's an AQ signature property type
+     */
+    private static boolean isAqSigPropType(String dataType) {
+        if (dataType == null) return false;
+        
+        String normalized = dataType.toUpperCase().trim();
+        return normalized.equals("AQ$_SIG_PROP") || 
+               normalized.equals("SYS.AQ$_SIG_PROP") ||
+               normalized.contains("AQ$_SIG_PROP");
     }
     
     /**
@@ -332,6 +393,8 @@ public class TableAnalyzer {
         if (everything != null) {
             int objectTypeColumns = countObjectTypeColumns(table, everything);
             int anydataColumns = countAnydataColumns(table);
+            int aqJmsMessageColumns = countAqJmsMessageColumns(table);
+            int aqSigPropColumns = countAqSigPropColumns(table);
             
             StringBuilder analysis = new StringBuilder(basicAnalysis);
             
@@ -341,6 +404,14 @@ public class TableAnalyzer {
             
             if (anydataColumns > 0) {
                 analysis.append(String.format(" [%d ANYDATA columns → JSONB]", anydataColumns));
+            }
+            
+            if (aqJmsMessageColumns > 0) {
+                analysis.append(String.format(" [%d AQ$_JMS_TEXT_MESSAGE columns → JSONB]", aqJmsMessageColumns));
+            }
+            
+            if (aqSigPropColumns > 0) {
+                analysis.append(String.format(" [%d AQ$_SIG_PROP columns → JSONB]", aqSigPropColumns));
             }
             
             return analysis.toString();

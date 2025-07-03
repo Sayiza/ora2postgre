@@ -23,9 +23,9 @@ public class TableExtractor {
       List<String> tables = fetchTableNames(oracleConn, user);
 
       for (String table : tables) {
-        if (table.matches("SYS_IOT_OVER_.*|BIN\\$.*|BW_STUDIUM_SEM_CFG_BAK\\$.*|DR\\$.*|MLOG\\$_.*|RUPD\\$_.*|AQ\\$.*|QUEUE_TABLE.*|ISEQ\\$\\$_.*|SYS_LOB.*|LOB\\$.*|WRI\\$_.*|SHSPACE.*|SQL\\$.*")) {
-          continue; // Skip internal/system tables
-        }
+        //if (table.matches("SYS_IOT_OVER_.*|BIN\\$.*|BW_STUDIUM_SEM_CFG_BAK\\$.*|DR\\$.*|MLOG\\$_.*|RUPD\\$_.*|AQ\\$.*|QUEUE_TABLE.*|ISEQ\\$\\$_.*|SYS_LOB.*|LOB\\$.*|WRI\\$_.*|SHSPACE.*|SQL\\$.*")) {
+        //  continue; // Skip internal/system tables
+        //}
 
         // Check if table is global temporary
         if (isGlobalTemporaryTable(oracleConn, user, table)) {

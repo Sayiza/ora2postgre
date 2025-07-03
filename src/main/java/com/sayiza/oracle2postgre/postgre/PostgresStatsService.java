@@ -50,7 +50,7 @@ public class PostgresStatsService {
             FROM information_schema.schemata 
             WHERE schema_name NOT IN ('information_schema', 'pg_catalog', 'pg_toast', 'pg_temp_1', 'pg_toast_temp_1')
             AND schema_name NOT LIKE 'pg_temp_%'
-            AND schema_name NOT LIKE 'pg_temp_%'
+            AND schema_name != 'public'
             AND schema_name NOT LIKE 'pg_toast_temp_%'
             """;
         
