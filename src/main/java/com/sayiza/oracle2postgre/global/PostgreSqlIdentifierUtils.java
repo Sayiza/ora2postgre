@@ -140,24 +140,22 @@ public class PostgreSqlIdentifierUtils {
         if (Character.isDigit(identifier.charAt(0))) {
             return true;
         }
-        /*
+
         // Check each character
         for (int i = 0; i < identifier.length(); i++) {
             char c = identifier.charAt(i);
             
             // Allow letters (upper and lower), digits, and underscore
-            if (Character.isLetter(c) || Character.isDigit(c) || c == '_') {
+            if (!(Character.isLetter(c) || Character.isDigit(c) || c == '_')) {
                 // If it contains uppercase letters, it needs quoting to preserve case
-                if (Character.isUpperCase(c)) {
-                    return true;
-                }
-                continue;
+                //if (Character.isUpperCase(c)) {
+                return true;
+                //}
+                //continue;
             }
-            
             // Any other character (spaces, special chars) requires quoting
-            return true;
         }
-        */
+
         return false;
     }
     

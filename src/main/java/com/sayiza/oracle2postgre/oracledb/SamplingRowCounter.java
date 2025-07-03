@@ -51,6 +51,9 @@ public class SamplingRowCounter {
                         owner, tableName, adjustedPercentage, estimatedCount);
                 return estimatedCount;
             }
+        } catch (Exception e) {
+            log.info("Error on estimating rows", e.getMessage());
+            return 0;
         }
         
         return 0;
@@ -78,6 +81,9 @@ public class SamplingRowCounter {
                 log.info("Exact row count for {}.{}: {}", owner, tableName, exactCount);
                 return exactCount;
             }
+        } catch (Exception e) {
+            log.info("Error on estimating rows", e.getMessage());
+            return 0;
         }
         
         return 0;
@@ -154,6 +160,7 @@ public class SamplingRowCounter {
     
     /**
      * Estimates row count using table segment size and average row length.
+     * Falls back through multiple approaches if all_segments is not accessible.
      * 
      * @param conn Oracle database connection
      * @param owner table owner/schema
@@ -162,34 +169,78 @@ public class SamplingRowCounter {
      * @throws SQLException if database query fails
      */
     public static long estimateRowCountBySegmentSize(Connection conn, String owner, String tableName) throws SQLException {
-        String sql = """
-            SELECT 
-                s.bytes,
-                t.avg_row_len
-            FROM all_segments s
-            JOIN all_tables t ON s.owner = t.owner AND s.segment_name = t.table_name
-            WHERE s.owner = ? AND s.segment_name = ? AND s.segment_type = 'TABLE'
-            """;
-        
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, owner.toUpperCase());
-            stmt.setString(2, tableName.toUpperCase());
+        // Try 1: Use dba_segments (requires DBA privileges)
+        try {
+            String sql = """
+                SELECT 
+                    s.bytes,
+                    t.avg_row_len
+                FROM dba_segments s
+                JOIN dba_tables t ON s.owner = t.owner AND s.segment_name = t.table_name
+                WHERE s.owner = ? AND s.segment_name = ? AND s.segment_type = 'TABLE'
+                """;
             
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    long bytes = rs.getLong("bytes");
-                    long avgRowLen = rs.getLong("avg_row_len");
-                    
-                    if (avgRowLen > 0) {
-                        long estimatedRows = bytes / avgRowLen;
-                        log.debug("Estimated row count for {}.{} by segment size: {} bytes / {} avg_row_len = {} rows", 
-                                 owner, tableName, bytes, avgRowLen, estimatedRows);
-                        return estimatedRows;
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, owner.toUpperCase());
+                stmt.setString(2, tableName.toUpperCase());
+                
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        long bytes = rs.getLong("bytes");
+                        long avgRowLen = rs.getLong("avg_row_len");
+                        
+                        if (avgRowLen > 0) {
+                            long estimatedRows = bytes / avgRowLen;
+                            log.debug("Estimated row count for {}.{} by dba_segments: {} bytes / {} avg_row_len = {} rows", 
+                                     owner, tableName, bytes, avgRowLen, estimatedRows);
+                            return estimatedRows;
+                        }
                     }
                 }
             }
+        } catch (SQLException e) {
+            log.debug("dba_segments approach failed for {}.{}: {}", owner, tableName, e.getMessage());
         }
         
+        // Try 2: Use table statistics only (fallback)
+        try {
+            String sql = """
+                SELECT 
+                    NVL(num_rows, 0),
+                    NVL(blocks, 0),
+                    NVL(avg_row_len, 0)
+                FROM all_tables
+                WHERE owner = ? AND table_name = ?
+                """;
+            
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, owner.toUpperCase());
+                stmt.setString(2, tableName.toUpperCase());
+                
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        long numRows = rs.getLong(1);
+                        long blocks = rs.getLong(2);
+                        long avgRowLen = rs.getLong(3);
+                        
+                        if (numRows > 0) {
+                            log.debug("Using table statistics for {}.{}: {} rows", owner, tableName, numRows);
+                            return numRows;
+                        } else if (blocks > 0 && avgRowLen > 0) {
+                            // Estimate: Oracle block size is typically 8K, assume 80% utilization
+                            long estimatedRows = (blocks * 8192 * 80 / 100) / avgRowLen;
+                            log.debug("Estimated row count for {}.{} by blocks: {} blocks * 8192 * 0.8 / {} avg_row_len = {} rows", 
+                                     owner, tableName, blocks, avgRowLen, estimatedRows);
+                            return estimatedRows;
+                        }
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            log.debug("Table statistics approach failed for {}.{}: {}", owner, tableName, e.getMessage());
+        }
+        
+        log.warn("All segment size estimation methods failed for {}.{}", owner, tableName);
         return 0;
     }
 }

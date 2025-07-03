@@ -41,21 +41,6 @@ public class RowCountExtractor {
                 return calculateTotalRowCountByStatistics(conn, allSchemas, schemaList);
         }
     }
-
-    /**
-     * Legacy method for backward compatibility. Uses statistics-only approach.
-     * 
-     * @param conn Oracle database connection
-     * @param allSchemas whether to include all schemas or limit to specific ones
-     * @param schemaList list of specific schemas to include (used when allSchemas is false)
-     * @return total row count across all tables in the specified schemas
-     * @throws SQLException if database query fails
-     * @deprecated Use {@link #calculateTotalRowCount(Connection, boolean, List, RowCountConfig)} instead
-     */
-    @Deprecated
-    public static long calculateTotalRowCount(Connection conn, boolean allSchemas, List<String> schemaList) throws SQLException {
-        return calculateTotalRowCountByStatistics(conn, allSchemas, schemaList);
-    }
     
     /**
      * Calculates the total row count for tables in the specified schemas using statistics only.

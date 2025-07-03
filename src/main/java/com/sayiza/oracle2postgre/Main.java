@@ -775,11 +775,15 @@ public class Main {
       if (doPackageBody) {
         data.getPackageBodyPlsql().addAll(PackageExtractor.extract(conn, data.getUserNames(), false));
       }
-      
-      // Calculate total row count for the extracted schemas
-      log.info("Calculating total row count for extracted schemas");
-      long totalRowCount = RowCountExtractor.calculateTotalRowCount(conn, doAllSchema, data.getUserNames(), rowCountConfig);
-      data.setTotalRowCount(totalRowCount);
+
+      if (configurationService.isDoData()) {
+        // Calculate total row count for the extracted schemas
+        log.info("Calculating total row count for extracted schemas");
+        long totalRowCount = RowCountExtractor.calculateTotalRowCount(conn, doAllSchema, data.getUserNames(), rowCountConfig);
+        data.setTotalRowCount(totalRowCount);
+      } else {
+        data.setTotalRowCount(0);
+      }
       
       // Debug logging for extracted data
       log.info("Extraction completed: {} schemas, {} tables, {} object type specs, {} package specs",
@@ -879,10 +883,14 @@ public class Main {
       completedSubSteps++;
       
       // Sub-step 9: Calculate total row counts
-      progressService.updateSubStepProgress(jobId, MigrationStep.EXTRACT, completedSubSteps, "Calculating total row count");
-      log.info("Calculating total row count for extracted schemas");
-      long totalRowCount = RowCountExtractor.calculateTotalRowCount(conn, doAllSchema, data.getUserNames(), rowCountConfig);
-      data.setTotalRowCount(totalRowCount);
+      if (configurationService.isDoData()) {
+        progressService.updateSubStepProgress(jobId, MigrationStep.EXTRACT, completedSubSteps, "Calculating total row count");
+        log.info("Calculating total row count for extracted schemas");
+        long totalRowCount = RowCountExtractor.calculateTotalRowCount(conn, doAllSchema, data.getUserNames(), rowCountConfig);
+        data.setTotalRowCount(totalRowCount);
+      } else {
+        data.setTotalRowCount(0);
+      }
       completedSubSteps++;
       
       // Complete extraction step
