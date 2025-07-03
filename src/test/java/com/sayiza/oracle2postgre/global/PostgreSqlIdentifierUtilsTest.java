@@ -58,10 +58,10 @@ public class PostgreSqlIdentifierUtilsTest {
         assertEquals("customerId", PostgreSqlIdentifierUtils.quoteIdentifier("customerId"));
         
         // Test special characters - current implementation does NOT quote these
-        assertEquals("my-table", PostgreSqlIdentifierUtils.quoteIdentifier("my-table"));
-        assertEquals("my table", PostgreSqlIdentifierUtils.quoteIdentifier("my table"));
-        assertEquals("my.table", PostgreSqlIdentifierUtils.quoteIdentifier("my.table"));
-        assertEquals("my@table", PostgreSqlIdentifierUtils.quoteIdentifier("my@table"));
+        assertEquals("\"my-table\"", PostgreSqlIdentifierUtils.quoteIdentifier("my-table"));
+        assertEquals("\"my table\"", PostgreSqlIdentifierUtils.quoteIdentifier("my table"));
+        assertEquals("\"my.table\"", PostgreSqlIdentifierUtils.quoteIdentifier("my.table"));
+        assertEquals("\"my@table\"", PostgreSqlIdentifierUtils.quoteIdentifier("my@table"));
         
         // Test starting with digit - should be quoted
         assertEquals("\"123table\"", PostgreSqlIdentifierUtils.quoteIdentifier("123table"));
@@ -192,9 +192,8 @@ public class PostgreSqlIdentifierUtilsTest {
         assertEquals("CustomerName", PostgreSqlIdentifierUtils.quoteIdentifier("CustomerName"));
         assertEquals("OrderDate", PostgreSqlIdentifierUtils.quoteIdentifier("OrderDate"));
         
-        // Oracle allows spaces in quoted identifiers - current implementation does NOT quote spaces
-        assertEquals("Customer Name", PostgreSqlIdentifierUtils.quoteIdentifier("Customer Name"));
-        assertEquals("Order Date", PostgreSqlIdentifierUtils.quoteIdentifier("Order Date"));
+        assertEquals("\"Customer Name\"", PostgreSqlIdentifierUtils.quoteIdentifier("Customer Name"));
+        assertEquals("\"Order Date\"", PostgreSqlIdentifierUtils.quoteIdentifier("Order Date"));
         
         // Normal Oracle patterns that don't need quoting in PostgreSQL
         assertEquals("customer_name", PostgreSqlIdentifierUtils.quoteIdentifier("customer_name"));

@@ -116,8 +116,8 @@ public class ObjectTypeSqlGenerationTest {
         assertEquals("SIMPLE_NAME", com.sayiza.oracle2postgre.global.PostgreSqlIdentifierUtils.quoteIdentifier("SIMPLE_NAME"));
         
         // Test special characters (current implementation does NOT quote these)
-        assertEquals("name with spaces", com.sayiza.oracle2postgre.global.PostgreSqlIdentifierUtils.quoteIdentifier("name with spaces"));
-        assertEquals("name-with-dash", com.sayiza.oracle2postgre.global.PostgreSqlIdentifierUtils.quoteIdentifier("name-with-dash"));
+        assertEquals("\"name with spaces\"", com.sayiza.oracle2postgre.global.PostgreSqlIdentifierUtils.quoteIdentifier("name with spaces"));
+        assertEquals("\"name-with-dash\"", com.sayiza.oracle2postgre.global.PostgreSqlIdentifierUtils.quoteIdentifier("name-with-dash"));
         
         // Test edge cases
         assertEquals("", com.sayiza.oracle2postgre.global.PostgreSqlIdentifierUtils.quoteIdentifier(""));

@@ -29,7 +29,8 @@ public class TableAnalyzer {
         "INTERVAL YEAR TO MONTH", "INTERVAL DAY TO SECOND",
         "XMLTYPE", "ANYDATA", "ANYTYPE", "URITYPE",
         "AQ$_JMS_TEXT_MESSAGE", "SYS.AQ$_JMS_TEXT_MESSAGE",
-        "AQ$_SIG_PROP", "SYS.AQ$_SIG_PROP"
+        "AQ$_SIG_PROP", "SYS.AQ$_SIG_PROP",
+        "AQ$_RECIPIENTS", "SYS.AQ$_RECIPIENTS"
     );
     
     /**
@@ -246,6 +247,51 @@ public class TableAnalyzer {
     }
     
     /**
+     * Checks if a table contains any AQ$_RECIPIENTS columns.
+     * These columns require special JSON conversion handling.
+     * 
+     * @param table The table metadata to analyze
+     * @return true if the table contains any AQ recipients columns
+     */
+    public static boolean hasAqRecipientsColumns(TableMetadata table) {
+        if (table.getColumns() == null || table.getColumns().isEmpty()) {
+            return false;
+        }
+        
+        for (ColumnMetadata column : table.getColumns()) {
+            String dataType = NameNormalizer.normalizeDataType(column.getDataType());
+            if (isAqRecipientsType(dataType)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Counts the number of AQ$_RECIPIENTS columns in a table.
+     * Useful for estimating the complexity of the migration process.
+     * 
+     * @param table The table metadata to analyze
+     * @return The number of AQ recipients columns found
+     */
+    public static int countAqRecipientsColumns(TableMetadata table) {
+        if (table.getColumns() == null || table.getColumns().isEmpty()) {
+            return 0;
+        }
+        
+        int count = 0;
+        for (ColumnMetadata column : table.getColumns()) {
+            String dataType = NameNormalizer.normalizeDataType(column.getDataType());
+            if (isAqRecipientsType(dataType)) {
+                count++;
+            }
+        }
+        
+        return count;
+    }
+    
+    /**
      * Checks if a data type is an AQ JMS message type.
      * 
      * @param dataType The data type to check
@@ -273,6 +319,21 @@ public class TableAnalyzer {
         return normalized.equals("AQ$_SIG_PROP") || 
                normalized.equals("SYS.AQ$_SIG_PROP") ||
                normalized.contains("AQ$_SIG_PROP");
+    }
+    
+    /**
+     * Checks if a data type is an AQ recipients type.
+     * 
+     * @param dataType The data type to check
+     * @return true if it's an AQ recipients type
+     */
+    private static boolean isAqRecipientsType(String dataType) {
+        if (dataType == null) return false;
+        
+        String normalized = dataType.toUpperCase().trim();
+        return normalized.equals("AQ$_RECIPIENTS") || 
+               normalized.equals("SYS.AQ$_RECIPIENTS") ||
+               normalized.contains("AQ$_RECIPIENTS");
     }
     
     /**
@@ -395,6 +456,7 @@ public class TableAnalyzer {
             int anydataColumns = countAnydataColumns(table);
             int aqJmsMessageColumns = countAqJmsMessageColumns(table);
             int aqSigPropColumns = countAqSigPropColumns(table);
+            int aqRecipientsColumns = countAqRecipientsColumns(table);
             
             StringBuilder analysis = new StringBuilder(basicAnalysis);
             
@@ -412,6 +474,10 @@ public class TableAnalyzer {
             
             if (aqSigPropColumns > 0) {
                 analysis.append(String.format(" [%d AQ$_SIG_PROP columns → JSONB]", aqSigPropColumns));
+            }
+            
+            if (aqRecipientsColumns > 0) {
+                analysis.append(String.format(" [%d AQ$_RECIPIENTS columns → JSONB]", aqRecipientsColumns));
             }
             
             return analysis.toString();

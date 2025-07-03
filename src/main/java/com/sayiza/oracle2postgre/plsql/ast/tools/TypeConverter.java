@@ -172,6 +172,10 @@ public class TypeConverter {
       case "sys.aq$_sig_prop":
         return "jsonb";
 
+      case "aq$_recipients":
+      case "sys.aq$_recipients":
+        return "jsonb";
+
       case "sdo_geometry":
         return "geometry";
 

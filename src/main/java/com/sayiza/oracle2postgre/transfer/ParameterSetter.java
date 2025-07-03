@@ -94,6 +94,12 @@ public class ParameterSetter {
                     setAqSigPropParameter(stmt, paramIndex, rs, columnName);
                     break;
                     
+                // Oracle AQ recipients types - convert to JSONB
+                case "AQ$_RECIPIENTS":
+                case "SYS.AQ$_RECIPIENTS":
+                    setAqRecipientsParameter(stmt, paramIndex, rs, columnName);
+                    break;
+                    
                 // Extended timestamp types
                 case "TIMESTAMP WITH TIME ZONE":
                 case "TIMESTAMP WITH LOCAL TIME ZONE":
@@ -116,6 +122,8 @@ public class ParameterSetter {
                         setAqJmsMessageParameter(stmt, paramIndex, rs, columnName);
                     } else if (oracleDataType.contains("AQ$_SIG_PROP")) {
                         setAqSigPropParameter(stmt, paramIndex, rs, columnName);
+                    } else if (oracleDataType.contains("AQ$_RECIPIENTS")) {
+                        setAqRecipientsParameter(stmt, paramIndex, rs, columnName);
                     } else {
                         // Handle primitive types and unknown types
                         setPrimitiveParameter(stmt, paramIndex, rs, column, oracleDataType);
@@ -268,6 +276,27 @@ public class ParameterSetter {
             
         } catch (Exception e) {
             throw new SQLException("Failed to convert AQ signature property for column " + columnName, e);
+        }
+    }
+    
+    /**
+     * Sets an AQ$_RECIPIENTS parameter by converting to JSONB.
+     */
+    private static void setAqRecipientsParameter(PreparedStatement stmt, int paramIndex, 
+                                               ResultSet rs, String columnName) throws SQLException {
+        try {
+            // Use AqRecipientsConverter to convert AQ recipients to JSON
+            String jsonValue = AqRecipientsConverter.convertToJson(rs, columnName);
+            
+            if (jsonValue != null) {
+                // Set as JSONB parameter (requires PostgreSQL JDBC driver support)
+                stmt.setObject(paramIndex, jsonValue, Types.OTHER);
+            } else {
+                stmt.setNull(paramIndex, Types.OTHER);
+            }
+            
+        } catch (Exception e) {
+            throw new SQLException("Failed to convert AQ recipients for column " + columnName, e);
         }
     }
     
