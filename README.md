@@ -1,29 +1,27 @@
-# Oracle to PostgreSQL Transformation API
+# Ora to Postgre Transformation API
 
-A comprehensive REST API for migrating Oracle databases to PostgreSQL using a **PostgreSQL-first architecture**. This tool automates the extraction, parsing, and transformation of Oracle schemas, PL/SQL code, and data into PostgreSQL-compatible formats.
+A comprehensive REST API for migrating a popular but expensive database that's name starts with Ora to PostgreSQL. This tool automates the extraction, parsing, and transformation of Ora schemas, PL/SQL code, and data into PostgreSQL-compatible formats.
 
 ## 🎯 Overview
 
-This application implements a sophisticated migration pipeline that converts Oracle databases to PostgreSQL while preserving business logic and ensuring data integrity. The unique **PostgreSQL-first approach** places all business logic in PostgreSQL functions, with minimal REST controllers serving as thin API proxies.
+This application implements a sophisticated migration pipeline that converts Ora databases to PostgreSQL while preserving business logic and ensuring data integrity. The **PostgreSQL-first approach** places all business logic in PostgreSQL functions, with an optional minimal REST controllers layer serving as thin API proxies.
 
 ### Key Features
 
-- **🔄 Complete Migration Pipeline**: Automated 6-phase process from Oracle extraction to PostgreSQL deployment
+- **🔄 Complete Migration Pipeline**: Automated 6-phase process from Ora extraction to PostgreSQL deployment
 - **🧠 Intelligent PL/SQL Parsing**: Uses ANTLR4 grammar for accurate code transformation
 - **⚡ High-Performance Data Transfer**: Parallel processing with intelligent type conversion
 - **🔧 PostgreSQL-First Architecture**: Business logic stays in database functions, not Java code
 - **📊 Real-Time Progress Tracking**: Detailed job monitoring with progress percentages
 - **🌐 REST API Interface**: Comprehensive OpenAPI-documented endpoints
-- **🔍 Advanced Schema Resolution**: Handles Oracle synonyms and cross-schema references
+- **🔍 Advanced Schema Resolution**: Handles Ora synonyms and cross-schema references
 
 ## 🏗️ Architecture
 
 ### PostgreSQL-First Design Philosophy
 
-Unlike traditional migration tools that duplicate business logic across layers, this application follows a **PostgreSQL-first architecture**:
-
 ```
-Oracle PL/SQL Packages → PostgreSQL Functions → Minimal REST Controllers
+Ora PL/SQL Packages → PostgreSQL Functions → Minimal REST Controllers
         ↓                        ↓                        ↓
    Business Logic         Business Logic           API Proxy Only
 ```
@@ -36,7 +34,7 @@ Oracle PL/SQL Packages → PostgreSQL Functions → Minimal REST Controllers
 
 ### Core Components
 
-- **🔍 Metadata Extractor**: Connects to Oracle and extracts comprehensive schema information
+- **🔍 Metadata Extractor**: Connects to Ora and extracts comprehensive schema information
 - **📝 ANTLR Parser**: Generates Abstract Syntax Trees from PL/SQL source code
 - **🔄 Code Generator**: Transforms AST into PostgreSQL functions and REST controllers
 - **📡 REST API Layer**: Quarkus-based web service with comprehensive OpenAPI documentation
@@ -47,11 +45,11 @@ Oracle PL/SQL Packages → PostgreSQL Functions → Minimal REST Controllers
 
 The migration process follows a carefully orchestrated 6-phase pipeline:
 
-### Phase 1: 📥 Extract Oracle Metadata
+### Phase 1: 📥 Extract Ora Metadata
 ```
 POST /migration/extract
 ```
-- Connects to Oracle database using configured credentials
+- Connects to Ora database using configured credentials
 - Extracts schemas, tables, views, synonyms, and PL/SQL code
 - Performs statistical analysis for row count estimation
 - Builds comprehensive metadata repository
@@ -72,7 +70,7 @@ POST /migration/export
 - Transforms AST into PostgreSQL functions (business logic)
 - Generates minimal JAX-RS REST controllers (API proxies)
 - Creates DDL scripts for tables, constraints, and indexes
-- Handles Oracle-to-PostgreSQL data type mappings
+- Handles Ora-to-PostgreSQL data type mappings
 
 ### Phase 4A: 🏗️ Execute Pre-Transfer SQL
 ```
@@ -88,7 +86,7 @@ POST /migration/execute-pre
 POST /migration/transferdata
 ```
 - Performs high-performance bulk data transfer
-- Handles Oracle ANYDATA to PostgreSQL JSONB conversion
+- Handles Ora ANYDATA to PostgreSQL JSONB conversion
 - Uses parallel processing for optimal throughput
 - Provides real-time progress tracking
 
@@ -112,12 +110,12 @@ Executes all phases in sequence with comprehensive progress tracking.
 ### Migration Operations
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/migration/extract` | POST | Extract Oracle database metadata |
+| `/migration/extract` | POST | Extract Ora database metadata |
 | `/migration/parse` | POST | Parse PL/SQL code to AST |
 | `/migration/export` | POST | Generate PostgreSQL code & REST controllers |
 | `/migration/execute-pre` | POST | Execute pre-transfer SQL (schema & tables) |
 | `/migration/execute-post` | POST | Execute post-transfer SQL (constraints & objects) |
-| `/migration/transferdata` | POST | Transfer table data Oracle → PostgreSQL |
+| `/migration/transferdata` | POST | Transfer table data Ora → PostgreSQL |
 | `/migration/full` | POST | 🚀 Execute complete migration pipeline |
 
 ### Monitoring & Status
@@ -134,10 +132,10 @@ Executes all phases in sequence with comprehensive progress tracking.
 
 ### Database Connections
 
-Configure Oracle and PostgreSQL connections in `src/main/resources/application.properties`:
+Configure Ora and PostgreSQL connections in `src/main/resources/application.properties`:
 
 ```properties
-# Oracle Database
+# Ora Database
 oracle.url=jdbc:oracle:thin:@hostname:1521:service
 oracle.user=username
 oracle.password=password

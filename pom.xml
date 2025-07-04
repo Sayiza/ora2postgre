@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project>
   <modelVersion>4.0.0</modelVersion>
-  <groupId>com.sayiza.oracle2postgre</groupId>
-  <artifactId>com-sayiza-oracle2postgre</artifactId>
+  <groupId>me.christianrobert.ora2postgre</groupId>
+  <artifactId>me-christianrobert-ora2postgre</artifactId>
   <version>1.0-SNAPSHOT</version>
 
   <properties>
@@ -104,7 +104,7 @@
           <sourceDirectory>${project.basedir}/src/main/antlr4</sourceDirectory>
           <outputDirectory>${project.build.directory}/generated-sources/antlr4</outputDirectory>
           <visitor>true</visitor>
-          <package>com.sayiza.oracle2postgre.antlr</package>
+          <package>me.christianrobert.ora2postgre.antlr</package>
         </configuration>
         <executions>
           <execution>

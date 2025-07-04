@@ -38,7 +38,7 @@ java -jar target/quarkus-app/quarkus-run.jar
 ### Legacy Run Command (Deprecated)
 ```bash
 # Old CLI approach - no longer the primary method
-mvn exec:java -Dexec.mainClass="com.sayiza.oracle2postgre.Main"
+mvn exec:java -Dexec.mainClass="me.christianrobert.ora2postgre.Main"
 ```
 
 ### Database Setup
@@ -212,7 +212,7 @@ mvn clean package
 java -jar target/quarkus-app/quarkus-run.jar
 
 # Legacy CLI method (deprecated, but still supported)
-mvn exec:java -Dexec.mainClass="com.sayiza.oracle2postgre.Main"
+mvn exec:java -Dexec.mainClass="me.christianrobert.ora2postgre.Main"
 ```
 
 ## Generated Code Architecture
