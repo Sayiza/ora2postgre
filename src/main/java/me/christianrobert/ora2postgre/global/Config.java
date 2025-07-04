@@ -130,6 +130,9 @@ public class Config {
   @ConfigProperty(name = "do.view-ddl", defaultValue = "true")
   boolean doViewDdl;
   
+  @ConfigProperty(name = "do.triggers", defaultValue = "true")
+  boolean doTriggers;
+  
   @ConfigProperty(name = "do.extract", defaultValue = "true")
   boolean doExtract;
   
@@ -154,7 +157,7 @@ public class Config {
   
   @ConfigProperty(name = "do.write-postgre-files", defaultValue = "true")
   boolean doWritePostgreFiles;
-  
+
   @ConfigProperty(name = "do.execute-postgre-files", defaultValue = "true")
   boolean doExecutePostgreFiles;
 
@@ -196,6 +199,10 @@ public class Config {
 
   public boolean isDoViewDdl() {
     return doViewDdl;
+  }
+
+  public boolean isDoTriggers() {
+    return doTriggers;
   }
 
   public boolean isDoWriteRestControllers() {

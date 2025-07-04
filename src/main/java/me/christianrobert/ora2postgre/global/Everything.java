@@ -25,6 +25,7 @@ public class Everything {
   private List<PlsqlCode> objectTypeBodyPlsql = new ArrayList<>();
   private List<PlsqlCode> packageSpecPlsql = new ArrayList<>();
   private List<PlsqlCode> packageBodyPlsql = new ArrayList<>();
+  private List<PlsqlCode> triggerPlsql = new ArrayList<>();
 
   // parsed data
   // TODO table default Expression!!!
@@ -33,6 +34,7 @@ public class Everything {
   private List<ObjectType> objectTypeBodyAst = new ArrayList<>();
   private List<OraclePackage> packageSpecAst = new ArrayList<>();
   private List<OraclePackage> packageBodyAst = new ArrayList<>();
+  // TODO: Add List<Trigger> triggerAst = new ArrayList<>(); in Phase 3
 
   private long totalRowCount = 0;
   private int intendations = 0;
@@ -65,6 +67,10 @@ public class Everything {
 
   public List<PlsqlCode> getPackageBodyPlsql() {
     return packageBodyPlsql;
+  }
+
+  public List<PlsqlCode> getTriggerPlsql() {
+    return triggerPlsql;
   }
 
   public List<ViewSpecAndQuery> getViewSpecAndQueries() {

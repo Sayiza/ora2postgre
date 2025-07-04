@@ -635,6 +635,9 @@
                             <input type="checkbox" id="doViewDdl"> Extract view DDL
                         </label>
                         <label class="config-item">
+                            <input type="checkbox" id="doTriggers"> Extract triggers
+                        </label>
+                        <label class="config-item">
                             <input type="checkbox" id="doWriteRestControllers"> Generate REST controllers
                         </label>
                         <label class="config-item">
@@ -1332,6 +1335,7 @@
             document.getElementById('doPackageBody').checked = config.doPackageBody || false;
             document.getElementById('doViewSignature').checked = config.doViewSignature || false;
             document.getElementById('doViewDdl').checked = config.doViewDdl || false;
+            document.getElementById('doTriggers').checked = config.doTriggers || false;
             document.getElementById('doWriteRestControllers').checked = config.doWriteRestControllers || false;
             document.getElementById('doWritePostgreFiles').checked = config.doWritePostgreFiles || false;
             document.getElementById('doExecutePostgreFiles').checked = config.doExecutePostgreFiles || false;
@@ -1368,6 +1372,7 @@
                 doPackageBody: document.getElementById('doPackageBody').checked,
                 doViewSignature: document.getElementById('doViewSignature').checked,
                 doViewDdl: document.getElementById('doViewDdl').checked,
+                doTriggers: document.getElementById('doTriggers').checked,
                 doWriteRestControllers: document.getElementById('doWriteRestControllers').checked,
                 doWritePostgreFiles: document.getElementById('doWritePostgreFiles').checked,
                 doExecutePostgreFiles: document.getElementById('doExecutePostgreFiles').checked,

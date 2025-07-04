@@ -29,6 +29,7 @@ public class ConfigurationService {
         runtimeConfig.setDoPackageBody(getValue("do.package-body", config.isDoPackageBody()));
         runtimeConfig.setDoViewSignature(getValue("do.view-signature", config.isDoViewSignature()));
         runtimeConfig.setDoViewDdl(getValue("do.view-ddl", config.isDoViewDdl()));
+        runtimeConfig.setDoTriggers(getValue("do.triggers", config.isDoTriggers()));
         runtimeConfig.setDoWriteRestControllers(getValue("do.write-rest-controllers", config.isDoWriteRestControllers()));
         runtimeConfig.setDoWritePostgreFiles(getValue("do.write-postgre-files", config.isDoWritePostgreFiles()));
         runtimeConfig.setDoExecutePostgreFiles(getValue("do.execute-postgre-files", config.isDoExecutePostgreFiles()));
@@ -86,6 +87,9 @@ public class ConfigurationService {
         }
         if (updates.getDoViewDdl() != null) {
             runtimeSettings.put("do.view-ddl", updates.getDoViewDdl());
+        }
+        if (updates.getDoTriggers() != null) {
+            runtimeSettings.put("do.triggers", updates.getDoTriggers());
         }
         if (updates.getDoWriteRestControllers() != null) {
             runtimeSettings.put("do.write-rest-controllers", updates.getDoWriteRestControllers());
@@ -191,12 +195,20 @@ public class ConfigurationService {
         return getValue("do.view-ddl", config.isDoViewDdl());
     }
 
+    public boolean isDoTriggers() {
+        return getValue("do.triggers", config.isDoTriggers());
+    }
+
     public boolean isDoWriteRestControllers() {
         return getValue("do.write-rest-controllers", config.isDoWriteRestControllers());
     }
 
     public boolean isDoWritePostgreFiles() {
         return getValue("do.write-postgre-files", config.isDoWritePostgreFiles());
+    }
+
+    public boolean isDoWriteTriggerFiles() {
+        return getValue("do.write-trigger-files", config.isDoWriteTriggerFiles());
     }
 
     public boolean isDoExecutePostgreFiles() {

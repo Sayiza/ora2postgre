@@ -732,6 +732,7 @@ public class Main {
     boolean doPackageSpec = configurationService.isDoPackageSpec();
     boolean doPackageBody = configurationService.isDoPackageBody();
     boolean doViewSignature = configurationService.isDoViewSignature();
+    boolean doTriggers = configurationService.isDoTriggers();
 
     if (doAddTestData) {
       // depricated
@@ -773,6 +774,10 @@ public class Main {
       if (doPackageBody) {
         data.getPackageBodyPlsql().addAll(PackageExtractor.extract(conn, data.getUserNames(), false));
       }
+      if (doTriggers) {
+        // TODO: Implement TriggerExtractor.extract() in Phase 2
+        log.info("Trigger extraction configured but not yet implemented");
+      }
 
       if (configurationService.isDoData()) {
         // Calculate total row count for the extracted schemas
@@ -804,6 +809,7 @@ public class Main {
     boolean doPackageSpec = configurationService.isDoPackageSpec();
     boolean doPackageBody = configurationService.isDoPackageBody();
     boolean doViewSignature = configurationService.isDoViewSignature();
+    boolean doTriggers = configurationService.isDoTriggers();
 
     if (doAddTestData) {
       // deprecated
@@ -880,7 +886,15 @@ public class Main {
       }
       completedSubSteps++;
       
-      // Sub-step 9: Calculate total row counts
+      // Sub-step 9: Extract triggers
+      progressService.updateSubStepProgress(jobId, MigrationStep.EXTRACT, completedSubSteps, "Extracting triggers");
+      if (doTriggers) {
+        // TODO: Implement TriggerExtractor.extract() in Phase 2
+        log.info("Trigger extraction configured but not yet implemented");
+      }
+      completedSubSteps++;
+      
+      // Sub-step 10: Calculate total row counts
       if (configurationService.isDoData()) {
         progressService.updateSubStepProgress(jobId, MigrationStep.EXTRACT, completedSubSteps, "Calculating total row count");
         log.info("Calculating total row count for extracted schemas");
@@ -1017,6 +1031,7 @@ public class Main {
     boolean doObjectTypeBody = configurationService.isDoObjectTypeBody();
     boolean doPackageSpec = configurationService.isDoPackageSpec();
     boolean doPackageBody = configurationService.isDoPackageBody();
+    boolean doTriggers = configurationService.isDoTriggers();
 
     if (doViewDdl) {
       for (ViewMetadata view : data.getViewDefinition()) {
@@ -1046,6 +1061,10 @@ public class Main {
       for (PlsqlCode s : data.getPackageBodyPlsql()) {
         data.getPackageBodyAst().add((OraclePackage) PlSqlAstMain.processPlsqlCode(s));
       }
+    }
+    if (doTriggers) {
+      // TODO: Implement trigger parsing in Phase 3
+      log.info("Trigger parsing configured but not yet implemented");
     }
     
     // Debug logging for parsed ASTs
@@ -1129,6 +1148,7 @@ public class Main {
     boolean doPackageSpec = configurationService.isDoPackageSpec();
     boolean doPackageBody = configurationService.isDoPackageBody();
     boolean doViewDdl = configurationService.isDoViewDdl();
+    boolean doTriggers = configurationService.isDoTriggers();
     
     // NEW: REST controller generation (PostgreSQL-first approach)
     if (doWriteRestControllers) {
@@ -1189,6 +1209,10 @@ public class Main {
       }
       if (doPackageBody) {
         ExportPackage.savePackageBodyToPostgre(path, data.getPackageSpecAst(), data.getPackageBodyAst(), data);
+      }
+      if (doTriggers) {
+        // TODO: Implement ExportTrigger.saveTriggersToPostgre() in Phase 5
+        log.info("Trigger file export configured but not yet implemented");
       }
     }
   }
