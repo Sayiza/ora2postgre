@@ -31,7 +31,8 @@ public class AssignmentStatement extends Statement {
     b.append(data.getIntendation())
             .append(target)
             .append(" := ")
-            .append(expression.toPostgre(data));
+            .append(expression.toPostgre(data))
+            .append(";");
     return b.toString();
   }
 }

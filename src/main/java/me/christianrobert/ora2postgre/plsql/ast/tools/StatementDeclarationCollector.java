@@ -1,6 +1,7 @@
 package me.christianrobert.ora2postgre.plsql.ast.tools;
 
 import me.christianrobert.ora2postgre.global.Everything;
+import me.christianrobert.ora2postgre.plsql.ast.AssignmentStatement;
 import me.christianrobert.ora2postgre.plsql.ast.ForLoopStatement;
 import me.christianrobert.ora2postgre.plsql.ast.Statement;
 
@@ -56,6 +57,7 @@ public class StatementDeclarationCollector {
                 // Recursively check nested statements within the FOR loop
                 declarations.append(collectNecessaryDeclarations(forLoop.getStatements(), data, declaredVariables));
             }
+
             // TODO: Add handling for other statement types that might contain nested statements
             // such as IF statements, WHILE loops, etc. when they are implemented
         }

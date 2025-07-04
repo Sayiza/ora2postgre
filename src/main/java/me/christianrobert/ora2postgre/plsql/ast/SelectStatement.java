@@ -2,11 +2,10 @@ package me.christianrobert.ora2postgre.plsql.ast;
 
 import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.global.StringAux;
-import me.christianrobert.ora2postgre.plsql.ast.tools.TypeConverter;
 
 import java.util.List;
 
-public class SelectStatement extends PlSqlAst {
+public class SelectStatement extends Statement {
   String schema;
   SelectSubQuery subQuery;
   SelectWithClause withClause;

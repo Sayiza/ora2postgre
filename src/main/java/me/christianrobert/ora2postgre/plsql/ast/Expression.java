@@ -1,6 +1,7 @@
 package me.christianrobert.ora2postgre.plsql.ast;
 
 import me.christianrobert.ora2postgre.global.Everything;
+import me.christianrobert.ora2postgre.global.PostgreSqlIdentifierUtils;
 
 import java.util.List;
 
@@ -126,7 +127,10 @@ public class Expression extends PlSqlAst {
     }
     
     // Return expression text for simple column references
-    return expressionText;
+    if (expressionText.contains(".")) {
+      return expressionText; // TODO it has a table alias or name prefix..
+    }
+    return PostgreSqlIdentifierUtils.quoteIdentifier(expressionText.toUpperCase());
   }
 
   /**

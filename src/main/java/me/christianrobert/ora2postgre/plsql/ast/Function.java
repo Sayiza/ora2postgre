@@ -91,9 +91,10 @@ public class Function extends PlSqlAst {
             .append(TypeConverter.toPostgre(returnType))
             .append("\nLANGUAGE plpgsql AS $$\n")
             .append("DECLARE\n");
-    // Collect and add variable declarations from FOR loops
-    StringBuilder declarations = StatementDeclarationCollector.collectNecessaryDeclarations(statements, data);
-    b.append(declarations);
+    // Collect and add variable stmtDeclarations from FOR loops
+    StringBuilder stmtDeclarations = StatementDeclarationCollector.collectNecessaryDeclarations(statements, data);
+    b.append(stmtDeclarations);
+    // TODO add declarations from plsql source code
     b.append("BEGIN\n");
     if (specOnly) {
       b.append("return null;\n");
