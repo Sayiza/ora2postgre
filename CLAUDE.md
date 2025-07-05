@@ -6,12 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is an Oracle-to-PostgreSQL migration tool that extracts, parses, and transpiles Oracle PL/SQL code using a **PostgreSQL-first architecture**. The project consists of multiple interconnected sub-projects:
 
-1. **PL/SQL to PostgreSQL transpilation** - Business logic transformation for functions, procedures, and views
+1. **PL/SQL to PostgreSQL transpilation** - Business logic transformation for functions, procedures, views, and triggers
 2. **REST controller generation** - Minimal JAX-RS endpoints that call PostgreSQL functions directly
 3. **High-performance data transfer system** - Hybrid CSV/SQL approach with progress tracking
-4. **Dynamic SQL transformation service** - Runtime transpilation for DBMS_SQL.PARSE calls
-5. **AI-based CoFramework to Angular transformation** (future)
-6. **AI-based backend transformation** (future)
+4. **Oracle trigger migration** - Complete pipeline for Oracle trigger extraction, parsing, and PostgreSQL transformation
+5. **Dynamic SQL transformation service** - Runtime transpilation for DBMS_SQL.PARSE calls
+6. **AI-based CoFramework to Angular transformation** (future)
+7. **AI-based backend transformation** (future)
 
 ## Architecture Philosophy
 
@@ -255,6 +256,15 @@ Oracle functions become PostgreSQL functions with this naming pattern:
 - `ExportRestControllers.java` - REST controller file management  
 - `SimpleDtoGenerator.java` - Basic DTO generation for complex types
 
+**Trigger Infrastructure**:
+- `TriggerExtractor.java` - Oracle trigger metadata and PL/SQL extraction
+- `TriggerMetadata.java` - Oracle trigger metadata model
+- `Trigger.java` - AST class for trigger parsing and PostgreSQL transformation
+- `ExportTrigger.java` - Two-phase trigger file generation (functions + definitions)
+- `TriggerTransformer.java` - Oracle→PostgreSQL syntax transformation utilities
+- `OracleFunctionMapper.java` - Reusable Oracle function mapping (SYSDATE→CURRENT_TIMESTAMP, etc.)
+- `PostgresStatsService.java` - PostgreSQL trigger counting for frontend statistics
+
 **Configuration**:
 - `CONFIG_MIGRATION.md` - Detailed migration guide
 - `ConfigTest.java` - Configuration verification
@@ -289,6 +299,44 @@ DataTransferService (Orchestrator)
 - **Approach**: Convert Oracle objects to PostgreSQL JSON/JSONB format
 - **Integration**: Leverage `Everything.getObjectTypeSpecAst()` for type definitions
 - **Status**: Ready for implementation
+
+## Oracle Trigger Migration Status
+
+### Current Implementation: Complete Infrastructure ✅
+
+**Completed Phases (All 6 phases)**:
+- ✅ **Phase 1**: Configuration & Infrastructure (triggers enabled in config and frontend)
+- ✅ **Phase 2**: TriggerMetadata and TriggerExtractor (Oracle extraction complete)
+- ✅ **Phase 3**: Trigger AST Class (full parsing infrastructure)
+- ✅ **Phase 4**: PostgreSQL Transformation Logic (Oracle→PostgreSQL mapping)
+- ✅ **Phase 5**: Export and File Generation (two-phase trigger export)
+- ✅ **Phase 6**: Execution Integration (POST_TRANSFER_TRIGGERS phase)
+
+**Frontend Integration Complete**:
+- ✅ **Source Statistics**: Displays extracted triggers and parsed trigger counts
+- ✅ **Target Statistics**: Displays successfully created PostgreSQL triggers
+- ✅ **Configuration**: "Extract triggers" checkbox fully functional
+- ✅ **REST API**: All trigger endpoints integrated
+
+**Architecture**:
+```
+Oracle Triggers → TriggerExtractor → Trigger AST → PostgreSQL Functions/Definitions
+├── Phase 1: step7atriggerfunctions/ (trigger functions)
+└── Phase 2: step7btriggerdefinitions/ (trigger definitions)
+```
+
+**Known Limitations**:
+- ✅ **Infrastructure Complete**: All extraction, parsing, export, and execution phases working
+- ⚠️ **Transpilation Limited**: Oracle PL/SQL→PostgreSQL transformation needs enhancement
+- ⚠️ **Error Handling**: Silent error catching (configurable error handling planned)
+- ⚠️ **Complex Trigger Logic**: Advanced Oracle trigger features require additional mapping
+
+**Key Achievements**:
+- Complete end-to-end trigger migration pipeline
+- PostgreSQL-first trigger function generation
+- Proper execution order (functions before definitions)
+- Full frontend integration with statistics display
+- Error isolation (trigger failures don't stop migration)
 
 **Implementation Path**:
 1. Enhance TableAnalyzer to detect Oracle object types in table columns

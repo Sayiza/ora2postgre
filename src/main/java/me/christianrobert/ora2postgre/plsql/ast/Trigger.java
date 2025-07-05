@@ -339,7 +339,7 @@ public class Trigger extends PlSqlAst {
         }
         
         // For now, get the statement as string and transform it
-        String statementText = statement.toString();
+        String statementText = statement.toPostgre(everything);
         
         if ("TriggerBodyStatement".equals(statementText)) {
             // This is our placeholder from Phase 3 - try to get actual trigger body
