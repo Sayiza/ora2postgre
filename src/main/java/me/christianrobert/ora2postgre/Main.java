@@ -396,9 +396,11 @@ public class Main {
     status.put("objectTypeBodies", data.getObjectTypeBodyPlsql().size());
     status.put("packageSpecs", data.getPackageSpecPlsql().size());
     status.put("packageBodies", data.getPackageBodyPlsql().size());
+    status.put("triggers", data.getTriggerPlsql().size());
     status.put("parsedViews", data.getViewSpecAndQueries().size());
     status.put("parsedObjectTypes", data.getObjectTypeSpecAst().size());
     status.put("parsedPackages", data.getPackageSpecAst().size());
+    status.put("parsedTriggers", data.getTriggerAst().size());
     status.put("totalRowCount", data.getTotalRowCount());
     return Response.ok(status).build();
   }
@@ -1062,8 +1064,20 @@ public class Main {
       }
     }
     if (doTriggers) {
-      // TODO: Implement trigger parsing in Phase 3
-      log.info("Trigger parsing configured but not yet implemented");
+      log.info("Starting trigger parsing...");
+      for (PlsqlCode triggerCode : data.getTriggerPlsql()) {
+        try {
+          // Parse trigger PL/SQL into AST
+          me.christianrobert.ora2postgre.plsql.ast.Trigger triggerAst = 
+            parseTriggerFromPlsqlCode(triggerCode);
+          data.getTriggerAst().add(triggerAst);
+          log.debug("Parsed trigger: {}", triggerAst.getTriggerName());
+        } catch (Exception e) {
+          log.error("Failed to parse trigger from schema {}: {}", 
+            triggerCode.schema, e.getMessage());
+        }
+      }
+      log.info("Trigger parsing completed: {} triggers parsed", data.getTriggerAst().size());
     }
     
     // Debug logging for parsed ASTs
@@ -1080,6 +1094,144 @@ public class Main {
       log.info("No object types found in AST parsing");
     }
   }
+  
+  /**
+   * Parses a trigger from PlsqlCode by extracting metadata and creating a Trigger AST.
+   * This method bridges the gap between TriggerExtractor output and Trigger AST.
+   */
+  private me.christianrobert.ora2postgre.plsql.ast.Trigger parseTriggerFromPlsqlCode(PlsqlCode triggerCode) {
+    // Extract trigger metadata from the PL/SQL code
+    String fullCode = triggerCode.code;
+    String schema = triggerCode.schema;
+    
+    // Parse the CREATE TRIGGER statement to extract metadata
+    // This is a simplified parser - in a full implementation, you'd use ANTLR
+    String triggerName = extractTriggerName(fullCode);
+    String tableName = extractTableName(fullCode);
+    String tableOwner = extractTableOwner(fullCode, schema);
+    
+    // Create the Trigger AST
+    me.christianrobert.ora2postgre.plsql.ast.Trigger trigger = 
+      new me.christianrobert.ora2postgre.plsql.ast.Trigger(triggerName, tableName, tableOwner, schema);
+    
+    // Extract trigger type and events
+    trigger.setTriggerType(extractTriggerType(fullCode));
+    trigger.setTriggeringEvent(extractTriggeringEvent(fullCode));
+    
+    // Extract WHEN clause if present
+    String whenClause = extractWhenClause(fullCode);
+    if (whenClause != null && !whenClause.trim().isEmpty()) {
+      trigger.setWhenClause(whenClause);
+    }
+    
+    // For now, parse the trigger body as a single statement
+    // In a full implementation, this would use ANTLR to parse the body into Statement ASTs
+    List<me.christianrobert.ora2postgre.plsql.ast.Statement> bodyStatements = 
+      parseSimpleTriggerBody(fullCode);
+    trigger.setTriggerBody(bodyStatements);
+    
+    return trigger;
+  }
+  
+  /**
+   * Simple helper methods to extract trigger metadata from PL/SQL code.
+   * These are simplified implementations for Phase 3 - full ANTLR parsing would be better.
+   */
+  private String extractTriggerName(String code) {
+    // Extract trigger name from "CREATE OR REPLACE TRIGGER schema.triggername"
+    java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+      "CREATE\\s+(?:OR\\s+REPLACE\\s+)?TRIGGER\\s+(?:\\w+\\.)?([\\w_]+)", 
+      java.util.regex.Pattern.CASE_INSENSITIVE);
+    java.util.regex.Matcher matcher = pattern.matcher(code);
+    if (matcher.find()) {
+      return matcher.group(1);
+    }
+    return "unknown_trigger";
+  }
+  
+  private String extractTableName(String code) {
+    // Extract table name from "ON schema.tablename"
+    java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+      "ON\\s+(?:\\w+\\.)?([\\w_]+)", 
+      java.util.regex.Pattern.CASE_INSENSITIVE);
+    java.util.regex.Matcher matcher = pattern.matcher(code);
+    if (matcher.find()) {
+      return matcher.group(1);
+    }
+    return "unknown_table";
+  }
+  
+  private String extractTableOwner(String code, String defaultSchema) {
+    // Extract table owner from "ON schema.tablename"
+    java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+      "ON\\s+([\\w_]+)\\.([\\w_]+)", 
+      java.util.regex.Pattern.CASE_INSENSITIVE);
+    java.util.regex.Matcher matcher = pattern.matcher(code);
+    if (matcher.find()) {
+      return matcher.group(1);
+    }
+    return defaultSchema; // Default to trigger schema
+  }
+  
+  private String extractTriggerType(String code) {
+    // Extract BEFORE/AFTER/INSTEAD OF
+    java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+      "(BEFORE|AFTER|INSTEAD\\s+OF)", 
+      java.util.regex.Pattern.CASE_INSENSITIVE);
+    java.util.regex.Matcher matcher = pattern.matcher(code);
+    if (matcher.find()) {
+      return matcher.group(1).toUpperCase();
+    }
+    return "BEFORE"; // Default
+  }
+  
+  private String extractTriggeringEvent(String code) {
+    // Extract INSERT/UPDATE/DELETE
+    java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+      "((?:INSERT|UPDATE|DELETE)(?:\\s+OR\\s+(?:INSERT|UPDATE|DELETE))*)", 
+      java.util.regex.Pattern.CASE_INSENSITIVE);
+    java.util.regex.Matcher matcher = pattern.matcher(code);
+    if (matcher.find()) {
+      return matcher.group(1).toUpperCase().replaceAll("\\s+OR\\s+", ",");
+    }
+    return "INSERT"; // Default
+  }
+  
+  private String extractWhenClause(String code) {
+    // Extract WHEN clause if present
+    java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+      "WHEN\\s+\\(([^)]+)\\)", 
+      java.util.regex.Pattern.CASE_INSENSITIVE);
+    java.util.regex.Matcher matcher = pattern.matcher(code);
+    if (matcher.find()) {
+      return matcher.group(1);
+    }
+    return null;
+  }
+  
+  private List<me.christianrobert.ora2postgre.plsql.ast.Statement> parseSimpleTriggerBody(String code) {
+    // For Phase 3, create a simple statement placeholder
+    // In Phase 4, this would be replaced with proper ANTLR parsing
+    List<me.christianrobert.ora2postgre.plsql.ast.Statement> statements = new ArrayList<>();
+    
+    // Create a simple statement wrapper for the trigger body
+    me.christianrobert.ora2postgre.plsql.ast.Statement bodyStatement = 
+      new me.christianrobert.ora2postgre.plsql.ast.Statement() {
+        @Override
+        public <T> T accept(me.christianrobert.ora2postgre.plsql.ast.PlSqlAstVisitor<T> visitor) {
+          return visitor.visit(this);
+        }
+        
+        @Override
+        public String toString() {
+          return "TriggerBodyStatement";
+        }
+      };
+    
+    statements.add(bodyStatement);
+    return statements;
+  }
+  
   private void performDataTransfer() throws Exception {
     boolean doData = configurationService.isDoData();
     

@@ -39,4 +39,5 @@ public interface PlSqlAstVisitor<T> {
   T visit(UnaryLogicalExpression unaryLogicalExpression);
   T visit(LogicalExpression logicalExpression);
   T visit(CursorExpression cursorExpression);
+  T visit(Trigger trigger);
 }

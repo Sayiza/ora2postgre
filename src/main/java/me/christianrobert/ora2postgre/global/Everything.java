@@ -9,6 +9,7 @@ import me.christianrobert.ora2postgre.plsql.ast.Function;
 import me.christianrobert.ora2postgre.plsql.ast.ObjectType;
 import me.christianrobert.ora2postgre.plsql.ast.OraclePackage;
 import me.christianrobert.ora2postgre.plsql.ast.TableReference;
+import me.christianrobert.ora2postgre.plsql.ast.Trigger;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import java.util.ArrayList;
@@ -34,7 +35,7 @@ public class Everything {
   private List<ObjectType> objectTypeBodyAst = new ArrayList<>();
   private List<OraclePackage> packageSpecAst = new ArrayList<>();
   private List<OraclePackage> packageBodyAst = new ArrayList<>();
-  // TODO: Add List<Trigger> triggerAst = new ArrayList<>(); in Phase 3
+  private List<Trigger> triggerAst = new ArrayList<>();
 
   private long totalRowCount = 0;
   private int intendations = 0;
@@ -91,6 +92,10 @@ public class Everything {
 
   public List<OraclePackage> getPackageBodyAst() {
     return packageBodyAst;
+  }
+
+  public List<Trigger> getTriggerAst() {
+    return triggerAst;
   }
 
   public long getTotalRowCount() {
