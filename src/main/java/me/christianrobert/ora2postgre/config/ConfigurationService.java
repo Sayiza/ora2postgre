@@ -207,10 +207,6 @@ public class ConfigurationService {
         return getValue("do.write-postgre-files", config.isDoWritePostgreFiles());
     }
 
-    public boolean isDoWriteTriggerFiles() {
-        return getValue("do.write-trigger-files", config.isDoWriteTriggerFiles());
-    }
-
     public boolean isDoExecutePostgreFiles() {
         return getValue("do.execute-postgre-files", config.isDoExecutePostgreFiles());
     }

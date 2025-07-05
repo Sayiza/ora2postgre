@@ -10,6 +10,7 @@ import me.christianrobert.ora2postgre.oracledb.SchemaExtractor;
 import me.christianrobert.ora2postgre.oracledb.SynonymExtractor;
 import me.christianrobert.ora2postgre.oracledb.TableExtractor;
 import me.christianrobert.ora2postgre.oracledb.ViewExtractor;
+import me.christianrobert.ora2postgre.oracledb.TriggerExtractor;
 import me.christianrobert.ora2postgre.oracledb.ViewMetadata;
 import me.christianrobert.ora2postgre.plsql.PlSqlAstMain;
 import me.christianrobert.ora2postgre.plsql.ast.ObjectType;
@@ -775,8 +776,7 @@ public class Main {
         data.getPackageBodyPlsql().addAll(PackageExtractor.extract(conn, data.getUserNames(), false));
       }
       if (doTriggers) {
-        // TODO: Implement TriggerExtractor.extract() in Phase 2
-        log.info("Trigger extraction configured but not yet implemented");
+        data.getTriggerPlsql().addAll(TriggerExtractor.extract(conn, data.getUserNames()));
       }
 
       if (configurationService.isDoData()) {
@@ -789,9 +789,9 @@ public class Main {
       }
       
       // Debug logging for extracted data
-      log.info("Extraction completed: {} schemas, {} tables, {} object type specs, {} package specs",
+      log.info("Extraction completed: {} schemas, {} tables, {} object type specs, {} package specs, {} triggers",
           data.getUserNames().size(), data.getTableSql().size(), 
-          data.getObjectTypeSpecPlsql().size(), data.getPackageSpecPlsql().size());
+          data.getObjectTypeSpecPlsql().size(), data.getPackageSpecPlsql().size(), data.getTriggerPlsql().size());
     }
   }
   
@@ -889,8 +889,7 @@ public class Main {
       // Sub-step 9: Extract triggers
       progressService.updateSubStepProgress(jobId, MigrationStep.EXTRACT, completedSubSteps, "Extracting triggers");
       if (doTriggers) {
-        // TODO: Implement TriggerExtractor.extract() in Phase 2
-        log.info("Trigger extraction configured but not yet implemented");
+        data.getTriggerPlsql().addAll(TriggerExtractor.extract(conn, data.getUserNames()));
       }
       completedSubSteps++;
       
@@ -909,9 +908,9 @@ public class Main {
       progressService.updateSubStepProgress(jobId, MigrationStep.EXTRACT, completedSubSteps, "Extraction completed");
       
       // Debug logging for extracted data
-      log.info("Extraction completed: {} schemas, {} tables, {} object type specs, {} package specs",
+      log.info("Extraction completed: {} schemas, {} tables, {} object type specs, {} package specs, {} triggers",
           data.getUserNames().size(), data.getTableSql().size(), 
-          data.getObjectTypeSpecPlsql().size(), data.getPackageSpecPlsql().size());
+          data.getObjectTypeSpecPlsql().size(), data.getPackageSpecPlsql().size(), data.getTriggerPlsql().size());
     }
   }
   
