@@ -529,6 +529,10 @@
                     <div class="data-count" id="packageBodies-count">-</div>
                     <div class="data-label">Package Bodies</div>
                 </div>
+                <div class="data-item">
+                    <div class="data-count" id="triggers-count">-</div>
+                    <div class="data-label">Triggers</div>
+                </div>
                 <!-- Parse AST Phase Data -->
                 <div class="data-item">
                     <div class="data-count" id="parsedViews-count">-</div>
@@ -541,6 +545,10 @@
                 <div class="data-item">
                     <div class="data-count" id="parsedPackages-count">-</div>
                     <div class="data-label">Parsed Packages</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-count" id="parsedTriggers-count">-</div>
+                    <div class="data-label">Parsed Triggers</div>
                 </div>
                 <!-- Row Count Data -->
                 <div class="data-item">
@@ -580,6 +588,10 @@
                 <div class="data-item">
                     <div class="data-count" id="target-types-count">-</div>
                     <div class="data-label">Types</div>
+                </div>
+                <div class="data-item">
+                    <div class="data-count" id="target-triggers-count">-</div>
+                    <div class="data-label">Triggers</div>
                 </div>
                 <div class="data-item">
                     <div class="data-count" id="target-totalRowCount-count">-</div>
@@ -943,11 +955,13 @@
             document.getElementById('objectTypeBodies-count').textContent = data.objectTypeBodies || 0;
             document.getElementById('packageSpecs-count').textContent = data.packageSpecs || 0;
             document.getElementById('packageBodies-count').textContent = data.packageBodies || 0;
+            document.getElementById('triggers-count').textContent = data.triggers || 0;
             
             // Parse AST Phase Data
             document.getElementById('parsedViews-count').textContent = data.parsedViews || 0;
             document.getElementById('parsedObjectTypes-count').textContent = data.parsedObjectTypes || 0;
             document.getElementById('parsedPackages-count').textContent = data.parsedPackages || 0;
+            document.getElementById('parsedTriggers-count').textContent = data.parsedTriggers || 0;
             
             // Row Count Data (format with commas for large numbers)
             const totalRowCount = data.totalRowCount || 0;
@@ -962,6 +976,7 @@
             document.getElementById('target-functions-count').textContent = stats.functions || 0;
             document.getElementById('target-procedures-count').textContent = stats.procedures || 0;
             document.getElementById('target-types-count').textContent = stats.types || 0;
+            document.getElementById('target-triggers-count').textContent = stats.triggers || 0;
             
             // Update target row count (format with commas for large numbers)
             const targetTotalRowCount = stats.totalRowCount || 0;

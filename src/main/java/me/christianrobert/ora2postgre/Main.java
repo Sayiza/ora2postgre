@@ -1462,6 +1462,23 @@ public class Main {
         );
         
         log.info("Post-transfer SQL execution completed successfully (constraints and other objects)");
+        
+        // Execute triggers after all other objects are created
+        try {
+          PostgresExecuter.executeAllSqlFiles(
+                  path,
+                  postgresConn,
+                  new ArrayList<>(), 
+                  new ArrayList<>(),
+                  ExecutionPhase.POST_TRANSFER_TRIGGERS
+          );
+          
+          log.info("Trigger execution completed successfully (functions and definitions)");
+        } catch (Exception triggerException) {
+          log.error("Trigger execution failed - some triggers may not have been created", triggerException);
+          log.warn("Continuing with migration despite trigger errors - triggers can be created manually later");
+          // Don't re-throw the exception - allow migration to continue
+        }
       }
     }
   }

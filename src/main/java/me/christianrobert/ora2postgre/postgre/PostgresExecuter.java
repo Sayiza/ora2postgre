@@ -21,7 +21,8 @@ public class PostgresExecuter {
   public enum ExecutionPhase {
     PRE_TRANSFER_TYPES,  // Execute type specs at very first
     PRE_TRANSFER_TABLES,  // Execute schema and table files before data transfer
-    POST_TRANSFER  // Execute constraint and other files after data transfer
+    POST_TRANSFER,  // Execute constraint and other files after data transfer
+    POST_TRANSFER_TRIGGERS  // Execute triggers after all other objects are created
   }
 
   public static void executeAllSqlFiles(
@@ -60,7 +61,7 @@ public class PostgresExecuter {
           subdirectories.add(entry);
         } else if (entry.getFileName().toString().toLowerCase().endsWith(".sql")) {
           String fileName = entry.getFileName().toString();
-          if (shouldExecuteFile(fileName, phase)) {
+          if (shouldExecuteFileUnified(entry, phase)) {
             sqlFiles.add(entry);
           }
         }
@@ -93,30 +94,60 @@ public class PostgresExecuter {
     }
   }
 
-  private static boolean shouldExecuteFile(String fileName, ExecutionPhase phase) {
+  /**
+   * Unified file execution detection method that handles both filename and path-based detection.
+   * This prevents duplicate file execution by using a single detection method.
+   */
+  private static boolean shouldExecuteFileUnified(Path filePath, ExecutionPhase phase) {
     if (phase == null) {
       return true; // Execute all files if no phase specified (backward compatibility)
     }
     
+    String fileName = filePath.getFileName().toString();
     String upperFileName = fileName.toUpperCase();
+    boolean isTriggerFile = isTriggerFileByPath(filePath);
     
     switch (phase) {
       case PRE_TRANSFER_TYPES:
-        // Execute types
+        // Execute types only
         return upperFileName.endsWith("SCHEMA.SQL")
                 || upperFileName.endsWith("OBJECTTYPESPEC.SQL");
       case PRE_TRANSFER_TABLES:
-        // Execute schema files and table files before data transfer
+        // Execute table files only
         return upperFileName.endsWith("TABLE.SQL");
       case POST_TRANSFER:
-        // Execute all other files after data transfer (excluding schema and table files)
+        // Execute all other files after data transfer (excluding schema, table, and trigger files)
         return !upperFileName.endsWith("SCHEMA.SQL")
                 && !upperFileName.endsWith("TABLE.SQL")
-                && !upperFileName.endsWith("OBJECTTYPESPEC.SQL");
+                && !upperFileName.endsWith("OBJECTTYPESPEC.SQL")
+                && !isTriggerFile;
+      case POST_TRANSFER_TRIGGERS:
+        // Execute only trigger files in the final phase
+        logger.debug("POST_TRANSFER_TRIGGERS phase - File: {}, IsTrigger: {}", fileName, isTriggerFile);
+        return isTriggerFile;
 
       default:
         return true;
     }
+  }
+
+
+  /**
+   * Enhanced trigger file detection that considers the full path.
+   * This provides more accurate detection by examining the directory structure.
+   */
+  private static boolean isTriggerFileByPath(Path filePath) {
+    String pathStr = filePath.toString().toLowerCase();
+    boolean isTrigger = pathStr.contains("step7atriggerfunctions") || 
+                       pathStr.contains("step7btriggerdefinitions") ||
+                       pathStr.contains("triggers");
+    
+    // Debug logging for trigger file detection
+    if (isTrigger) {
+      logger.debug("Detected trigger file: {}", filePath);
+    }
+    
+    return isTrigger;
   }
 
   public static void executeSQLFile(Path sqlFilePath, Connection connection) throws Exception {

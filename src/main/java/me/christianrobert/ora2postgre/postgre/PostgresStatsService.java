@@ -37,6 +37,9 @@ public class PostgresStatsService {
         // Count types (composite types, domains, enums - excluding system types)
         stats.put("types", countTypes(postgresConnection));
         
+        // Count triggers (excluding system triggers)
+        stats.put("triggers", countTriggers(postgresConnection));
+        
         // Count total rows (excluding system tables)
         stats.put("totalRowCount", countTotalRows(postgresConnection));
         
@@ -175,6 +178,24 @@ public class PostgresStatsService {
              ResultSet rs = stmt.executeQuery()) {
             if (rs.next()) {
                 return rs.getLong(1);
+            }
+        }
+        return 0;
+    }
+    
+    private int countTriggers(Connection conn) throws SQLException {
+        String sql = """
+            SELECT count(*) 
+            FROM information_schema.triggers 
+            WHERE trigger_schema NOT IN ('information_schema', 'pg_catalog', 'pg_toast')
+            AND trigger_schema NOT LIKE 'pg_temp_%'
+            AND trigger_schema NOT LIKE 'pg_toast_temp_%'
+            """;
+        
+        try (PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+            if (rs.next()) {
+                return rs.getInt(1);
             }
         }
         return 0;

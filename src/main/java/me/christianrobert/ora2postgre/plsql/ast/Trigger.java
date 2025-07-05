@@ -166,7 +166,7 @@ public class Trigger extends PlSqlAst {
         }
         
         // Add return statement
-        function.append(generateReturnStatement());
+        function.append(generateReturnStatement()).append("\n");
         
         function.append("END;\n")
                 .append("$$ LANGUAGE plpgsql;\n");
