@@ -106,11 +106,12 @@ public class Main {
   public Response extractData() {
     log.info("Extract data endpoint called");
     
-    if (jobManager.isJobRunning("extract")) {
-      log.warn("Extract job is already running, rejecting request");
+    if (jobManager.isAnyJobRunning()) {
+      log.warn("Another job is already running, rejecting extract request");
       Map<String, String> error = new HashMap<>();
       error.put("status", "error");
-      error.put("message", "Extract job is already running");
+      error.put("message", "Another job is already running. Only one job can run at a time.");
+      error.put("currentJobId", jobManager.getCurrentRunningJobId());
       return Response.status(409).entity(error).build();
     }
     
@@ -145,10 +146,11 @@ public class Main {
     @APIResponse(responseCode = "409", description = "Another parsing job is already running")
   })
   public Response parseData() {
-    if (jobManager.isJobRunning("parse")) {
+    if (jobManager.isAnyJobRunning()) {
       Map<String, String> error = new HashMap<>();
       error.put("status", "error");
-      error.put("message", "Parse job is already running");
+      error.put("message", "Another job is already running. Only one job can run at a time.");
+      error.put("currentJobId", jobManager.getCurrentRunningJobId());
       return Response.status(409).entity(error).build();
     }
     
@@ -179,10 +181,11 @@ public class Main {
     @APIResponse(responseCode = "409", description = "Another export job is already running")
   })
   public Response exportFiles() {
-    if (jobManager.isJobRunning("export")) {
+    if (jobManager.isAnyJobRunning()) {
       Map<String, String> error = new HashMap<>();
       error.put("status", "error");
-      error.put("message", "Export job is already running");
+      error.put("message", "Another job is already running. Only one job can run at a time.");
+      error.put("currentJobId", jobManager.getCurrentRunningJobId());
       return Response.status(409).entity(error).build();
     }
     
@@ -213,10 +216,11 @@ public class Main {
     @APIResponse(responseCode = "409", description = "Another pre-transfer execution is running")
   })
   public Response executePreTransferSQL() {
-    if (jobManager.isJobRunning("execute-pre")) {
+    if (jobManager.isAnyJobRunning()) {
       Map<String, String> error = new HashMap<>();
       error.put("status", "error");
-      error.put("message", "Pre-transfer execute job is already running");
+      error.put("message", "Another job is already running. Only one job can run at a time.");
+      error.put("currentJobId", jobManager.getCurrentRunningJobId());
       return Response.status(409).entity(error).build();
     }
     
@@ -247,10 +251,11 @@ public class Main {
     @APIResponse(responseCode = "409", description = "Another post-transfer execution is running")
   })
   public Response executePostTransferSQL() {
-    if (jobManager.isJobRunning("execute-post")) {
+    if (jobManager.isAnyJobRunning()) {
       Map<String, String> error = new HashMap<>();
       error.put("status", "error");
-      error.put("message", "Post-transfer execute job is already running");
+      error.put("message", "Another job is already running. Only one job can run at a time.");
+      error.put("currentJobId", jobManager.getCurrentRunningJobId());
       return Response.status(409).entity(error).build();
     }
     
@@ -281,10 +286,11 @@ public class Main {
     @APIResponse(responseCode = "409", description = "Another data transfer job is running")
   })
   public Response transferData() {
-    if (jobManager.isJobRunning("transferdata")) {
+    if (jobManager.isAnyJobRunning()) {
       Map<String, String> error = new HashMap<>();
       error.put("status", "error");
-      error.put("message", "Execute job is already running");
+      error.put("message", "Another job is already running. Only one job can run at a time.");
+      error.put("currentJobId", jobManager.getCurrentRunningJobId());
       return Response.status(409).entity(error).build();
     }
 
@@ -317,11 +323,12 @@ public class Main {
   public Response runFullMigration() {
     log.info("Full migration endpoint called");
     
-    if (jobManager.isJobRunning("full")) {
-      log.warn("Full migration job is already running, rejecting request");
+    if (jobManager.isAnyJobRunning()) {
+      log.warn("Another job is already running, rejecting full migration request");
       Map<String, String> error = new HashMap<>();
       error.put("status", "error");
-      error.put("message", "Full migration job is already running");
+      error.put("message", "Another job is already running. Only one job can run at a time.");
+      error.put("currentJobId", jobManager.getCurrentRunningJobId());
       return Response.status(409).entity(error).build();
     }
     
@@ -467,9 +474,63 @@ public class Main {
   }
   
   @POST
+  @Path("/cancel")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Operation(
+    summary = "❌ Cancel Running Job",
+    description = "Cancels a specific running job by ID, or cancels all jobs if no ID is provided. The job will be marked as cancelled and any queued jobs will continue processing."
+  )
+  @APIResponses({
+    @APIResponse(responseCode = "200", description = "Job cancelled successfully"),
+    @APIResponse(responseCode = "404", description = "Job not found"),
+    @APIResponse(responseCode = "409", description = "Job already completed or cancelled")
+  })
+  public Response cancelJob(@QueryParam("jobId") String jobId) {
+    log.info("Cancel job endpoint called with jobId: {}", jobId);
+    
+    if (jobId == null || jobId.trim().isEmpty()) {
+      // Cancel all jobs
+      jobManager.cancelAllJobs("Manual cancellation requested");
+      Map<String, String> result = new HashMap<>();
+      result.put("status", "success");
+      result.put("message", "All jobs have been cancelled");
+      return Response.ok(result).build();
+    }
+    
+    // Cancel specific job
+    boolean cancelled = jobManager.cancelJob(jobId, "Manual cancellation requested");
+    
+    if (!cancelled) {
+      JobStatus status = jobManager.getJobStatus(jobId);
+      if (status == null) {
+        Map<String, String> error = new HashMap<>();
+        error.put("status", "error");
+        error.put("message", "Job not found: " + jobId);
+        return Response.status(404).entity(error).build();
+      } else {
+        Map<String, String> error = new HashMap<>();
+        error.put("status", "error");
+        error.put("message", "Job already completed or cancelled: " + status.getState());
+        return Response.status(409).entity(error).build();
+      }
+    }
+    
+    Map<String, String> result = new HashMap<>();
+    result.put("status", "success");
+    result.put("message", "Job cancelled successfully");
+    result.put("jobId", jobId);
+    return Response.ok(result).build();
+  }
+  
+  @POST
   @Path("/reset")
   @Produces(MediaType.APPLICATION_JSON)
   public Response resetEverything() {
+    log.info("Reset endpoint called - cancelling all jobs and clearing data");
+    
+    // First, cancel all running jobs
+    jobManager.cancelAllJobs("Application reset requested");
+    
     // Clear all data in the Everything singleton
     data.getUserNames().clear();
     data.getTableSql().clear();
@@ -486,9 +547,12 @@ public class Main {
     data.getPackageBodyAst().clear();
     data.setTotalRowCount(0);
     
+    // Clear completed jobs from job manager
+    jobManager.clearCompletedJobs();
+    
     Map<String, String> result = new HashMap<>();
     result.put("status", "success");
-    result.put("message", "Everything data has been reset");
+    result.put("message", "Everything data has been reset and all jobs cancelled");
     return Response.ok(result).build();
   }
   
@@ -799,6 +863,12 @@ public class Main {
   }
   
   private void performExtractionWithProgress(String jobId) throws Exception {
+    // Check if job was cancelled before starting
+    if (progressService.isJobCancelled(jobId)) {
+      log.info("Job {} was cancelled before extraction started", jobId);
+      return;
+    }
+    
     List<String> doOnlySomeSchema = Arrays.stream(configurationService.getDoOnlyTestSchema().split(","))
             .map(String::trim)
             .filter(s -> !s.isEmpty())
@@ -918,16 +988,42 @@ public class Main {
   }
   
   private void performParsingWithProgress(String jobId) throws Exception {
+    // Check if job was cancelled before starting
+    if (progressService.isJobCancelled(jobId)) {
+      log.info("Job {} was cancelled before parsing started", jobId);
+      return;
+    }
+    
     // Delegate to existing method for now - can be enhanced later with detailed sub-step tracking
     progressService.updateSubStepProgress(jobId, MigrationStep.PARSE, 0, "Starting AST parsing");
     performParsing();
+    
+    // Check if job was cancelled during parsing
+    if (progressService.isJobCancelled(jobId)) {
+      log.info("Job {} was cancelled during parsing", jobId);
+      return;
+    }
+    
     progressService.updateSubStepProgress(jobId, MigrationStep.PARSE, MigrationStep.PARSE.getSubStepCount(), "AST parsing completed");
   }
   
   private void performExportWithProgress(String jobId) throws Exception {
+    // Check if job was cancelled before starting
+    if (progressService.isJobCancelled(jobId)) {
+      log.info("Job {} was cancelled before export started", jobId);
+      return;
+    }
+    
     // Delegate to existing method for now - can be enhanced later with detailed sub-step tracking
     progressService.updateSubStepProgress(jobId, MigrationStep.EXPORT, 0, "Starting file export");
     performExport();
+    
+    // Check if job was cancelled during export
+    if (progressService.isJobCancelled(jobId)) {
+      log.info("Job {} was cancelled during export", jobId);
+      return;
+    }
+    
     progressService.updateSubStepProgress(jobId, MigrationStep.EXPORT, MigrationStep.EXPORT.getSubStepCount(), "File export completed");
   }
   
@@ -939,6 +1035,12 @@ public class Main {
   }
   
   private void performDataTransferWithProgress(String jobId) throws Exception {
+    // Check if job was cancelled before starting
+    if (progressService.isJobCancelled(jobId)) {
+      log.info("Job {} was cancelled before data transfer started", jobId);
+      return;
+    }
+    
     boolean doData = configurationService.isDoData();
     
     if (doData) {

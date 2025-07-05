@@ -43,7 +43,7 @@ public class MigrationProgressService {
      */
     public void updateSubStepProgress(String jobId, MigrationStep currentStep, int completedSubSteps, String currentSubStepDetails) {
         JobStatus jobStatus = jobManager.getJobStatus(jobId);
-        if (jobStatus != null) {
+        if (jobStatus != null && !jobStatus.isCancelled()) {
             double stepProgress = (double) completedSubSteps / currentStep.getSubStepCount();
             double overallProgress = currentStep.calculateOverallProgress(stepProgress);
             
@@ -65,7 +65,7 @@ public class MigrationProgressService {
      */
     public void advanceToNextStep(String jobId, MigrationStep nextStep) {
         JobStatus jobStatus = jobManager.getJobStatus(jobId);
-        if (jobStatus != null) {
+        if (jobStatus != null && !jobStatus.isCancelled()) {
             // Complete current step
             if (jobStatus.getCurrentStep() != null) {
                 log.info("Completed step: {} for job {}", jobStatus.getCurrentStep(), jobId);
@@ -127,7 +127,7 @@ public class MigrationProgressService {
                                                 String currentTableName, boolean isStarting, 
                                                 Long rowsTransferredSoFar) {
         JobStatus jobStatus = jobManager.getJobStatus(jobId);
-        if (jobStatus != null) {
+        if (jobStatus != null && !jobStatus.isCancelled()) {
             MigrationStep transferStep = MigrationStep.TRANSFERDATA;
             
             // Calculate step progress based on table completion
@@ -172,7 +172,7 @@ public class MigrationProgressService {
      */
     public void updateDataTransferProgress(String jobId, double transferProgress, String transferDetails) {
         JobStatus jobStatus = jobManager.getJobStatus(jobId);
-        if (jobStatus != null) {
+        if (jobStatus != null && !jobStatus.isCancelled()) {
             MigrationStep transferStep = MigrationStep.TRANSFERDATA;
             
             // Update step progress with transfer progress
@@ -224,6 +224,33 @@ public class MigrationProgressService {
         }
         
         return new JobProgressInfo(jobStatus);
+    }
+    
+    /**
+     * Check if a job has been cancelled - useful for long-running operations
+     */
+    public boolean isJobCancelled(String jobId) {
+        JobStatus jobStatus = jobManager.getJobStatus(jobId);
+        return jobStatus != null && jobStatus.isCancelled();
+    }
+    
+    /**
+     * Utility method to check if a job should continue processing
+     */
+    public boolean shouldContinueProcessing(String jobId) {
+        JobStatus jobStatus = jobManager.getJobStatus(jobId);
+        return jobStatus != null && !jobStatus.isCancelled() && jobStatus.isActive();
+    }
+    
+    /**
+     * Handle job cancellation during processing
+     */
+    public void handleJobCancellation(String jobId, MigrationStep currentStep) {
+        JobStatus jobStatus = jobManager.getJobStatus(jobId);
+        if (jobStatus != null && jobStatus.isCancelled()) {
+            jobStatus.setSubStepDetails(String.format("Job cancelled during %s", currentStep.getDisplayName()));
+            log.info("Job {} was cancelled during step: {}", jobId, currentStep.getDisplayName());
+        }
     }
     
     /**
