@@ -28,6 +28,7 @@ import me.christianrobert.ora2postgre.writing.ExportProjectPostgre;
 import me.christianrobert.ora2postgre.writing.ExportRestControllers;
 import me.christianrobert.ora2postgre.writing.ExportSchema;
 import me.christianrobert.ora2postgre.writing.ExportTable;
+import me.christianrobert.ora2postgre.writing.ExportTrigger;
 import me.christianrobert.ora2postgre.writing.ExportView;
 import me.christianrobert.ora2postgre.jobs.JobManager;
 import me.christianrobert.ora2postgre.jobs.JobStatus;
@@ -1399,8 +1400,9 @@ public class Main {
         ExportPackage.savePackageBodyToPostgre(path, data.getPackageSpecAst(), data.getPackageBodyAst(), data);
       }
       if (doTriggers) {
-        // TODO: Implement ExportTrigger.saveTriggersToPostgre() in Phase 5
-        log.info("Trigger file export configured but not yet implemented");
+        log.info("Starting trigger export to PostgreSQL files");
+        ExportTrigger.saveAllTriggers(path, data);
+        log.info("Trigger export completed");
       }
     }
   }
