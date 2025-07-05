@@ -1186,9 +1186,9 @@ public class Main {
   }
   
   private String extractTriggeringEvent(String code) {
-    // Extract INSERT/UPDATE/DELETE
+    // Extract INSERT/UPDATE/DELETE, including UPDATE OF column_list
     java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
-      "((?:INSERT|UPDATE|DELETE)(?:\\s+OR\\s+(?:INSERT|UPDATE|DELETE))*)", 
+      "((?:INSERT|UPDATE(?:\\s+OF\\s+[\\w,\\s]+)?|DELETE)(?:\\s+OR\\s+(?:INSERT|UPDATE(?:\\s+OF\\s+[\\w,\\s]+)?|DELETE))*)", 
       java.util.regex.Pattern.CASE_INSENSITIVE);
     java.util.regex.Matcher matcher = pattern.matcher(code);
     if (matcher.find()) {
@@ -1210,11 +1210,12 @@ public class Main {
   }
   
   private List<me.christianrobert.ora2postgre.plsql.ast.Statement> parseSimpleTriggerBody(String code) {
-    // For Phase 3, create a simple statement placeholder
-    // In Phase 4, this would be replaced with proper ANTLR parsing
+    // Extract the actual trigger body from the CREATE TRIGGER statement
+    String triggerBody = extractTriggerBodyContent(code);
+    
     List<me.christianrobert.ora2postgre.plsql.ast.Statement> statements = new ArrayList<>();
     
-    // Create a simple statement wrapper for the trigger body
+    // Create a statement wrapper that contains the actual trigger body
     me.christianrobert.ora2postgre.plsql.ast.Statement bodyStatement = 
       new me.christianrobert.ora2postgre.plsql.ast.Statement() {
         @Override
@@ -1224,12 +1225,48 @@ public class Main {
         
         @Override
         public String toString() {
-          return "TriggerBodyStatement";
+          return triggerBody;
         }
       };
     
     statements.add(bodyStatement);
     return statements;
+  }
+  
+  /**
+   * Extract the actual trigger body content from the full CREATE TRIGGER statement.
+   */
+  private String extractTriggerBodyContent(String fullTriggerCode) {
+    // Find the trigger body between BEGIN and END or after the last keyword
+    java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+      "(?:BEGIN|FOR\\s+EACH\\s+ROW)\\s*(.*?)(?:END|;)\\s*$", 
+      java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.DOTALL);
+    
+    java.util.regex.Matcher matcher = pattern.matcher(fullTriggerCode);
+    if (matcher.find()) {
+      String body = matcher.group(1).trim();
+      if (!body.isEmpty()) {
+        return body;
+      }
+    }
+    
+    // Fallback: try to extract content after FOR EACH ROW
+    pattern = java.util.regex.Pattern.compile(
+      "FOR\\s+EACH\\s+ROW\\s+(.*?)$", 
+      java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.DOTALL);
+    
+    matcher = pattern.matcher(fullTriggerCode);
+    if (matcher.find()) {
+      String body = matcher.group(1).trim();
+      // Remove trailing semicolon and END if present
+      body = body.replaceAll("(?i)\\s*END\\s*;?\\s*$", "").trim();
+      if (!body.isEmpty()) {
+        return body;
+      }
+    }
+    
+    // If no body found, return a comment
+    return "-- No trigger body found to transform";
   }
   
   private void performDataTransfer() throws Exception {

@@ -2,6 +2,7 @@ package me.christianrobert.ora2postgre.plsql.ast;
 
 import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.global.PostgreSqlIdentifierUtils;
+import me.christianrobert.ora2postgre.plsql.ast.tools.TriggerTransformer;
 
 import java.util.List;
 import java.util.ArrayList;
@@ -190,9 +191,10 @@ public class Trigger extends PlSqlAst {
                 .append(".").append(PostgreSqlIdentifierUtils.quoteIdentifier(tableName))
                 .append("\n  FOR EACH ROW");
         
-        // Add WHEN clause if present
-        if (whenClause != null && !whenClause.trim().isEmpty()) {
-            trigger.append("\n  WHEN (").append(transformWhenClause(whenClause, everything)).append(")");
+        // Add WHEN clause if present or if UPDATE OF columns are specified
+        String combinedWhenClause = buildCombinedWhenClause(everything);
+        if (combinedWhenClause != null && !combinedWhenClause.trim().isEmpty()) {
+            trigger.append("\n  WHEN (").append(combinedWhenClause).append(")");
         }
         
         trigger.append("\n  EXECUTE FUNCTION ")
@@ -221,7 +223,44 @@ public class Trigger extends PlSqlAst {
      * Helper method to get PostgreSQL event list (INSERT OR UPDATE OR DELETE).
      */
     public String getPostgreEventList() {
-        return triggeringEvent.toUpperCase().replace(",", " OR ");
+        String events = triggeringEvent.toUpperCase().replace(",", " OR ");
+        
+        // Handle UPDATE OF column_list - PostgreSQL doesn't support this syntax
+        // We'll need to add this logic to the WHEN clause or function body
+        if (events.contains("UPDATE OF")) {
+            events = events.replaceAll("UPDATE OF [\\w,\\s]+", "UPDATE");
+        }
+        
+        return events;
+    }
+    
+    /**
+     * Extract UPDATE OF column list if present.
+     */
+    public List<String> getUpdateOfColumns() {
+        List<String> columns = new ArrayList<>();
+        
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+            "UPDATE\\s+OF\\s+([\\w,\\s]+)", 
+            java.util.regex.Pattern.CASE_INSENSITIVE);
+        java.util.regex.Matcher matcher = pattern.matcher(triggeringEvent);
+        
+        if (matcher.find()) {
+            String columnList = matcher.group(1);
+            String[] columnArray = columnList.split(",");
+            for (String column : columnArray) {
+                columns.add(column.trim());
+            }
+        }
+        
+        return columns;
+    }
+    
+    /**
+     * Check if this trigger has UPDATE OF column restrictions.
+     */
+    public boolean hasUpdateOfColumns() {
+        return triggeringEvent.toUpperCase().contains("UPDATE OF");
     }
 
     /**
@@ -232,7 +271,13 @@ public class Trigger extends PlSqlAst {
         if (triggeringEvent != null && !triggeringEvent.trim().isEmpty()) {
             String[] eventArray = triggeringEvent.split(",");
             for (String event : eventArray) {
-                events.add(event.trim().toUpperCase());
+                String cleanEvent = event.trim().toUpperCase();
+                // Handle UPDATE OF by extracting just UPDATE
+                if (cleanEvent.startsWith("UPDATE OF")) {
+                    events.add("UPDATE");
+                } else {
+                    events.add(cleanEvent);
+                }
             }
         }
         return events;
@@ -267,46 +312,118 @@ public class Trigger extends PlSqlAst {
     private String generateTriggerLogic(String event, Everything everything) {
         StringBuilder logic = new StringBuilder();
         
-        logic.append("    -- TODO: Transform trigger body statements\n");
-        logic.append("    -- Original Oracle trigger logic goes here\n");
-        logic.append("    -- Event: ").append(event).append("\n");
+        if (triggerBody.isEmpty()) {
+            logic.append("    -- Empty trigger body\n");
+            logic.append("    -- Event: ").append(event).append("\n");
+            return logic.toString();
+        }
         
-        // For now, add placeholder logic
-        // This will be enhanced in Phase 4 with actual statement transformation
+        logic.append("    -- Trigger logic for event: ").append(event).append("\n");
+        
+        // Transform each statement in the trigger body
         for (Statement stmt : triggerBody) {
-            logic.append("    -- Statement: ").append(stmt.getClass().getSimpleName()).append("\n");
+            String transformedStatement = transformStatement(stmt, everything);
+            logic.append("    ").append(transformedStatement).append("\n");
         }
         
         return logic.toString();
+    }
+    
+    /**
+     * Transform a single trigger body statement from Oracle to PostgreSQL.
+     */
+    private String transformStatement(Statement statement, Everything everything) {
+        if (statement == null) {
+            return "-- NULL statement";
+        }
+        
+        // For now, get the statement as string and transform it
+        String statementText = statement.toString();
+        
+        if ("TriggerBodyStatement".equals(statementText)) {
+            // This is our placeholder from Phase 3 - try to get actual trigger body
+            return getActualTriggerBodyTransformed(everything);
+        }
+        
+        // Transform the statement using TriggerTransformer
+        return TriggerTransformer.transformTriggerBody(statementText, everything);
+    }
+    
+    /**
+     * Get and transform the actual trigger body from Oracle trigger metadata.
+     * This method extracts the raw trigger body and transforms it.
+     */
+    private String getActualTriggerBodyTransformed(Everything everything) {
+        // For Phase 4, we'll implement more sophisticated body extraction
+        // For now, return a transformed placeholder
+        StringBuilder body = new StringBuilder();
+        
+        body.append("-- Transformed trigger body\n");
+        body.append("    -- Original Oracle trigger: ").append(triggerName).append("\n");
+        body.append("    -- Table: ").append(tableOwner).append(".").append(tableName).append("\n");
+        body.append("    \n");
+        body.append("    -- Example transformations:\n");
+        body.append("    -- :NEW.created_date := SYSDATE; becomes NEW.created_date := CURRENT_TIMESTAMP;\n");
+        body.append("    -- IF INSERTING THEN becomes IF TG_OP = 'INSERT' THEN\n");
+        body.append("    -- IF UPDATING('salary') THEN becomes IF (TG_OP = 'UPDATE' AND OLD.salary IS DISTINCT FROM NEW.salary) THEN\n");
+        body.append("    \n");
+        body.append("    -- TODO: Add actual trigger body transformation here\n");
+        
+        return body.toString();
     }
 
     /**
      * Generate appropriate return statement based on trigger type.
      */
     private String generateReturnStatement() {
-        StringBuilder returnStmt = new StringBuilder();
-        
-        List<String> events = getTriggeringEvents();
-        if (events.contains("DELETE")) {
-            returnStmt.append("  RETURN OLD;\n");
-        } else {
-            returnStmt.append("  RETURN NEW;\n");
-        }
-        
-        return returnStmt.toString();
+        // Use TriggerTransformer to determine the correct return statement
+        return "  " + TriggerTransformer.getPostgreTriggerReturn(triggeringEvent, triggerType);
     }
 
     /**
      * Transform Oracle WHEN clause to PostgreSQL equivalent.
      */
     private String transformWhenClause(String oracleWhen, Everything everything) {
-        // Basic transformation - replace :NEW with NEW and :OLD with OLD
-        String pgWhen = oracleWhen;
-        pgWhen = pgWhen.replaceAll(":NEW\\.", "NEW.");
-        pgWhen = pgWhen.replaceAll(":OLD\\.", "OLD.");
+        return TriggerTransformer.transformWhenClause(oracleWhen, everything);
+    }
+    
+    /**
+     * Build combined WHEN clause that includes both original WHEN clause and UPDATE OF column logic.
+     */
+    private String buildCombinedWhenClause(Everything everything) {
+        List<String> conditions = new ArrayList<>();
         
-        // Additional transformations can be added here
-        return pgWhen;
+        // Add original WHEN clause if present
+        if (whenClause != null && !whenClause.trim().isEmpty()) {
+            String transformedWhen = transformWhenClause(whenClause, everything);
+            if (transformedWhen != null && !transformedWhen.trim().isEmpty()) {
+                conditions.add("(" + transformedWhen + ")");
+            }
+        }
+        
+        // Add UPDATE OF column conditions if present
+        if (hasUpdateOfColumns()) {
+            List<String> updateOfColumns = getUpdateOfColumns();
+            List<String> columnConditions = new ArrayList<>();
+            
+            for (String column : updateOfColumns) {
+                columnConditions.add(String.format("OLD.%s IS DISTINCT FROM NEW.%s", column, column));
+            }
+            
+            if (!columnConditions.isEmpty()) {
+                String updateOfCondition = "TG_OP = 'UPDATE' AND (" + String.join(" OR ", columnConditions) + ")";
+                conditions.add("(" + updateOfCondition + ")");
+            }
+        }
+        
+        // Combine conditions with AND
+        if (conditions.isEmpty()) {
+            return null;
+        } else if (conditions.size() == 1) {
+            return conditions.get(0).replaceAll("^\\((.*)\\)$", "$1"); // Remove outer parentheses
+        } else {
+            return String.join(" AND ", conditions);
+        }
     }
 
     @Override
