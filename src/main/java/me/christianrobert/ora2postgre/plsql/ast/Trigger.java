@@ -293,10 +293,11 @@ public class Trigger extends PlSqlAst {
     }
 
     /**
-     * Generate PostgreSQL function name based on trigger name.
+     * Generate PostgreSQL function name following package naming convention.
+     * Pattern: SCHEMA.TRIGGERFUNCTION_triggername (uppercase schema and prefix, lowercase trigger name)
      */
     private String getPostgreFunctionName() {
-        return schema.toLowerCase() + "_" + triggerName.toLowerCase() + "_func";
+        return schema.toUpperCase() + ".TRIGGERFUNCTION_" + triggerName.toLowerCase();
     }
 
     /**

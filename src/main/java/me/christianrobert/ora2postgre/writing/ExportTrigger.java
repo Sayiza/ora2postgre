@@ -161,6 +161,7 @@ public class ExportTrigger {
     
     /**
      * Get the file path for trigger functions in the schema directory structure.
+     * Uses step7atriggerfunctions to ensure execution before step7btriggerdefinitions.
      * 
      * @param basePath Base export path
      * @param schema Database schema name
@@ -169,12 +170,12 @@ public class ExportTrigger {
     private static String getTriggerFunctionPath(String basePath, String schema) {
         return basePath + 
                File.separator + schema.toLowerCase() + 
-               File.separator + "step7triggers" + 
-               File.separator + "functions";
+               File.separator + "step7atriggerfunctions";
     }
     
     /**
      * Get the file path for trigger definitions in the schema directory structure.
+     * Uses step7btriggerdefinitions to ensure execution after step7atriggerfunctions.
      * 
      * @param basePath Base export path
      * @param schema Database schema name
@@ -183,28 +184,29 @@ public class ExportTrigger {
     private static String getTriggerDefinitionPath(String basePath, String schema) {
         return basePath + 
                File.separator + schema.toLowerCase() + 
-               File.separator + "step7triggers" + 
-               File.separator + "definitions";
+               File.separator + "step7btriggerdefinitions";
     }
     
     /**
      * Generate filename for trigger function SQL file.
+     * Uses 'a_' prefix to ensure alphabetical execution before trigger definitions.
      * 
      * @param trigger Trigger AST object
      * @return SQL filename for the trigger function
      */
     private static String getTriggerFunctionFileName(Trigger trigger) {
-        return trigger.getTriggerName().toLowerCase() + "_func.sql";
+        return "a_" + trigger.getTriggerName().toLowerCase() + "_function.sql";
     }
     
     /**
      * Generate filename for trigger definition SQL file.
+     * Uses 'b_' prefix to ensure alphabetical execution after trigger functions.
      * 
      * @param trigger Trigger AST object
      * @return SQL filename for the trigger definition
      */
     private static String getTriggerDefinitionFileName(Trigger trigger) {
-        return trigger.getTriggerName().toLowerCase() + "_trigger.sql";
+        return "b_" + trigger.getTriggerName().toLowerCase() + "_trigger.sql";
     }
     
     /**
