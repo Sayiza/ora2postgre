@@ -167,7 +167,7 @@ public class PostgresStatsService {
     
     private long countTotalRows(Connection conn) throws SQLException {
         String sql = """
-            SELECT COALESCE(SUM(n_tup_ins - n_tup_del), 0) 
+            SELECT COALESCE(SUM(n_live_tup), 0) 
             FROM pg_stat_user_tables 
             WHERE schemaname NOT IN ('information_schema', 'pg_catalog', 'pg_toast')
             AND schemaname NOT LIKE 'pg_temp_%'
