@@ -103,37 +103,168 @@ public class TableExtractor {
       }
     }
 
-    // Fetch primary key constraints
-    String constraintSql = "SELECT ac.constraint_name, ac.constraint_type " +
+    // Fetch all constraints (PRIMARY KEY, FOREIGN KEY, UNIQUE, CHECK)
+    fetchConstraints(oracleConn, owner, table, tableMetadata);
+
+    return tableMetadata;
+  }
+
+  /**
+   * Fetches all constraints for a table including PRIMARY KEY, FOREIGN KEY, UNIQUE, and CHECK constraints.
+   * 
+   * @param oracleConn Oracle database connection
+   * @param owner Schema owner (Oracle user)
+   * @param table Table name
+   * @param tableMetadata TableMetadata object to add constraints to
+   * @throws SQLException if database operations fail
+   */
+  private static void fetchConstraints(Connection oracleConn, String owner, String table, 
+                                     TableMetadata tableMetadata) throws SQLException {
+    // Enhanced SQL to fetch comprehensive constraint metadata
+    String constraintSql = "SELECT ac.constraint_name, ac.constraint_type, ac.status, " +
+            "ac.deferrable, ac.deferred, ac.validated, ac.index_name, " +
+            "ac.search_condition, ac.r_owner, ac.r_constraint_name, ac.delete_rule " +
             "FROM all_constraints ac " +
-            "WHERE ac.owner = ? AND ac.table_name = ? AND ac.constraint_type = 'P'";
+            "WHERE ac.owner = ? AND ac.table_name = ? " +
+            "AND ac.constraint_type IN ('P', 'R', 'U', 'C') " +
+            "ORDER BY ac.constraint_type, ac.constraint_name";
+
     try (PreparedStatement ps = oracleConn.prepareStatement(constraintSql)) {
       ps.setString(1, owner.toUpperCase());
       ps.setString(2, table);
+      
       try (ResultSet rs = ps.executeQuery()) {
         while (rs.next()) {
           String constraintName = rs.getString("constraint_name");
           String constraintType = rs.getString("constraint_type");
-          ConstraintMetadata constraint = new ConstraintMetadata(constraintName, constraintType);
-          tableMetadata.addConstraint(constraint);
+          String status = rs.getString("status");
+          String deferrable = rs.getString("deferrable");
+          String deferred = rs.getString("deferred");
+          String validated = rs.getString("validated");
+          String indexName = rs.getString("index_name");
+          String searchCondition = rs.getString("search_condition");
+          String referencedOwner = rs.getString("r_owner");
+          String referencedConstraintName = rs.getString("r_constraint_name");
+          String deleteRule = rs.getString("delete_rule");
+
+          // Create constraint metadata based on type
+          ConstraintMetadata constraint;
+          if ("R".equals(constraintType) && referencedOwner != null && referencedConstraintName != null) {
+            // Foreign key constraint - need to resolve referenced table
+            String[] referencedTableInfo = resolveReferencedTable(oracleConn, referencedOwner, referencedConstraintName);
+            if (referencedTableInfo != null) {
+              constraint = new ConstraintMetadata(constraintName, constraintType, 
+                                                referencedOwner, referencedTableInfo[0]);
+            } else {
+              log.warn("Could not resolve referenced table for foreign key constraint {}.{}", 
+                      owner, constraintName);
+              continue;
+            }
+          } else {
+            constraint = new ConstraintMetadata(constraintName, constraintType);
+          }
+
+          // Set constraint properties
+          constraint.setStatus(status);
+          constraint.setDeferrable("DEFERRABLE".equals(deferrable));
+          constraint.setInitiallyDeferred("DEFERRED".equals(deferred));
+          constraint.setValidated("VALIDATED".equals(validated));
+          constraint.setIndexName(indexName);
+          
+          if ("R".equals(constraintType)) {
+            constraint.setDeleteRule(deleteRule);
+            // Note: Oracle doesn't have separate update rules in all_constraints
+            // Update rules are typically the same as delete rules or NO ACTION
+          }
+          
+          if ("C".equals(constraintType)) {
+            constraint.setCheckCondition(searchCondition);
+          }
 
           // Fetch columns for this constraint
-          String consColsSql = "SELECT column_name FROM all_cons_columns " +
-                  "WHERE owner = ? AND table_name = ? AND constraint_name = ? ORDER BY position";
-          try (PreparedStatement psCols = oracleConn.prepareStatement(consColsSql)) {
-            psCols.setString(1, owner.toUpperCase());
-            psCols.setString(2, table);
-            psCols.setString(3, constraintName);
-            try (ResultSet rsCols = psCols.executeQuery()) {
-              while (rsCols.next()) {
-                constraint.addColumnName(rsCols.getString("column_name"));
-              }
-            }
+          fetchConstraintColumns(oracleConn, owner, table, constraintName, constraint);
+          
+          // For foreign keys, fetch referenced columns
+          if ("R".equals(constraintType) && referencedOwner != null && referencedConstraintName != null) {
+            fetchReferencedColumns(oracleConn, referencedOwner, referencedConstraintName, constraint);
+          }
+
+          // Add constraint to table metadata if it's valid
+          if (constraint.isValid()) {
+            tableMetadata.addConstraint(constraint);
+          } else {
+            log.warn("Skipping invalid constraint: {}", constraint);
           }
         }
       }
     }
+  }
 
-    return tableMetadata;
+  /**
+   * Fetches columns for a specific constraint.
+   */
+  private static void fetchConstraintColumns(Connection oracleConn, String owner, String table, 
+                                           String constraintName, ConstraintMetadata constraint) throws SQLException {
+    String consColsSql = "SELECT column_name FROM all_cons_columns " +
+            "WHERE owner = ? AND table_name = ? AND constraint_name = ? ORDER BY position";
+    
+    try (PreparedStatement psCols = oracleConn.prepareStatement(consColsSql)) {
+      psCols.setString(1, owner.toUpperCase());
+      psCols.setString(2, table);
+      psCols.setString(3, constraintName);
+      
+      try (ResultSet rsCols = psCols.executeQuery()) {
+        while (rsCols.next()) {
+          constraint.addColumnName(rsCols.getString("column_name"));
+        }
+      }
+    }
+  }
+
+  /**
+   * Resolves the referenced table name and schema for a foreign key constraint.
+   * 
+   * @param oracleConn Oracle database connection
+   * @param referencedOwner Schema of the referenced constraint
+   * @param referencedConstraintName Name of the referenced constraint (typically primary key)
+   * @return Array containing [tableName, schemaName] or null if not found
+   */
+  private static String[] resolveReferencedTable(Connection oracleConn, String referencedOwner, 
+                                               String referencedConstraintName) throws SQLException {
+    String sql = "SELECT table_name FROM all_constraints " +
+            "WHERE owner = ? AND constraint_name = ?";
+    
+    try (PreparedStatement ps = oracleConn.prepareStatement(sql)) {
+      ps.setString(1, referencedOwner.toUpperCase());
+      ps.setString(2, referencedConstraintName);
+      
+      try (ResultSet rs = ps.executeQuery()) {
+        if (rs.next()) {
+          String tableName = rs.getString("table_name");
+          return new String[]{tableName, referencedOwner};
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Fetches the referenced columns for a foreign key constraint.
+   */
+  private static void fetchReferencedColumns(Connection oracleConn, String referencedOwner, 
+                                           String referencedConstraintName, ConstraintMetadata constraint) throws SQLException {
+    String sql = "SELECT column_name FROM all_cons_columns " +
+            "WHERE owner = ? AND constraint_name = ? ORDER BY position";
+    
+    try (PreparedStatement ps = oracleConn.prepareStatement(sql)) {
+      ps.setString(1, referencedOwner.toUpperCase());
+      ps.setString(2, referencedConstraintName);
+      
+      try (ResultSet rs = ps.executeQuery()) {
+        while (rs.next()) {
+          constraint.addReferencedColumnName(rs.getString("column_name"));
+        }
+      }
+    }
   }
 }
