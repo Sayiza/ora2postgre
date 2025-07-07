@@ -18,6 +18,7 @@ import me.christianrobert.ora2postgre.plsql.ast.OraclePackage;
 import me.christianrobert.ora2postgre.plsql.ast.SelectStatement;
 import me.christianrobert.ora2postgre.global.PlsqlCode;
 import me.christianrobert.ora2postgre.global.ViewSpecAndQuery;
+import me.christianrobert.ora2postgre.plsql.ast.Trigger;
 import me.christianrobert.ora2postgre.writing.ExportObjectType;
 import me.christianrobert.ora2postgre.writing.ExportPackage;
 import me.christianrobert.ora2postgre.writing.ExportProjectPostgre;
@@ -31,8 +32,6 @@ import me.christianrobert.ora2postgre.jobs.JobManager;
 import me.christianrobert.ora2postgre.jobs.MigrationProgressService;
 import me.christianrobert.ora2postgre.jobs.MigrationStep;
 import me.christianrobert.ora2postgre.config.ConfigurationService;
-import me.christianrobert.ora2postgre.controllers.ExecutionController;
-import me.christianrobert.ora2postgre.controllers.DataTransferController;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,7 +49,6 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -562,7 +560,7 @@ public class MigrationController {
             log.info("Starting trigger parsing...");
             for (PlsqlCode triggerCode : data.getTriggerPlsql()) {
                 try {
-                    me.christianrobert.ora2postgre.plsql.ast.Trigger triggerAst = 
+                    Trigger triggerAst =
                         parseTriggerFromPlsqlCode(triggerCode);
                     data.getTriggerAst().add(triggerAst);
                     log.debug("Parsed trigger: {}", triggerAst.getTriggerName());
@@ -587,7 +585,7 @@ public class MigrationController {
         }
     }
 
-    private me.christianrobert.ora2postgre.plsql.ast.Trigger parseTriggerFromPlsqlCode(PlsqlCode triggerCode) {
+    private Trigger parseTriggerFromPlsqlCode(PlsqlCode triggerCode) {
         String fullCode = triggerCode.code;
         String schema = triggerCode.schema;
         
@@ -595,8 +593,8 @@ public class MigrationController {
         String tableName = extractTableName(fullCode);
         String tableOwner = extractTableOwner(fullCode, schema);
         
-        me.christianrobert.ora2postgre.plsql.ast.Trigger trigger = 
-            new me.christianrobert.ora2postgre.plsql.ast.Trigger(triggerName, tableName, tableOwner, schema);
+        Trigger trigger =
+            new Trigger(triggerName, tableName, tableOwner, schema);
         
         trigger.setTriggerType(extractTriggerType(fullCode));
         trigger.setTriggeringEvent(extractTriggeringEvent(fullCode));
