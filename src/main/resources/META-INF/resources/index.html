@@ -533,6 +533,10 @@
                     <div class="data-count" id="triggers-count">-</div>
                     <div class="data-label">Triggers</div>
                 </div>
+                <div class="data-item">
+                    <div class="data-count" id="constraints-count">-</div>
+                    <div class="data-label">Constraints</div>
+                </div>
                 <!-- Parse AST Phase Data -->
                 <div class="data-item">
                     <div class="data-count" id="parsedViews-count">-</div>
@@ -594,6 +598,10 @@
                     <div class="data-label">Triggers</div>
                 </div>
                 <div class="data-item">
+                    <div class="data-count" id="target-constraints-count">-</div>
+                    <div class="data-label">Constraints</div>
+                </div>
+                <div class="data-item">
                     <div class="data-count" id="target-totalRowCount-count">-</div>
                     <div class="data-label">Total Rows</div>
                 </div>
@@ -648,6 +656,9 @@
                         </label>
                         <label class="config-item">
                             <input type="checkbox" id="doTriggers"> Extract triggers
+                        </label>
+                        <label class="config-item">
+                            <input type="checkbox" id="doConstraints"> Extract constraints
                         </label>
                         <label class="config-item">
                             <input type="checkbox" id="doWriteRestControllers"> Generate REST controllers
@@ -956,6 +967,7 @@
             document.getElementById('packageSpecs-count').textContent = data.packageSpecs || 0;
             document.getElementById('packageBodies-count').textContent = data.packageBodies || 0;
             document.getElementById('triggers-count').textContent = data.triggers || 0;
+            document.getElementById('constraints-count').textContent = data.constraints || 0;
             
             // Parse AST Phase Data
             document.getElementById('parsedViews-count').textContent = data.parsedViews || 0;
@@ -977,6 +989,7 @@
             document.getElementById('target-procedures-count').textContent = stats.procedures || 0;
             document.getElementById('target-types-count').textContent = stats.types || 0;
             document.getElementById('target-triggers-count').textContent = stats.triggers || 0;
+            document.getElementById('target-constraints-count').textContent = stats.constraints || 0;
             
             // Update target row count (format with commas for large numbers)
             const targetTotalRowCount = stats.totalRowCount || 0;
@@ -1351,6 +1364,7 @@
             document.getElementById('doViewSignature').checked = config.doViewSignature || false;
             document.getElementById('doViewDdl').checked = config.doViewDdl || false;
             document.getElementById('doTriggers').checked = config.doTriggers || false;
+            document.getElementById('doConstraints').checked = config.doConstraints || false;
             document.getElementById('doWriteRestControllers').checked = config.doWriteRestControllers || false;
             document.getElementById('doWritePostgreFiles').checked = config.doWritePostgreFiles || false;
             document.getElementById('doExecutePostgreFiles').checked = config.doExecutePostgreFiles || false;
@@ -1388,6 +1402,7 @@
                 doViewSignature: document.getElementById('doViewSignature').checked,
                 doViewDdl: document.getElementById('doViewDdl').checked,
                 doTriggers: document.getElementById('doTriggers').checked,
+                doConstraints: document.getElementById('doConstraints').checked,
                 doWriteRestControllers: document.getElementById('doWriteRestControllers').checked,
                 doWritePostgreFiles: document.getElementById('doWritePostgreFiles').checked,
                 doExecutePostgreFiles: document.getElementById('doExecutePostgreFiles').checked,
