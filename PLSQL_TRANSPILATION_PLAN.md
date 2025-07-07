@@ -1,0 +1,303 @@
+# PL/SQL to PostgreSQL Transpilation Enhancement Plan
+
+## Current State Assessment
+
+The transpilation system has a **strong foundation** with working implementations for:
+- ✅ Functions, procedures, packages (basic structure)
+- ✅ FOR loops with cursor support (advanced implementation)
+- ✅ Expressions, assignments, return statements
+- ✅ Comprehensive data type mapping (50+ types)
+- ✅ Oracle function mapping (75+ functions)
+- ✅ Trigger infrastructure (complete pipeline)
+
+**Current Success Rate**: ~5-10% of typical PL/SQL code is fully transpiled
+**Goal**: Increase to 60-80% coverage for common business logic patterns
+
+## Priority Phases
+
+### Phase 1: Core Control Flow Statements (HIGH PRIORITY)
+**Goal**: Enable basic procedural logic transpilation
+**Impact**: Will handle 40-50% of typical trigger and function logic
+
+#### 1.1 IF/ELSIF/ELSE Statements
+- **Missing**: IF statement AST class and transpilation
+- **Oracle**: `IF condition THEN ... ELSIF condition THEN ... ELSE ... END IF;`
+- **PostgreSQL**: `IF condition THEN ... ELSIF condition THEN ... ELSE ... END IF;`
+- **Implementation**: Create `IfStatement.java` with nested condition/statement handling
+- **Files to modify**: `PlSqlAstBuilder.java` (parsing), new `IfStatement.java`
+
+#### 1.2 WHILE Loop Statements
+- **Missing**: WHILE loop AST class
+- **Oracle**: `WHILE condition LOOP ... END LOOP;`
+- **PostgreSQL**: `WHILE condition LOOP ... END LOOP;`
+- **Implementation**: Create `WhileLoopStatement.java`
+- **Files to modify**: `PlSqlAstBuilder.java`, new `WhileLoopStatement.java`
+
+#### 1.3 Basic Exception Handling
+- **Missing**: Exception block AST support
+- **Oracle**: `BEGIN ... EXCEPTION WHEN ... THEN ... END;`
+- **PostgreSQL**: `BEGIN ... EXCEPTION WHEN ... THEN ... END;`
+- **Implementation**: Enhance existing `ExceptionTransformer.java` with AST integration
+- **Files to modify**: `PlSqlAstBuilder.java`, `ExceptionTransformer.java`
+
+### Phase 2: SQL DML Statements (HIGH PRIORITY)
+**Goal**: Handle database operations in triggers and procedures
+**Impact**: Critical for trigger logic that inserts/updates logging tables
+
+#### 2.1 INSERT Statements
+- **Missing**: INSERT AST class with value/select support
+- **Oracle**: `INSERT INTO table VALUES (...);` or `INSERT INTO table SELECT ...;`
+- **PostgreSQL**: Same syntax, but handle schema prefixes and data types
+- **Implementation**: Create `InsertStatement.java`
+- **Use case**: Trigger logging - `INSERT INTO audit_table VALUES (NEW.id, CURRENT_TIMESTAMP);`
+
+#### 2.2 UPDATE Statements
+- **Missing**: UPDATE AST class with WHERE clause support
+- **Oracle**: `UPDATE table SET col = value WHERE condition;`
+- **PostgreSQL**: Same syntax with proper identifier quoting
+- **Implementation**: Create `UpdateStatement.java`
+- **Use case**: Trigger updates - `UPDATE status_table SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;`
+
+#### 2.3 DELETE Statements
+- **Missing**: DELETE AST class
+- **Oracle**: `DELETE FROM table WHERE condition;`
+- **PostgreSQL**: Same syntax
+- **Implementation**: Create `DeleteStatement.java`
+
+### Phase 3: SELECT INTO and Cursor Enhancement (MEDIUM PRIORITY)
+**Goal**: Support common data retrieval patterns
+**Impact**: Essential for getter functions and data validation logic
+
+#### 3.1 SELECT INTO Statements
+- **Missing**: SELECT INTO AST class
+- **Oracle**: `SELECT col INTO variable FROM table WHERE condition;`
+- **PostgreSQL**: Same syntax
+- **Implementation**: Create `SelectIntoStatement.java`
+- **Use case**: `SELECT field_name INTO v_result FROM config_table WHERE id = p_id;`
+
+#### 3.2 Cursor Declarations and Usage
+- **Existing**: Basic cursor support in FOR loops
+- **Missing**: Explicit cursor declarations and FETCH statements
+- **Oracle**: `CURSOR c1 IS SELECT ...; OPEN c1; FETCH c1 INTO ...; CLOSE c1;`
+- **PostgreSQL**: Same pattern
+- **Implementation**: Enhance `Cursor.java` and create cursor statement classes
+
+#### 3.3 Cursor Attributes
+- **Missing**: `%FOUND`, `%NOTFOUND`, `%ROWCOUNT`
+- **Oracle**: `IF cursor_name%FOUND THEN ...`
+- **PostgreSQL**: Use `FOUND` variable and `GET DIAGNOSTICS`
+- **Implementation**: Create cursor attribute expression classes
+
+### Phase 4: Variable Declarations and Types (MEDIUM PRIORITY)
+**Goal**: Handle complex variable declarations and record types
+**Impact**: Support for complex data structures in procedures
+
+#### 4.1 Record Types
+- **Missing**: Record type declarations and usage
+- **Oracle**: `TYPE rec_type IS RECORD (field1 VARCHAR2(100), field2 NUMBER);`
+- **PostgreSQL**: Create custom composite types
+- **Implementation**: Create `RecordType.java` and enhance type system
+
+#### 4.2 Collection Types
+- **Missing**: TABLE OF and VARRAY types
+- **Oracle**: `TYPE table_type IS TABLE OF VARCHAR2(100);`
+- **PostgreSQL**: Use arrays or custom types
+- **Implementation**: Create collection type classes
+
+#### 4.3 %TYPE and %ROWTYPE Attributes
+- **Missing**: Column and row type attributes
+- **Oracle**: `variable table.column%TYPE;` or `rec table%ROWTYPE;`
+- **PostgreSQL**: Resolve to actual types
+- **Implementation**: Enhance variable declaration with type resolution
+
+### Phase 5: Package-Level Features (MEDIUM PRIORITY)
+**Goal**: Complete package support for complex business logic
+**Impact**: Enable migration of packages with state and shared components
+
+#### 5.1 Package Variables
+- **Missing**: Package-level variable declarations and initialization
+- **Oracle**: Variables declared in package spec/body
+- **PostgreSQL**: Use schema-level variables or session variables
+- **Implementation**: Enhance `OraclePackage.java` with variable management
+
+#### 5.2 Package Types
+- **Missing**: Types declared in package specification
+- **Oracle**: `TYPE package_type IS ...` in package spec
+- **PostgreSQL**: Create schema-level types
+- **Implementation**: Add type declaration support to package transpilation
+
+#### 5.3 Package Initialization
+- **Missing**: Package body initialization blocks
+- **Oracle**: Initialization code that runs when package is first accessed
+- **PostgreSQL**: Use initialization functions or startup scripts
+- **Implementation**: Create package initialization handler
+
+### Phase 6: Advanced SQL Features (LOW PRIORITY)
+**Goal**: Handle complex Oracle SQL constructs
+**Impact**: Support for advanced reporting and analytical functions
+
+#### 6.1 Common Table Expressions (WITH Clause)
+- **Existing**: Partial support in SelectStatement
+- **Missing**: Complete CTE handling with recursive support
+- **Implementation**: Enhance SELECT statement parsing and transpilation
+
+#### 6.2 Analytical Functions
+- **Missing**: ROW_NUMBER(), RANK(), DENSE_RANK(), etc.
+- **Oracle**: `ROW_NUMBER() OVER (PARTITION BY ... ORDER BY ...)`
+- **PostgreSQL**: Same syntax
+- **Implementation**: Create analytical function expression classes
+
+#### 6.3 MERGE Statements
+- **Missing**: Oracle MERGE (UPSERT) statements
+- **Oracle**: `MERGE INTO target USING source ON condition WHEN MATCHED THEN ... WHEN NOT MATCHED THEN ...`
+- **PostgreSQL**: Use INSERT ... ON CONFLICT or separate statements
+- **Implementation**: Create `MergeStatement.java` with complex transformation logic
+
+### Phase 7: Oracle-Specific Features (LOW PRIORITY)
+**Goal**: Handle Oracle-specific constructs that need special transformation
+**Impact**: Improve compatibility with Oracle-specific code patterns
+
+#### 7.1 CONNECT BY Hierarchical Queries
+- **Missing**: Oracle hierarchical query support
+- **Oracle**: `SELECT ... FROM table START WITH ... CONNECT BY ...`
+- **PostgreSQL**: Use WITH RECURSIVE common table expressions
+- **Implementation**: Create hierarchical query transformer
+
+#### 7.2 PIVOT/UNPIVOT Operations
+- **Missing**: Oracle PIVOT operations
+- **Oracle**: `SELECT ... FROM table PIVOT (aggregate FOR column IN (values))`
+- **PostgreSQL**: Use CASE statements or crosstab functions
+- **Implementation**: Create pivot transformation logic
+
+#### 7.3 Advanced PL/SQL Features
+- **Missing**: BULK COLLECT, FORALL, autonomous transactions
+- **Oracle**: Performance and transaction control features
+- **PostgreSQL**: Alternative approaches or skip with comments
+- **Implementation**: Create specialized transformers with PostgreSQL alternatives
+
+## Implementation Strategy
+
+### Quick Wins (Immediate Impact)
+1. **IF/ELSIF/ELSE Statements** - Most common control flow
+2. **INSERT/UPDATE/DELETE** - Essential for trigger logic
+3. **SELECT INTO** - Common in getter functions
+
+### Development Approach
+1. **Follow Existing Patterns**: Use `ForLoopStatement.java` as template
+2. **Leverage Infrastructure**: Use `OracleFunctionMapper.java` and `TypeConverter.java`
+3. **Test-Driven Development**: Create test cases for each new feature
+4. **Incremental Enhancement**: Add features that build on existing capabilities
+
+### Implementation Priority Matrix
+
+| Feature | Business Impact | Implementation Effort | Priority |
+|---------|----------------|----------------------|----------|
+| IF/ELSIF/ELSE | High | Low | Phase 1 |
+| INSERT/UPDATE/DELETE | High | Medium | Phase 1 |
+| SELECT INTO | High | Low | Phase 2 |
+| WHILE Loops | Medium | Low | Phase 2 |
+| Exception Handling | Medium | Medium | Phase 2 |
+| Package Variables | Medium | High | Phase 3 |
+| Record Types | Medium | High | Phase 3 |
+| Cursors (explicit) | Medium | Medium | Phase 3 |
+| Analytical Functions | Low | Medium | Phase 4 |
+| MERGE Statements | Low | High | Phase 4 |
+
+### Success Metrics
+- **Phase 1 Complete**: 40-50% of typical PL/SQL code transpiles successfully
+- **Phase 2 Complete**: 60-70% of typical PL/SQL code transpiles successfully
+- **Phase 3 Complete**: 80-85% of typical PL/SQL code transpiles successfully
+
+### Common Use Cases to Target
+
+#### Trigger Logic (Phase 1 Priority)
+```sql
+-- Oracle trigger body
+IF INSERTING THEN
+    INSERT INTO audit_table (table_name, action, timestamp) 
+    VALUES ('employees', 'INSERT', SYSDATE);
+ELSIF UPDATING THEN
+    UPDATE status_table SET updated_at = SYSDATE WHERE id = :NEW.id;
+END IF;
+```
+
+#### Getter Functions (Phase 2 Priority)
+```sql
+-- Oracle function
+FUNCTION getEmployeeNameById(p_id NUMBER) RETURN VARCHAR2 IS
+    v_name VARCHAR2(100);
+BEGIN
+    SELECT first_name || ' ' || last_name 
+    INTO v_name 
+    FROM employees 
+    WHERE employee_id = p_id;
+    RETURN v_name;
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RETURN NULL;
+END;
+```
+
+#### Package Functions with State (Phase 3 Priority)
+```sql
+-- Oracle package with variables
+PACKAGE BODY employee_pkg IS
+    g_cache_timeout NUMBER := 300; -- 5 minutes
+    g_last_refresh DATE;
+    
+    FUNCTION get_employee_count RETURN NUMBER IS
+        v_count NUMBER;
+    BEGIN
+        IF g_last_refresh IS NULL OR (SYSDATE - g_last_refresh) * 24 * 60 * 60 > g_cache_timeout THEN
+            SELECT COUNT(*) INTO v_count FROM employees;
+            g_last_refresh := SYSDATE;
+        END IF;
+        RETURN v_count;
+    END;
+END;
+```
+
+## Notes for Implementation
+
+### File Structure
+- **AST Classes**: `src/main/java/me/christianrobert/ora2postgre/ast/`
+- **Parsing Logic**: `src/main/java/me/christianrobert/ora2postgre/ast/PlSqlAstBuilder.java`
+- **Utilities**: `src/main/java/me/christianrobert/ora2postgre/transpilation/`
+- **Tests**: `src/test/java/me/christianrobert/ora2postgre/`
+
+### Key Infrastructure to Leverage
+- **OracleFunctionMapper.java**: 75+ Oracle function mappings
+- **TypeConverter.java**: Comprehensive type mapping
+- **Everything.java**: Schema and context resolution
+- **ForLoopStatement.java**: Example of complete statement implementation
+
+### Testing Strategy
+- Create unit tests for each new AST class
+- Include integration tests with complete PL/SQL blocks
+- Test both simple and complex scenarios
+- Verify PostgreSQL syntax validity
+
+### Error Handling Philosophy
+- **Graceful Degradation**: If transpilation fails, add comment with original Oracle code
+- **Incremental Improvement**: Each phase should increase success rate
+- **Logging**: Track what gets transpiled vs. what gets skipped
+- **User Feedback**: Clear indication of transpilation success/failure rates
+
+## Future Considerations
+
+### AI-Assisted Transpilation
+- Consider using AI models for complex Oracle constructs that don't have direct PostgreSQL equivalents
+- Implement fallback to AI transformation for unsupported features
+
+### Performance Optimization
+- Optimize generated PostgreSQL code for performance
+- Consider PostgreSQL-specific optimizations (e.g., using JSONB for complex data structures)
+
+### Extensibility
+- Design new AST classes to be easily extensible
+- Consider plugin architecture for custom transpilation rules
+- Support for user-defined transformation patterns
+
+---
+
+*This plan is designed to be executed incrementally, with each phase building on the previous one. The focus is on high-impact, commonly-used PL/SQL features first, then expanding to more complex and specialized constructs.*
