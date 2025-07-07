@@ -352,6 +352,57 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     //Expression expression = new Expression(ctx.expression().getText());
     return new AssignmentStatement(target, expressionVisited);
   }
+
+  @Override
+  public PlSqlAst visitIf_statement(PlSqlParser.If_statementContext ctx) {
+    // Parse the main IF condition
+    Expression condition = (Expression) visit(ctx.condition());
+    
+    // Parse THEN statements
+    List<Statement> thenStatements = new ArrayList<>();
+    if (ctx.seq_of_statements() != null && ctx.seq_of_statements().statement() != null) {
+      for (PlSqlParser.StatementContext stmt : ctx.seq_of_statements().statement()) {
+        Statement statement = (Statement) visit(stmt);
+        if (statement != null) {
+          thenStatements.add(statement);
+        }
+      }
+    }
+    
+    // Parse ELSIF parts
+    List<IfStatement.ElsifPart> elsifParts = null;
+    if (ctx.elsif_part() != null && !ctx.elsif_part().isEmpty()) {
+      elsifParts = new ArrayList<>();
+      for (PlSqlParser.Elsif_partContext elsif : ctx.elsif_part()) {
+        Expression elsifCondition = (Expression) visit(elsif.condition());
+        List<Statement> elsifStatements = new ArrayList<>();
+        if (elsif.seq_of_statements() != null && elsif.seq_of_statements().statement() != null) {
+          for (PlSqlParser.StatementContext stmt : elsif.seq_of_statements().statement()) {
+            Statement statement = (Statement) visit(stmt);
+            if (statement != null) {
+              elsifStatements.add(statement);
+            }
+          }
+        }
+        elsifParts.add(new IfStatement.ElsifPart(elsifCondition, elsifStatements));
+      }
+    }
+    
+    // Parse ELSE statements
+    List<Statement> elseStatements = null;
+    if (ctx.else_part() != null && ctx.else_part().seq_of_statements() != null && 
+        ctx.else_part().seq_of_statements().statement() != null) {
+      elseStatements = new ArrayList<>();
+      for (PlSqlParser.StatementContext stmt : ctx.else_part().seq_of_statements().statement()) {
+        Statement statement = (Statement) visit(stmt);
+        if (statement != null) {
+          elseStatements.add(statement);
+        }
+      }
+    }
+    
+    return new IfStatement(condition, thenStatements, elsifParts, elseStatements);
+  }
   // Statement END
 
   @Override
