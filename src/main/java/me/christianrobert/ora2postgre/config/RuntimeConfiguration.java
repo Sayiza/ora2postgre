@@ -15,6 +15,7 @@ public class RuntimeConfiguration {
     private Boolean doViewSignature;
     private Boolean doViewDdl;
     private Boolean doTriggers;
+    private Boolean doConstraints;
     private Boolean doWriteRestControllers;
     private Boolean doWritePostgreFiles;
     private Boolean doExecutePostgreFiles;
@@ -130,6 +131,14 @@ public class RuntimeConfiguration {
 
     public void setDoTriggers(Boolean doTriggers) {
         this.doTriggers = doTriggers;
+    }
+
+    public Boolean getDoConstraints() {
+        return doConstraints;
+    }
+
+    public void setDoConstraints(Boolean doConstraints) {
+        this.doConstraints = doConstraints;
     }
 
     public Boolean getDoWriteRestControllers() {

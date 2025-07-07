@@ -133,6 +133,9 @@ public class Config {
   @ConfigProperty(name = "do.triggers", defaultValue = "true")
   boolean doTriggers;
   
+  @ConfigProperty(name = "do.constraints", defaultValue = "true")
+  boolean doConstraints;
+  
   @ConfigProperty(name = "do.extract", defaultValue = "true")
   boolean doExtract;
   
@@ -203,6 +206,10 @@ public class Config {
 
   public boolean isDoTriggers() {
     return doTriggers;
+  }
+
+  public boolean isDoConstraints() {
+    return doConstraints;
   }
 
   public boolean isDoWriteRestControllers() {
