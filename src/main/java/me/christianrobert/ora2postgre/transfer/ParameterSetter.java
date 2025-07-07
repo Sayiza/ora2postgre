@@ -100,6 +100,12 @@ public class ParameterSetter {
                     setAqRecipientsParameter(stmt, paramIndex, rs, columnName);
                     break;
                     
+                // Oracle ROWID type - convert to TEXT
+                case "ROWID":
+                case "UROWID":
+                    setRowidParameter(stmt, paramIndex, rs, columnName);
+                    break;
+                    
                 // Extended timestamp types
                 case "TIMESTAMP WITH TIME ZONE":
                 case "TIMESTAMP WITH LOCAL TIME ZONE":
@@ -297,6 +303,21 @@ public class ParameterSetter {
             
         } catch (Exception e) {
             throw new SQLException("Failed to convert AQ recipients for column " + columnName, e);
+        }
+    }
+    
+    /**
+     * Sets a ROWID parameter, converting it to TEXT format.
+     */
+    private static void setRowidParameter(PreparedStatement stmt, int paramIndex, 
+                                        ResultSet rs, String columnName) throws SQLException {
+        // Oracle ROWID is retrieved as a string representation
+        String rowidString = rs.getString(columnName);
+        if (rowidString != null) {
+            // PostgreSQL stores ROWID as TEXT
+            stmt.setString(paramIndex, rowidString);
+        } else {
+            stmt.setNull(paramIndex, Types.VARCHAR);
         }
     }
     
