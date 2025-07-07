@@ -78,8 +78,8 @@ public class ExecutionController {
     @Path("/execute-post")
     @Produces(MediaType.APPLICATION_JSON)
     @Operation(
-        summary = "Execute Post-Transfer SQL (Constraints & Objects)",
-        description = "Phase 4B: Executes remaining PostgreSQL DDL after data transfer including foreign keys, constraints, indexes, and views to finalize database structure."
+        summary = "Execute Post-Transfer SQL (Views, Constraints & Triggers)",
+        description = "Phase 4B: Executes remaining PostgreSQL DDL after data transfer in dependency order: views/packages → constraints → triggers to finalize database structure."
     )
     @APIResponses({
         @APIResponse(responseCode = "202", description = "Post-transfer execution started successfully"),
@@ -163,7 +163,24 @@ public class ExecutionController {
                         ExecutionPhase.POST_TRANSFER
                 );
                 
-                log.info("Post-transfer SQL execution completed successfully (constraints and other objects)");
+                log.info("Post-transfer SQL execution completed successfully (views and packages)");
+                
+                // Execute constraints after basic objects are created but before triggers
+                try {
+                    PostgresExecuter.executeAllSqlFiles(
+                            path,
+                            postgresConn,
+                            new ArrayList<>(), 
+                            new ArrayList<>(),
+                            ExecutionPhase.POST_TRANSFER_CONSTRAINTS
+                    );
+                    
+                    log.info("Constraint execution completed successfully (foreign keys and advanced constraints)");
+                } catch (Exception constraintException) {
+                    log.error("Constraint execution failed - some constraints may not have been created", constraintException);
+                    log.warn("Continuing with migration despite constraint errors - constraints can be created manually later");
+                    // Don't re-throw the exception - allow migration to continue
+                }
                 
                 // Execute triggers after all other objects are created
                 try {
