@@ -25,7 +25,7 @@ public class HtpStatement extends Statement {
   public String toPostgre(Everything data) {
     StringBuilder b = new StringBuilder();
     b.append(data.getIntendation())
-            .append("PERFORM SYS.HTP_p(")
+            .append("CALL SYS.HTP_p(")
             .append(what)
             .append(");\n");
     return b.toString();
