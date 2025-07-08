@@ -11,6 +11,7 @@ import me.christianrobert.ora2postgre.oracledb.SynonymExtractor;
 import me.christianrobert.ora2postgre.oracledb.TableExtractor;
 import me.christianrobert.ora2postgre.oracledb.ViewExtractor;
 import me.christianrobert.ora2postgre.oracledb.TriggerExtractor;
+import me.christianrobert.ora2postgre.oracledb.IndexExtractor;
 import me.christianrobert.ora2postgre.oracledb.ViewMetadata;
 import me.christianrobert.ora2postgre.plsql.PlSqlAstMain;
 import me.christianrobert.ora2postgre.plsql.ast.ObjectType;
@@ -292,6 +293,7 @@ public class MigrationController {
         boolean doPackageBody = configurationService.isDoPackageBody();
         boolean doViewSignature = configurationService.isDoViewSignature();
         boolean doTriggers = configurationService.isDoTriggers();
+        boolean doIndexes = configurationService.isDoIndexes();
 
         if (doAddTestData) {
             // deprecated
@@ -336,6 +338,9 @@ public class MigrationController {
             if (doTriggers) {
                 data.getTriggerPlsql().addAll(TriggerExtractor.extract(conn, data.getUserNames()));
             }
+            if (doIndexes) {
+                data.getIndexes().addAll(IndexExtractor.extractAllIndexes(conn, data.getUserNames()));
+            }
 
             if (configurationService.isDoData()) {
                 log.info("Calculating total row count for extracted schemas");
@@ -345,9 +350,9 @@ public class MigrationController {
                 data.setTotalRowCount(0);
             }
             
-            log.info("Extraction completed: {} schemas, {} tables, {} object type specs, {} package specs, {} triggers",
+            log.info("Extraction completed: {} schemas, {} tables, {} object type specs, {} package specs, {} triggers, {} indexes",
                 data.getUserNames().size(), data.getTableSql().size(), 
-                data.getObjectTypeSpecPlsql().size(), data.getPackageSpecPlsql().size(), data.getTriggerPlsql().size());
+                data.getObjectTypeSpecPlsql().size(), data.getPackageSpecPlsql().size(), data.getTriggerPlsql().size(), data.getIndexes().size());
         }
     }
 
@@ -371,6 +376,7 @@ public class MigrationController {
         boolean doPackageBody = configurationService.isDoPackageBody();
         boolean doViewSignature = configurationService.isDoViewSignature();
         boolean doTriggers = configurationService.isDoTriggers();
+        boolean doIndexes = configurationService.isDoIndexes();
 
         if (doAddTestData) {
             // deprecated
@@ -454,7 +460,14 @@ public class MigrationController {
             }
             completedSubSteps++;
             
-            // Sub-step 10: Calculate total row counts
+            // Sub-step 10: Extract indexes
+            progressService.updateSubStepProgress(jobId, MigrationStep.EXTRACT, completedSubSteps, "Extracting indexes");
+            if (doIndexes) {
+                data.getIndexes().addAll(IndexExtractor.extractAllIndexes(conn, data.getUserNames()));
+            }
+            completedSubSteps++;
+            
+            // Sub-step 11: Calculate total row counts
             if (configurationService.isDoData()) {
                 progressService.updateSubStepProgress(jobId, MigrationStep.EXTRACT, completedSubSteps, "Calculating total row count");
                 log.info("Calculating total row count for extracted schemas");
@@ -468,9 +481,9 @@ public class MigrationController {
             // Complete extraction step
             progressService.updateSubStepProgress(jobId, MigrationStep.EXTRACT, completedSubSteps, "Extraction completed");
             
-            log.info("Extraction completed: {} schemas, {} tables, {} object type specs, {} package specs, {} triggers",
+            log.info("Extraction completed: {} schemas, {} tables, {} object type specs, {} package specs, {} triggers, {} indexes",
                 data.getUserNames().size(), data.getTableSql().size(), 
-                data.getObjectTypeSpecPlsql().size(), data.getPackageSpecPlsql().size(), data.getTriggerPlsql().size());
+                data.getObjectTypeSpecPlsql().size(), data.getPackageSpecPlsql().size(), data.getTriggerPlsql().size(), data.getIndexes().size());
         }
     }
 

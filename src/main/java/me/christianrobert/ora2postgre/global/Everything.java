@@ -1,6 +1,7 @@
 package me.christianrobert.ora2postgre.global;
 
 import me.christianrobert.ora2postgre.oracledb.ColumnMetadata;
+import me.christianrobert.ora2postgre.oracledb.IndexMetadata;
 import me.christianrobert.ora2postgre.oracledb.SynonymMetadata;
 import me.christianrobert.ora2postgre.oracledb.TableMetadata;
 import me.christianrobert.ora2postgre.oracledb.ViewMetadata;
@@ -22,6 +23,7 @@ public class Everything {
   private List<TableMetadata> tableSql = new ArrayList<>();
   private List<ViewMetadata> viewDefinition = new ArrayList<>();
   private List<SynonymMetadata> synonyms = new ArrayList<>();
+  private List<IndexMetadata> indexes = new ArrayList<>();
   private List<PlsqlCode> objectTypeSpecPlsql = new ArrayList<>();
   private List<PlsqlCode> objectTypeBodyPlsql = new ArrayList<>();
   private List<PlsqlCode> packageSpecPlsql = new ArrayList<>();
@@ -53,6 +55,8 @@ public class Everything {
   }
 
   public List<SynonymMetadata> getSynonyms() { return synonyms; }
+
+  public List<IndexMetadata> getIndexes() { return indexes; }
 
   public List<PlsqlCode> getObjectTypeSpecPlsql() {
     return objectTypeSpecPlsql;
