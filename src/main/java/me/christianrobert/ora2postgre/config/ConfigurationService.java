@@ -31,6 +31,7 @@ public class ConfigurationService {
         runtimeConfig.setDoViewDdl(getValue("do.view-ddl", config.isDoViewDdl()));
         runtimeConfig.setDoTriggers(getValue("do.triggers", config.isDoTriggers()));
         runtimeConfig.setDoConstraints(getValue("do.constraints", config.isDoConstraints()));
+        runtimeConfig.setDoIndexes(getValue("do.indexes", config.isDoIndexes()));
         runtimeConfig.setDoWriteRestControllers(getValue("do.write-rest-controllers", config.isDoWriteRestControllers()));
         runtimeConfig.setDoWritePostgreFiles(getValue("do.write-postgre-files", config.isDoWritePostgreFiles()));
         runtimeConfig.setDoExecutePostgreFiles(getValue("do.execute-postgre-files", config.isDoExecutePostgreFiles()));
@@ -94,6 +95,9 @@ public class ConfigurationService {
         }
         if (updates.getDoConstraints() != null) {
             runtimeSettings.put("do.constraints", updates.getDoConstraints());
+        }
+        if (updates.getDoIndexes() != null) {
+            runtimeSettings.put("do.indexes", updates.getDoIndexes());
         }
         if (updates.getDoWriteRestControllers() != null) {
             runtimeSettings.put("do.write-rest-controllers", updates.getDoWriteRestControllers());
@@ -205,6 +209,10 @@ public class ConfigurationService {
 
     public boolean isDoConstraints() {
         return getValue("do.constraints", config.isDoConstraints());
+    }
+
+    public boolean isDoIndexes() {
+        return getValue("do.indexes", config.isDoIndexes());
     }
 
     public boolean isDoWriteRestControllers() {

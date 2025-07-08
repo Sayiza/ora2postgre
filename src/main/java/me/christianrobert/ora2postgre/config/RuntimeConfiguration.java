@@ -16,6 +16,7 @@ public class RuntimeConfiguration {
     private Boolean doViewDdl;
     private Boolean doTriggers;
     private Boolean doConstraints;
+    private Boolean doIndexes;
     private Boolean doWriteRestControllers;
     private Boolean doWritePostgreFiles;
     private Boolean doExecutePostgreFiles;
@@ -139,6 +140,14 @@ public class RuntimeConfiguration {
 
     public void setDoConstraints(Boolean doConstraints) {
         this.doConstraints = doConstraints;
+    }
+
+    public Boolean getDoIndexes() {
+        return doIndexes;
+    }
+
+    public void setDoIndexes(Boolean doIndexes) {
+        this.doIndexes = doIndexes;
     }
 
     public Boolean getDoWriteRestControllers() {

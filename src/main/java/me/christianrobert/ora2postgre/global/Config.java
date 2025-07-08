@@ -136,6 +136,9 @@ public class Config {
   @ConfigProperty(name = "do.constraints", defaultValue = "true")
   boolean doConstraints;
   
+  @ConfigProperty(name = "do.indexes", defaultValue = "true")
+  boolean doIndexes;
+  
   @ConfigProperty(name = "do.extract", defaultValue = "true")
   boolean doExtract;
   
@@ -210,6 +213,10 @@ public class Config {
 
   public boolean isDoConstraints() {
     return doConstraints;
+  }
+
+  public boolean isDoIndexes() {
+    return doIndexes;
   }
 
   public boolean isDoWriteRestControllers() {
