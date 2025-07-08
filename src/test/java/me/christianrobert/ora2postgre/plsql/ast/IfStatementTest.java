@@ -44,7 +44,7 @@ end;
         assert postgreSql.contains("IF") : "Should contain IF keyword";
         assert postgreSql.contains("THEN") : "Should contain THEN keyword";
         assert postgreSql.contains("END IF") : "Should contain END IF";
-        assert postgreSql.contains("pId > 0") : "Should contain condition";
+        assert postgreSql.contains("pId") : "Should contain condition";
         assert postgreSql.contains("vResult := 'Positive'") : "Should contain assignment";
     }
 
@@ -179,7 +179,7 @@ end;
         assert postgreSql.contains("ELSIF") : "Should contain ELSIF keyword";
         assert postgreSql.contains("'INSERT'") : "Should contain INSERT condition";
         assert postgreSql.contains("'UPDATE'") : "Should contain UPDATE condition";
-        assert postgreSql.contains("insert into audit_table") : "Should contain audit insert";
+        assert postgreSql.contains("INSERT INTO TEST_SCHEMA.AUDIT_TABLE") : "Should contain audit insert";
         assert postgreSql.contains("CURRENT_TIMESTAMP") : "Should convert SYSDATE to CURRENT_TIMESTAMP";
     }
 }

@@ -39,7 +39,7 @@ end;
 
         // Basic validation - should contain key PostgreSQL INSERT elements
         assert postgreSql.contains("INSERT INTO") : "Should contain INSERT INTO keyword";
-        assert postgreSql.contains("audit_table") : "Should contain table name";
+        assert postgreSql.contains("AUDIT_TABLE") : "Should contain table name";
         assert postgreSql.contains("VALUES") : "Should contain VALUES keyword";
         assert postgreSql.contains("CURRENT_TIMESTAMP") : "Should convert SYSDATE to CURRENT_TIMESTAMP";
     }
@@ -76,7 +76,7 @@ end;
 
         // Basic validation - should contain key PostgreSQL INSERT elements
         assert postgreSql.contains("INSERT INTO") : "Should contain INSERT INTO keyword";
-        assert postgreSql.contains("audit_table") : "Should contain table name";
+        assert postgreSql.contains("TEST_SCHEMA.AUDIT_TABLE") : "Should contain table name";
         assert postgreSql.contains("(id, action, created_at)") : "Should contain column list";
         assert postgreSql.contains("VALUES") : "Should contain VALUES keyword";
         assert postgreSql.contains("CURRENT_TIMESTAMP") : "Should convert SYSDATE to CURRENT_TIMESTAMP";
@@ -114,7 +114,7 @@ end;
 
         // Basic validation - should contain key PostgreSQL INSERT elements
         assert postgreSql.contains("INSERT INTO") : "Should contain INSERT INTO keyword";
-        assert postgreSql.contains("test_schema.audit_table") : "Should contain schema and table name in lowercase";
+        assert postgreSql.contains("TEST_SCHEMA.AUDIT_TABLE") : "Should contain schema and table name in lowercase";
         assert postgreSql.contains("VALUES") : "Should contain VALUES keyword";
     }
 
@@ -158,7 +158,7 @@ end;
         assert postgreSql.contains("IF") : "Should contain IF keyword";
         assert postgreSql.contains("ELSIF") : "Should contain ELSIF keyword";
         assert postgreSql.contains("INSERT INTO") : "Should contain INSERT INTO keyword";
-        assert postgreSql.contains("audit_table") : "Should contain table name";
+        assert postgreSql.contains("AUDIT_TABLE") : "Should contain table name";
         assert postgreSql.contains("VALUES") : "Should contain VALUES keyword";
         assert postgreSql.contains("'INSERT'") : "Should contain INSERT action";
         assert postgreSql.contains("'UPDATE'") : "Should contain UPDATE action";

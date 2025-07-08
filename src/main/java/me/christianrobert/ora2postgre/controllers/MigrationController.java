@@ -18,6 +18,7 @@ import me.christianrobert.ora2postgre.plsql.ast.OraclePackage;
 import me.christianrobert.ora2postgre.plsql.ast.SelectStatement;
 import me.christianrobert.ora2postgre.global.PlsqlCode;
 import me.christianrobert.ora2postgre.global.ViewSpecAndQuery;
+import me.christianrobert.ora2postgre.plsql.ast.Statement;
 import me.christianrobert.ora2postgre.plsql.ast.Trigger;
 import me.christianrobert.ora2postgre.writing.ExportObjectType;
 import me.christianrobert.ora2postgre.writing.ExportPackage;
@@ -604,7 +605,7 @@ public class MigrationController {
             trigger.setWhenClause(whenClause);
         }
         
-        List<me.christianrobert.ora2postgre.plsql.ast.Statement> bodyStatements = 
+        List<Statement> bodyStatements =
             parseSimpleTriggerBody(fullCode);
         trigger.setTriggerBody(bodyStatements);
         
@@ -677,13 +678,13 @@ public class MigrationController {
         return null;
     }
 
-    private List<me.christianrobert.ora2postgre.plsql.ast.Statement> parseSimpleTriggerBody(String code) {
+    private List<Statement> parseSimpleTriggerBody(String code) {
         String triggerBody = extractTriggerBodyContent(code);
         
-        List<me.christianrobert.ora2postgre.plsql.ast.Statement> statements = new ArrayList<>();
+        List<Statement> statements = new ArrayList<>();
         
-        me.christianrobert.ora2postgre.plsql.ast.Statement bodyStatement = 
-            new me.christianrobert.ora2postgre.plsql.ast.Statement() {
+        Statement bodyStatement =
+            new Statement() {
                 @Override
                 public <T> T accept(me.christianrobert.ora2postgre.plsql.ast.PlSqlAstVisitor<T> visitor) {
                     return visitor.visit(this);

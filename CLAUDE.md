@@ -36,6 +36,13 @@ mvn clean package
 java -jar target/quarkus-app/quarkus-run.jar
 ```
 
+### Testing Requirements
+**CRITICAL**: All implementation steps must pass tests before being considered complete!
+```bash
+# Required test command - must succeed before any implementation phase is complete
+mvn clean test
+```
+
 ### Legacy Run Command (Deprecated)
 ```bash
 # Old CLI approach - no longer the primary method

@@ -105,9 +105,9 @@ public class InsertStatement extends Statement {
         
         // Always emit schema prefix for PostgreSQL reliability
         if (resolvedSchema != null && !resolvedSchema.isEmpty()) {
-            b.append(resolvedSchema.toLowerCase()).append(".");
+            b.append(resolvedSchema.toUpperCase()).append(".");
         }
-        b.append(tableName.toLowerCase());
+        b.append(tableName.toUpperCase());
         
         // Handle column list if specified
         if (columnNames != null && !columnNames.isEmpty()) {

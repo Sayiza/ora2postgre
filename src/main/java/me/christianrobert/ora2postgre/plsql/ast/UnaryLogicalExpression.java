@@ -1,6 +1,8 @@
 package me.christianrobert.ora2postgre.plsql.ast;
 
 import me.christianrobert.ora2postgre.global.Everything;
+import me.christianrobert.ora2postgre.plsql.ast.tools.OracleFunctionMapper;
+import me.christianrobert.ora2postgre.plsql.ast.tools.TypeConverter;
 
 public class UnaryLogicalExpression extends PlSqlAst {
     
@@ -77,6 +79,8 @@ public class UnaryLogicalExpression extends PlSqlAst {
             // If there's no multiset expression, logicalOperation might contain the raw text
             sb.append(logicalOperation);
         }
-        return sb.toString();
+        String result = sb.toString();
+
+        return OracleFunctionMapper.getMappingIfIs2BeApplied(result);
     }
 }
