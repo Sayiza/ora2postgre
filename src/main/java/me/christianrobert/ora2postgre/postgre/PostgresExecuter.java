@@ -23,7 +23,8 @@ public class PostgresExecuter {
     PRE_TRANSFER_TABLES,  // Execute schema and table files before data transfer
     POST_TRANSFER,  // Execute views, packages, and other files after data transfer
     POST_TRANSFER_CONSTRAINTS,  // Execute constraints after all other objects are created
-    POST_TRANSFER_TRIGGERS  // Execute triggers after constraints are created
+    POST_TRANSFER_INDEXES,  // Execute indexes after constraints are created
+    POST_TRANSFER_TRIGGERS  // Execute triggers after indexes are created
   }
 
   public static void executeAllSqlFiles(
@@ -116,6 +117,7 @@ public class PostgresExecuter {
     String upperFileName = fileName.toUpperCase();
     boolean isTriggerFile = isTriggerFileByPath(filePath);
     boolean isConstraintFile = isConstraintFileByPath(filePath);
+    boolean isIndexFile = isIndexFileByPath(filePath);
     
     switch (phase) {
       case PRE_TRANSFER_TYPES:
@@ -126,16 +128,21 @@ public class PostgresExecuter {
         // Execute table files only
         return upperFileName.endsWith("TABLE.SQL");
       case POST_TRANSFER:
-        // Execute all other files after data transfer (excluding schema, table, constraint, and trigger files)
+        // Execute all other files after data transfer (excluding schema, table, constraint, index, and trigger files)
         return !upperFileName.endsWith("SCHEMA.SQL")
                 && !upperFileName.endsWith("TABLE.SQL")
                 && !upperFileName.endsWith("OBJECTTYPESPEC.SQL")
                 && !isTriggerFile
-                && !isConstraintFile;
+                && !isConstraintFile
+                && !isIndexFile;
       case POST_TRANSFER_CONSTRAINTS:
         // Execute only constraint files
         logger.debug("POST_TRANSFER_CONSTRAINTS phase - File: {}, IsConstraint: {}", fileName, isConstraintFile);
         return isConstraintFile;
+      case POST_TRANSFER_INDEXES:
+        // Execute only index files after constraints
+        logger.debug("POST_TRANSFER_INDEXES phase - File: {}, IsIndex: {}", fileName, isIndexFile);
+        return isIndexFile;
       case POST_TRANSFER_TRIGGERS:
         // Execute only trigger files in the final phase
         logger.debug("POST_TRANSFER_TRIGGERS phase - File: {}, IsTrigger: {}", fileName, isTriggerFile);
@@ -179,6 +186,22 @@ public class PostgresExecuter {
     }
     
     return isConstraint;
+  }
+
+  /**
+   * Enhanced index file detection that considers the full path.
+   * Detects files in step6indexes directories.
+   */
+  private static boolean isIndexFileByPath(Path filePath) {
+    String pathStr = filePath.toString().toLowerCase();
+    boolean isIndex = pathStr.contains("step6indexes");
+    
+    // Debug logging for index file detection
+    if (isIndex) {
+      logger.debug("Detected index file: {}", filePath);
+    }
+    
+    return isIndex;
   }
 
   /**

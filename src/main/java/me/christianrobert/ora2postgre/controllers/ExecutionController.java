@@ -182,6 +182,23 @@ public class ExecutionController {
                     // Don't re-throw the exception - allow migration to continue
                 }
                 
+                // Execute indexes after constraints but before triggers
+                try {
+                    PostgresExecuter.executeAllSqlFiles(
+                            path,
+                            postgresConn,
+                            new ArrayList<>(), 
+                            new ArrayList<>(),
+                            ExecutionPhase.POST_TRANSFER_INDEXES
+                    );
+                    
+                    log.info("Index execution completed successfully");
+                } catch (Exception indexException) {
+                    log.error("Index execution failed - some indexes may not have been created", indexException);
+                    log.warn("Continuing with migration despite index errors - indexes can be created manually later");
+                    // Don't re-throw the exception - allow migration to continue
+                }
+                
                 // Execute triggers after all other objects are created
                 try {
                     PostgresExecuter.executeAllSqlFiles(

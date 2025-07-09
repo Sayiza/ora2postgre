@@ -92,11 +92,13 @@ class ConstraintExecutionIntegrationTest {
         // Verify that execution phases are in correct order
         ExecutionPhase[] phases = ExecutionPhase.values();
         
+        assertEquals(6, phases.length); // Updated from 5 to 6 phases
         assertEquals("PRE_TRANSFER_TYPES", phases[0].name());
         assertEquals("PRE_TRANSFER_TABLES", phases[1].name());
         assertEquals("POST_TRANSFER", phases[2].name());
         assertEquals("POST_TRANSFER_CONSTRAINTS", phases[3].name());
-        assertEquals("POST_TRANSFER_TRIGGERS", phases[4].name());
+        assertEquals("POST_TRANSFER_INDEXES", phases[4].name());
+        assertEquals("POST_TRANSFER_TRIGGERS", phases[5].name());
     }
 
     // Helper method to test file selection for phases

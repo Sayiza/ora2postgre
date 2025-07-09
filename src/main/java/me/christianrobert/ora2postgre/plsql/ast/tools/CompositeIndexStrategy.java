@@ -1,35 +1,38 @@
-package me.christianrobert.ora2postgre.indexes;
+package me.christianrobert.ora2postgre.plsql.ast.tools;
 
 import me.christianrobert.ora2postgre.oracledb.IndexMetadata;
 import me.christianrobert.ora2postgre.oracledb.IndexColumn;
+import me.christianrobert.ora2postgre.writing.PostgreSQLIndexDDL;
 
 /**
- * Strategy for converting Oracle B-tree indexes to PostgreSQL B-tree indexes.
- * This is the most common and straightforward conversion case.
+ * Strategy for converting Oracle composite (multi-column) indexes to PostgreSQL.
+ * Handles indexes with multiple columns while preserving column order and sort directions.
  */
-public class BTreeIndexStrategy implements IndexMigrationStrategy {
+public class CompositeIndexStrategy implements IndexMigrationStrategy {
     
     @Override
     public boolean supports(IndexMetadata index) {
-        // Support normal B-tree indexes that are not unique (handled by UniqueIndexStrategy)
-        // and not functional (those need special handling)
-        return index.isNormal() && 
-               !index.isUniqueIndex() && 
+        // Support composite indexes that are not functional and have multiple columns
+        return index.isComposite() && 
                !index.isFunctional() && 
                index.isValid() &&
-               !index.getColumns().isEmpty();
+               index.getColumns().size() > 1;
     }
     
     @Override
     public PostgreSQLIndexDDL convert(IndexMetadata index) {
         if (!supports(index)) {
-            throw new UnsupportedOperationException("Index not supported by BTreeIndexStrategy: " + index.getIndexName());
+            throw new UnsupportedOperationException("Index not supported by CompositeIndexStrategy: " + index.getIndexName());
         }
         
         StringBuilder sql = new StringBuilder();
         
-        // Build CREATE INDEX statement
-        sql.append("CREATE INDEX ");
+        // Build CREATE INDEX statement (unique if needed)
+        sql.append("CREATE ");
+        if (index.isUniqueIndex()) {
+            sql.append("UNIQUE ");
+        }
+        sql.append("INDEX ");
         
         // Generate PostgreSQL-compatible index name (handle length limit)
         String pgIndexName = generatePostgreSQLIndexName(index);
@@ -42,7 +45,7 @@ public class BTreeIndexStrategy implements IndexMigrationStrategy {
         }
         sql.append(index.getTableName().toLowerCase());
         
-        // Column list
+        // Column list - preserve order from Oracle
         sql.append(" (");
         for (int i = 0; i < index.getColumns().size(); i++) {
             if (i > 0) {
@@ -81,12 +84,12 @@ public class BTreeIndexStrategy implements IndexMigrationStrategy {
     
     @Override
     public String getStrategyName() {
-        return "B-Tree Index";
+        return "Composite Index";
     }
     
     @Override
     public int getPriority() {
-        return 10; // Lower priority than unique/composite strategies
+        return 15; // Medium priority, between unique and regular B-tree
     }
     
     /**
@@ -112,10 +115,16 @@ public class BTreeIndexStrategy implements IndexMigrationStrategy {
     private String generateConversionNotes(IndexMetadata index) {
         StringBuilder notes = new StringBuilder();
         
-        if (index.isComposite()) {
-            notes.append("Composite index with ").append(index.getColumns().size()).append(" columns");
-        } else {
-            notes.append("Single-column B-tree index");
+        notes.append("Composite index with ").append(index.getColumns().size()).append(" columns");
+        
+        // List column names for reference
+        if (index.getColumns().size() <= 5) { // Don't list too many columns
+            notes.append(" (");
+            for (int i = 0; i < index.getColumns().size(); i++) {
+                if (i > 0) notes.append(", ");
+                notes.append(index.getColumns().get(i).getColumnName().toLowerCase());
+            }
+            notes.append(")");
         }
         
         // Check for descending columns
@@ -124,14 +133,25 @@ public class BTreeIndexStrategy implements IndexMigrationStrategy {
             .sum();
         
         if (descendingColumns > 0) {
-            if (notes.length() > 0) notes.append("; ");
-            notes.append(descendingColumns).append(" descending column(s)");
+            notes.append("; ").append(descendingColumns).append(" descending column(s)");
+        }
+        
+        // Check for mixed sort orders (some ASC, some DESC)
+        boolean hasAscending = index.getColumns().stream().anyMatch(col -> !col.isDescending());
+        boolean hasDescending = index.getColumns().stream().anyMatch(IndexColumn::isDescending);
+        
+        if (hasAscending && hasDescending) {
+            notes.append("; Mixed sort orders");
+        }
+        
+        // Check if unique
+        if (index.isUniqueIndex()) {
+            notes.append("; Enforces uniqueness constraint");
         }
         
         // Check if name was truncated
         if (index.getIndexName().length() > 63) {
-            if (notes.length() > 0) notes.append("; ");
-            notes.append("Name truncated due to PostgreSQL 63-char limit");
+            notes.append("; Name truncated due to PostgreSQL 63-char limit");
         }
         
         // Check for unusual tablespace
@@ -139,11 +159,10 @@ public class BTreeIndexStrategy implements IndexMigrationStrategy {
             !index.getTablespace().trim().isEmpty() && 
             !"USERS".equalsIgnoreCase(index.getTablespace()) &&
             !"SYSTEM".equalsIgnoreCase(index.getTablespace())) {
-            if (notes.length() > 0) notes.append("; ");
-            notes.append("Custom tablespace: ").append(index.getTablespace());
+            notes.append("; Custom tablespace: ").append(index.getTablespace());
         }
         
-        return notes.length() > 0 ? notes.toString() : "Standard B-tree conversion";
+        return notes.toString();
     }
     
     @Override

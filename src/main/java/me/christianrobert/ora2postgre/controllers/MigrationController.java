@@ -30,6 +30,7 @@ import me.christianrobert.ora2postgre.writing.ExportTable;
 import me.christianrobert.ora2postgre.writing.ExportTrigger;
 import me.christianrobert.ora2postgre.writing.ExportView;
 import me.christianrobert.ora2postgre.writing.ExportConstraint;
+import me.christianrobert.ora2postgre.writing.ExportIndex;
 import me.christianrobert.ora2postgre.jobs.JobManager;
 import me.christianrobert.ora2postgre.jobs.MigrationProgressService;
 import me.christianrobert.ora2postgre.jobs.MigrationStep;
@@ -755,6 +756,7 @@ public class MigrationController {
         boolean doViewDdl = configurationService.isDoViewDdl();
         boolean doTriggers = configurationService.isDoTriggers();
         boolean doConstraints = configurationService.isDoConstraints();
+        boolean doIndexes = configurationService.isDoIndexes();
         
         if (doWriteRestControllers) {
             String pathJava = configurationService.getPathTargetProjectRoot() + configurationService.getPathTargetProjectJava();
@@ -795,6 +797,11 @@ public class MigrationController {
                 log.info("Starting constraint export to PostgreSQL files");
                 ExportConstraint.saveConstraints(path, data);
                 log.info("Constraint export completed");
+            }
+            if (doIndexes) {
+                log.info("Starting index export to PostgreSQL files");
+                ExportIndex.saveIndexes(path, data);
+                log.info("Index export completed");
             }
             if (doViewSignature) {
                 ExportView.saveEmptyViews(path, data.getViewDefinition());
