@@ -212,6 +212,7 @@ function updateDataOverview(data) {
     document.getElementById('packageBodies-count').textContent = data.packageBodies || 0;
     document.getElementById('triggers-count').textContent = data.triggers || 0;
     document.getElementById('constraints-count').textContent = data.constraints || 0;
+    document.getElementById('indexes-count').textContent = data.indexes || 0;
     
     // Parse AST Phase Data
     document.getElementById('parsedViews-count').textContent = data.parsedViews || 0;
@@ -234,6 +235,7 @@ function updateTargetStats(stats, fetchedAt, errorMessage) {
     document.getElementById('target-types-count').textContent = stats.types || 0;
     document.getElementById('target-triggers-count').textContent = stats.triggers || 0;
     document.getElementById('target-constraints-count').textContent = stats.constraints || 0;
+    document.getElementById('target-indexes-count').textContent = stats.indexes || 0;
     
     // Update target row count (format with commas for large numbers)
     const targetTotalRowCount = stats.totalRowCount || 0;
@@ -597,6 +599,7 @@ function populateConfigurationForm(config) {
     document.getElementById('doViewDdl').checked = config.doViewDdl || false;
     document.getElementById('doTriggers').checked = config.doTriggers || false;
     document.getElementById('doConstraints').checked = config.doConstraints || false;
+    document.getElementById('doIndexes').checked = config.doIndexes || false;
     document.getElementById('doWriteRestControllers').checked = config.doWriteRestControllers || false;
     document.getElementById('doWritePostgreFiles').checked = config.doWritePostgreFiles || false;
     document.getElementById('doExecutePostgreFiles').checked = config.doExecutePostgreFiles || false;
@@ -635,6 +638,7 @@ function getConfigurationFromForm() {
         doViewDdl: document.getElementById('doViewDdl').checked,
         doTriggers: document.getElementById('doTriggers').checked,
         doConstraints: document.getElementById('doConstraints').checked,
+        doIndexes: document.getElementById('doIndexes').checked,
         doWriteRestControllers: document.getElementById('doWriteRestControllers').checked,
         doWritePostgreFiles: document.getElementById('doWritePostgreFiles').checked,
         doExecutePostgreFiles: document.getElementById('doExecutePostgreFiles').checked,

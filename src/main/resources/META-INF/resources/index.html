@@ -131,6 +131,10 @@
                     <div class="data-count" id="constraints-count">-</div>
                     <div class="data-label">Constraints</div>
                 </div>
+                <div class="data-item">
+                    <div class="data-count" id="indexes-count">-</div>
+                    <div class="data-label">Indexes</div>
+                </div>
                 <!-- Parse AST Phase Data -->
                 <div class="data-item">
                     <div class="data-count" id="parsedViews-count">-</div>
@@ -196,6 +200,10 @@
                     <div class="data-label">Constraints</div>
                 </div>
                 <div class="data-item">
+                    <div class="data-count" id="target-indexes-count">-</div>
+                    <div class="data-label">Indexes</div>
+                </div>
+                <div class="data-item">
                     <div class="data-count" id="target-totalRowCount-count">-</div>
                     <div class="data-label">Total Rows</div>
                 </div>
@@ -253,6 +261,9 @@
                         </label>
                         <label class="config-item">
                             <input type="checkbox" id="doConstraints"> Extract constraints
+                        </label>
+                        <label class="config-item">
+                            <input type="checkbox" id="doIndexes"> Extract indexes
                         </label>
                         <label class="config-item">
                             <input type="checkbox" id="doWriteRestControllers"> Generate REST controllers

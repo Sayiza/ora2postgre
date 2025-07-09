@@ -63,6 +63,7 @@ public class StatusController {
         status.put("packageBodies", data.getPackageBodyPlsql().size());
         status.put("triggers", data.getTriggerPlsql().size());
         status.put("constraints", data.getTableSql().stream().mapToInt(table -> table.getConstraints().size()).sum());
+        status.put("indexes", data.getIndexes().size());
         status.put("parsedViews", data.getViewSpecAndQueries().size());
         status.put("parsedObjectTypes", data.getObjectTypeSpecAst().size());
         status.put("parsedPackages", data.getPackageSpecAst().size());

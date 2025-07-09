@@ -43,6 +43,9 @@ public class PostgresStatsService {
         // Count constraints (excluding system constraints)
         stats.put("constraints", countConstraints(postgresConnection));
         
+        // Count indexes (excluding system indexes)
+        stats.put("indexes", countIndexes(postgresConnection));
+        
         // Count total rows (excluding system tables)
         stats.put("totalRowCount", countTotalRows(postgresConnection));
         
@@ -211,6 +214,24 @@ public class PostgresStatsService {
             WHERE constraint_schema NOT IN ('information_schema', 'pg_catalog', 'pg_toast')
             AND constraint_schema NOT LIKE 'pg_temp_%'
             AND constraint_schema NOT LIKE 'pg_toast_temp_%'
+            """;
+        
+        try (PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+            if (rs.next()) {
+                return rs.getInt(1);
+            }
+        }
+        return 0;
+    }
+    
+    private int countIndexes(Connection conn) throws SQLException {
+        String sql = """
+            SELECT count(*) 
+            FROM pg_indexes 
+            WHERE schemaname NOT IN ('information_schema', 'pg_catalog', 'pg_toast')
+            AND schemaname NOT LIKE 'pg_temp_%'
+            AND schemaname NOT LIKE 'pg_toast_temp_%'
             """;
         
         try (PreparedStatement stmt = conn.prepareStatement(sql);
