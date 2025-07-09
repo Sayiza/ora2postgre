@@ -2,10 +2,14 @@ package me.christianrobert.ora2postgre.oracledb;
 
 import java.util.ArrayList;
 import java.util.List;
+import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.global.PostgreSqlIdentifierUtils;
 import me.christianrobert.ora2postgre.plsql.ast.tools.TypeConverter;
+import me.christianrobert.ora2postgre.plsql.ast.tools.managers.ViewTransformationManager;
 
 public class ViewMetadata {
+  private static final ViewTransformationManager viewManager = new ViewTransformationManager();
+  
   private String schema; // Oracle schema (user)
   private String viewName;
   private List<ColumnMetadata> columns;
@@ -36,9 +40,35 @@ public class ViewMetadata {
    * Generates PostgreSQL-compatible CREATE OR REPLACE VIEW statements.
    * Uses a dummy query with NULLs for now, as the raw query will be processed later.
    *
+   * @deprecated Use ViewTransformationManager.transformViewMetadata() instead
    * @return List of SQL statements (one per view)
    */
+  @Deprecated
   public String toPostgre(boolean withDummyQuery) {
+    return viewManager.transformViewMetadata(this, withDummyQuery, null);
+  }
+
+  /**
+   * Generates PostgreSQL-compatible CREATE OR REPLACE VIEW statements.
+   * Uses a dummy query with NULLs for now, as the raw query will be processed later.
+   *
+   * @param withDummyQuery Whether to include dummy NULL query for empty views
+   * @param context The global context containing all migration data
+   * @return List of SQL statements (one per view)
+   */
+  public String toPostgre(boolean withDummyQuery, Everything context) {
+    return viewManager.transformViewMetadata(this, withDummyQuery, context);
+  }
+
+  /**
+   * Generates PostgreSQL-compatible CREATE OR REPLACE VIEW statements.
+   * Uses a dummy query with NULLs for now, as the raw query will be processed later.
+   *
+   * @return List of SQL statements (one per view)
+   * @deprecated Use toPostgre(boolean, Everything) instead
+   */
+  @Deprecated
+  public String toPostgreLegacy(boolean withDummyQuery) {
     StringBuilder createView = new StringBuilder("CREATE OR REPLACE VIEW ");
     createView.append(schema)
             .append(".")

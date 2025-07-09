@@ -4,12 +4,15 @@ import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.oracledb.ViewMetadata;
 import me.christianrobert.ora2postgre.global.StringAux;
 import me.christianrobert.ora2postgre.global.ViewSpecAndQuery;
+import me.christianrobert.ora2postgre.plsql.ast.tools.managers.ViewTransformationManager;
 
 import java.io.File;
 import java.nio.file.Paths;
 import java.util.List;
 
 public class ExportView {
+
+  private static final ViewTransformationManager viewManager = new ViewTransformationManager();
 
   public static void saveEmptyViews(String path, List<ViewMetadata> views) {
     for (ViewMetadata v : views) {
@@ -20,7 +23,7 @@ public class ExportView {
                       File.separator +
                       "step1viewspec"),
               StringAux.capitalizeFirst(v.getViewName()) + "VIEW.sql",
-              v.toPostgre(true)
+              viewManager.transformViewMetadata(v, true, null)
       );
     }
   }
@@ -32,8 +35,8 @@ public class ExportView {
                       File.separator +
                       "step4viewbody"),
               StringAux.capitalizeFirst(v.spec.getViewName()) + "VIEW.sql",
-              v.spec.toPostgre(false) +
-                      "\n" + v.query.toPostgre(data, v.spec.getSchema()) + "\n;\n"
+              viewManager.transformViewMetadata(v.spec, false, data) +
+                      "\n" + viewManager.transformSelectStatement(v.query, data, v.spec.getSchema()) + "\n;\n"
       );
     }
   }
