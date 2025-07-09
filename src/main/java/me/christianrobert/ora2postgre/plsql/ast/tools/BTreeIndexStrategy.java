@@ -2,7 +2,6 @@ package me.christianrobert.ora2postgre.plsql.ast.tools;
 
 import me.christianrobert.ora2postgre.oracledb.IndexMetadata;
 import me.christianrobert.ora2postgre.oracledb.IndexColumn;
-import me.christianrobert.ora2postgre.writing.PostgreSQLIndexDDL;
 
 /**
  * Strategy for converting Oracle B-tree indexes to PostgreSQL B-tree indexes.

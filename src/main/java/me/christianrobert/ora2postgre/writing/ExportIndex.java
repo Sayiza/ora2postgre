@@ -4,6 +4,7 @@ import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.oracledb.IndexMetadata;
 import me.christianrobert.ora2postgre.plsql.ast.tools.IndexMigrationStrategyManager;
 import me.christianrobert.ora2postgre.plsql.ast.tools.IndexMigrationStrategyManager.IndexConversionResult;
+import me.christianrobert.ora2postgre.plsql.ast.tools.PostgreSQLIndexDDL;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -80,24 +80,4 @@ public class TableMetadata {
 
     return statements;
   }
-
-  public List<String>  toPostgreConstrain() {
-    List<String> statements = new ArrayList<>();
-
-    // Primary key constraints as ALTER TABLE
-    for (ConstraintMetadata cons : constraints) {
-      if ("P".equals(cons.getConstraintType())) {
-        StringBuilder alterTable = new StringBuilder("ALTER TABLE ");
-        alterTable.append(tableName);
-        alterTable.append(" ADD CONSTRAINT ");
-        alterTable.append(cons.getConstraintName());
-        alterTable.append(" PRIMARY KEY (");
-        alterTable.append(String.join(", ", cons.getColumnNames()));
-        alterTable.append(");");
-        statements.add(alterTable.toString());
-      }
-    }
-
-    return statements;
-  }
 }

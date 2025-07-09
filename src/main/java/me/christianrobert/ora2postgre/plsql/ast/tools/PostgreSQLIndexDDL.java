@@ -1,4 +1,4 @@
-package me.christianrobert.ora2postgre.writing;
+package me.christianrobert.ora2postgre.plsql.ast.tools;
 
 import java.util.List;
 import java.util.ArrayList;

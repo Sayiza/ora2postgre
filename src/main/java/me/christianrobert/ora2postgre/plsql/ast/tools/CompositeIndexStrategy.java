@@ -2,7 +2,6 @@ package me.christianrobert.ora2postgre.plsql.ast.tools;
 
 import me.christianrobert.ora2postgre.oracledb.IndexMetadata;
 import me.christianrobert.ora2postgre.oracledb.IndexColumn;
-import me.christianrobert.ora2postgre.writing.PostgreSQLIndexDDL;
 
 /**
  * Strategy for converting Oracle composite (multi-column) indexes to PostgreSQL.

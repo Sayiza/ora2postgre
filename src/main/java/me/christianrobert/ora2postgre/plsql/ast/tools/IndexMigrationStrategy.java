@@ -1,7 +1,6 @@
 package me.christianrobert.ora2postgre.plsql.ast.tools;
 
 import me.christianrobert.ora2postgre.oracledb.IndexMetadata;
-import me.christianrobert.ora2postgre.writing.PostgreSQLIndexDDL;
 
 /**
  * Strategy interface for converting Oracle indexes to PostgreSQL equivalents.
