@@ -1,6 +1,8 @@
 package me.christianrobert.ora2postgre.oracledb;
 
+import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.global.PostgreSqlIdentifierUtils;
+import me.christianrobert.ora2postgre.plsql.ast.tools.managers.ConstraintTransformationManager;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -139,94 +141,27 @@ public class ConstraintMetadata {
   
   /**
    * Generates PostgreSQL constraint DDL for use in ALTER TABLE statements
+   * @deprecated Use ConstraintTransformationManager instead for better strategy-based transformation
    */
+  @Deprecated
   public String toPostgreConstraintDDL() {
-    StringBuilder ddl = new StringBuilder();
-    
-    // Add constraint name
-    ddl.append("CONSTRAINT ")
-       .append(PostgreSqlIdentifierUtils.quoteIdentifier(constraintName))
-       .append(" ");
-    
-    switch (constraintType) {
-      case PRIMARY_KEY:
-        ddl.append("PRIMARY KEY (");
-        ddl.append(columnNames.stream()
-            .map(PostgreSqlIdentifierUtils::quoteIdentifier)
-            .collect(Collectors.joining(", ")));
-        ddl.append(")");
-        break;
-        
-      case FOREIGN_KEY:
-        ddl.append("FOREIGN KEY (");
-        ddl.append(columnNames.stream()
-            .map(PostgreSqlIdentifierUtils::quoteIdentifier)
-            .collect(Collectors.joining(", ")));
-        ddl.append(") REFERENCES ");
-        if (referencedSchema != null && !referencedSchema.isEmpty()) {
-          ddl.append(PostgreSqlIdentifierUtils.quoteIdentifier(referencedSchema)).append(".");
-        }
-        ddl.append(PostgreSqlIdentifierUtils.quoteIdentifier(referencedTable));
-        if (!referencedColumns.isEmpty()) {
-          ddl.append(" (");
-          ddl.append(referencedColumns.stream()
-              .map(PostgreSqlIdentifierUtils::quoteIdentifier)
-              .collect(Collectors.joining(", ")));
-          ddl.append(")");
-        }
-        if (deleteRule != null && !"NO ACTION".equals(deleteRule)) {
-          ddl.append(" ON DELETE ").append(REFERENTIAL_ACTION_MAP.getOrDefault(deleteRule, "NO ACTION"));
-        }
-        if (updateRule != null && !"NO ACTION".equals(updateRule)) {
-          ddl.append(" ON UPDATE ").append(REFERENTIAL_ACTION_MAP.getOrDefault(updateRule, "NO ACTION"));
-        }
-        break;
-        
-      case UNIQUE:
-        ddl.append("UNIQUE (");
-        ddl.append(columnNames.stream()
-            .map(PostgreSqlIdentifierUtils::quoteIdentifier)
-            .collect(Collectors.joining(", ")));
-        ddl.append(")");
-        break;
-        
-      case CHECK:
-        ddl.append("CHECK (");
-        if (checkCondition != null) {
-          ddl.append(transformCheckCondition(checkCondition));
-        }
-        ddl.append(")");
-        break;
-        
-      default:
-        throw new IllegalArgumentException("Unsupported constraint type: " + constraintType);
-    }
-    
-    // Add deferrable clause if applicable
-    if (deferrable) {
-      ddl.append(" DEFERRABLE");
-      if (initiallyDeferred) {
-        ddl.append(" INITIALLY DEFERRED");
-      }
-    }
-    
-    return ddl.toString();
+    // Delegate to strategy manager for consistent transformation
+    // Note: This method doesn't have access to Everything context, so we pass null
+    // This is acceptable for backward compatibility as the original implementation
+    // didn't use context either
+    ConstraintTransformationManager manager = new ConstraintTransformationManager();
+    return manager.transformConstraintDDL(this, null);
   }
   
   /**
    * Generates complete ALTER TABLE statement for this constraint
+   * @deprecated Use ConstraintTransformationManager instead for better strategy-based transformation
    */
+  @Deprecated
   public String toPostgreAlterTableDDL(String schemaName, String tableName) {
-    StringBuilder ddl = new StringBuilder();
-    ddl.append("ALTER TABLE ");
-    if (schemaName != null && !schemaName.isEmpty()) {
-      ddl.append(PostgreSqlIdentifierUtils.quoteIdentifier(schemaName)).append(".");
-    }
-    ddl.append(PostgreSqlIdentifierUtils.quoteIdentifier(tableName));
-    ddl.append(" ADD ");
-    ddl.append(toPostgreConstraintDDL());
-    ddl.append(";");
-    return ddl.toString();
+    // Delegate to strategy manager for consistent transformation
+    ConstraintTransformationManager manager = new ConstraintTransformationManager();
+    return manager.transformAlterTableDDL(this, schemaName, tableName, null);
   }
   
   /**

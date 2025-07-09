@@ -3,6 +3,7 @@ package me.christianrobert.ora2postgre.writing;
 import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.oracledb.ConstraintMetadata;
 import me.christianrobert.ora2postgre.oracledb.TableMetadata;
+import me.christianrobert.ora2postgre.plsql.ast.tools.managers.ConstraintTransformationManager;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -283,8 +284,9 @@ public class ExportConstraint {
         }
         ddl.append("\n");
         
-        // Generate ALTER TABLE statement
-        ddl.append(constraint.toPostgreAlterTableDDL(schema, tableName));
+        // Generate ALTER TABLE statement using transformation manager
+        ConstraintTransformationManager manager = new ConstraintTransformationManager();
+        ddl.append(manager.transformAlterTableDDL(constraint, schema, tableName, everything));
         
         return ddl.toString();
     }
@@ -352,26 +354,7 @@ public class ExportConstraint {
      * @return true if referenced table exists, false otherwise
      */
     private static boolean validateForeignKeyReferences(ConstraintMetadata constraint, Everything everything) {
-        if (!constraint.isForeignKey()) {
-            return true; // Not a foreign key, validation passes
-        }
-        
-        String referencedSchema = constraint.getReferencedSchema();
-        String referencedTable = constraint.getReferencedTable();
-        
-        if (referencedSchema == null || referencedTable == null) {
-            return false;
-        }
-        
-        // Check if referenced table exists in our migration
-        for (TableMetadata table : everything.getTableSql()) {
-            if (referencedSchema.equalsIgnoreCase(table.getSchema()) && 
-                referencedTable.equalsIgnoreCase(table.getTableName())) {
-                return true;
-            }
-        }
-        
-        // Table not found in migration
-        return false;
+        ConstraintTransformationManager manager = new ConstraintTransformationManager();
+        return manager.validateDependencies(constraint, everything);
     }
 }
