@@ -1,17 +1,8 @@
 package me.christianrobert.ora2postgre;
 
-import me.christianrobert.ora2postgre.global.Everything;
-import me.christianrobert.ora2postgre.global.Config;
-import me.christianrobert.ora2postgre.controllers.MigrationController;
-import me.christianrobert.ora2postgre.controllers.ExecutionController;
-import me.christianrobert.ora2postgre.controllers.DataTransferController;
-
+import jakarta.enterprise.context.ApplicationScoped;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-import jakarta.ws.rs.Path;
 
 /**
  * Legacy CLI entry point (deprecated).
