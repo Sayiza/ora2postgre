@@ -3,6 +3,7 @@ package me.christianrobert.ora2postgre.writing;
 import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.oracledb.TableMetadata;
 import me.christianrobert.ora2postgre.global.StringAux;
+import me.christianrobert.ora2postgre.plsql.ast.tools.managers.TableTransformationManager;
 
 import java.io.File;
 import java.nio.file.Paths;
@@ -23,11 +24,12 @@ public class ExportTable {
   }
 
   public static void saveSql(String path, List<TableMetadata> tables, Everything data) {
+    TableTransformationManager manager = new TableTransformationManager();
     for (TableMetadata t : tables) {
       FileWriter.write(
               Paths.get(path + File.separator + t.getSchema().toLowerCase()),
               StringAux.capitalizeFirst(t.getTableName()) + "TABLE.sql",
-              String.join("\n",t.toPostgre(data))
+              String.join("\n", manager.transform(t, data))
       );
     }
   }

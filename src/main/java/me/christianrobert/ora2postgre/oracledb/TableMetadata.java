@@ -3,6 +3,7 @@ package me.christianrobert.ora2postgre.oracledb;
 import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.oracledb.tools.CodeCleaner;
 import me.christianrobert.ora2postgre.plsql.ast.tools.TypeConverter;
+import me.christianrobert.ora2postgre.plsql.ast.tools.managers.TableTransformationManager;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -58,26 +59,13 @@ public class TableMetadata {
 
   /**
    * Generates PostgreSQL-compatible CREATE TABLE and ALTER TABLE statements for the table and its constraints.
+   * @deprecated Use TableTransformationManager instead for better strategy-based transformation
    * @return List of SQL statements
    */
+  @Deprecated
   public List<String> toPostgre(Everything data) {
-    List<String> statements = new ArrayList<>();
-
-    // Build CREATE TABLE statement
-    StringBuilder createTable = new StringBuilder("CREATE TABLE ");
-    createTable.append(schema)
-            .append(".")
-            .append(tableName).append(" (\n");
-
-    // Columns
-    List<String> columnDefs = new ArrayList<>();
-    for (ColumnMetadata col : columns) {
-      columnDefs.add(col.toPostgre(data, this.schema, this.tableName));
-    }
-    createTable.append(String.join(",\n", columnDefs));
-    createTable.append("\n);");
-    statements.add(createTable.toString());
-
-    return statements;
+    // Delegate to strategy manager for consistent transformation
+    TableTransformationManager manager = new TableTransformationManager();
+    return manager.transform(this, data);
   }
 }
