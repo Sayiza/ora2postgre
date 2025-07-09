@@ -1,8 +1,6 @@
 package me.christianrobert.ora2postgre.plsql.ast;
 
 import me.christianrobert.ora2postgre.global.Everything;
-import me.christianrobert.ora2postgre.global.StringAux;
-import me.christianrobert.ora2postgre.plsql.ast.tools.ToExportJava;
 import me.christianrobert.ora2postgre.plsql.ast.tools.ToExportPostgre;
 
 import java.util.List;

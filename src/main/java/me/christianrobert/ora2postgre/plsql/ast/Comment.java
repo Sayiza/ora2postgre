@@ -20,10 +20,6 @@ public class Comment extends Statement {
     return "Comment{" + what + "}";
   }
 
-  public String toJava(Everything data) {
-    return "  /* " + what + " */";
-  }
-
   public String toPostgre(Everything data) {
     return "  /* " + what + " */";
   }

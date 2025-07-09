@@ -14,10 +14,6 @@ public class Statement extends PlSqlAst {
     return "For Statement {code=" + "}";
   }
 
-  public String toJava(Everything data) {
-    return " /* statement not implemented " + this.getClass() + " */ ";
-  }
-
   public String toPostgre(Everything data) {
     return " /* statement not implemented  */ ";
   }

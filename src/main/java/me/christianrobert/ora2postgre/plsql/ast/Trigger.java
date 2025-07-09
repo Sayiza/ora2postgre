@@ -6,7 +6,6 @@ import me.christianrobert.ora2postgre.plsql.ast.tools.TriggerTransformer;
 
 import java.util.List;
 import java.util.ArrayList;
-import java.util.Arrays;
 
 public class Trigger extends PlSqlAst {
     private String triggerName;

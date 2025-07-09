@@ -1,12 +1,9 @@
 package me.christianrobert.ora2postgre.oracledb;
 
-import me.christianrobert.ora2postgre.global.Everything;
-import me.christianrobert.ora2postgre.global.PostgreSqlIdentifierUtils;
 import me.christianrobert.ora2postgre.plsql.ast.tools.managers.ConstraintTransformationManager;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * Represents a database constraint with comprehensive Oracle constraint support.
@@ -162,29 +159,6 @@ public class ConstraintMetadata {
     // Delegate to strategy manager for consistent transformation
     ConstraintTransformationManager manager = new ConstraintTransformationManager();
     return manager.transformAlterTableDDL(this, schemaName, tableName, null);
-  }
-  
-  /**
-   * Transforms Oracle check constraint condition to PostgreSQL equivalent
-   */
-  private String transformCheckCondition(String oracleCondition) {
-    if (oracleCondition == null) {
-      return "";
-    }
-    
-    String postgresCondition = oracleCondition;
-    
-    // Transform Oracle functions to PostgreSQL equivalents
-    postgresCondition = postgresCondition.replace("SYSDATE", "CURRENT_TIMESTAMP");
-    postgresCondition = postgresCondition.replace("USER", "CURRENT_USER");
-    postgresCondition = postgresCondition.replace("SYSTIMESTAMP", "CURRENT_TIMESTAMP");
-    
-    // Transform Oracle data types in conditions
-    postgresCondition = postgresCondition.replaceAll("(?i)VARCHAR2", "TEXT");
-    postgresCondition = postgresCondition.replaceAll("(?i)NUMBER", "NUMERIC");
-    
-    // Note: More complex transformations may be needed for advanced Oracle features
-    return postgresCondition;
   }
   
   /**

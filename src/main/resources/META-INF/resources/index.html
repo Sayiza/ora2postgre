@@ -1,363 +1,363 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ora to Postgre Transformation Tool</title>
-    <link rel="stylesheet" href="app.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ora to Postgre Transformation Tool</title>
+  <link rel="stylesheet" href="app.css">
 </head>
 <body>
-    <div class="header">
-        <h1>Ora to Postgre Transformation Tool</h1>
-        <p>Monitor and control your database migration process</p>
+<div class="header">
+  <h1>Ora to Postgre Transformation Tool</h1>
+  <p>Monitor and control your database migration process</p>
+</div>
+
+<div class="container">
+  <!-- Job Controls -->
+  <div class="card singlecolcard">
+    <h2>Migration Jobs</h2>
+    <div class="job-buttons">
+      <button class="btn btn-primary" onclick="startJob('extract')">
+        <span class="status-indicator status-idle" id="extract-status"></span>
+        Extract Oracle
+      </button>
+      <button class="btn btn-primary" onclick="startJob('parse')">
+        <span class="status-indicator status-idle" id="parse-status"></span>
+        Parse AST
+      </button>
+      <button class="btn btn-primary" onclick="startJob('export')">
+        <span class="status-indicator status-idle" id="export-status"></span>
+        Export Files
+      </button>
+      <button class="btn btn-primary" onclick="startJob('execute-pre')">
+        <span class="status-indicator status-idle" id="execute-pre-status"></span>
+        Execute Pre-Transfer
+      </button>
+      <button class="btn btn-primary" onclick="startJob('transferdata')">
+        <span class="status-indicator status-idle" id="data-status"></span>
+        Data Transfer
+      </button>
+      <button class="btn btn-primary" onclick="startJob('execute-post')">
+        <span class="status-indicator status-idle" id="execute-post-status"></span>
+        Execute Post-Transfer
+      </button>
+      <button class="btn btn-primary" onclick="startJob('full')">
+        <span class="status-indicator status-idle" id="full-status"></span>
+        Full Migration
+      </button>
+      <button class="btn btn-danger" onclick="resetSystem()">
+        Reset System
+      </button>
     </div>
+  </div>
 
-    <div class="container">
-        <!-- Job Controls -->
-        <div class="card singlecolcard">
-            <h2>Migration Jobs</h2>
-            <div class="job-buttons">
-                <button class="btn btn-primary" onclick="startJob('extract')">
-                    <span class="status-indicator status-idle" id="extract-status"></span>
-                    Extract Oracle
-                </button>
-                <button class="btn btn-primary" onclick="startJob('parse')">
-                    <span class="status-indicator status-idle" id="parse-status"></span>
-                    Parse AST
-                </button>
-                <button class="btn btn-primary" onclick="startJob('export')">
-                    <span class="status-indicator status-idle" id="export-status"></span>
-                    Export Files
-                </button>
-                <button class="btn btn-primary" onclick="startJob('execute-pre')">
-                    <span class="status-indicator status-idle" id="execute-pre-status"></span>
-                    Execute Pre-Transfer
-                </button>
-                <button class="btn btn-primary" onclick="startJob('transferdata')">
-                    <span class="status-indicator status-idle" id="data-status"></span>
-                    Data Transfer
-                </button>
-                <button class="btn btn-primary" onclick="startJob('execute-post')">
-                    <span class="status-indicator status-idle" id="execute-post-status"></span>
-                    Execute Post-Transfer
-                </button>
-                <button class="btn btn-primary" onclick="startJob('full')">
-                    <span class="status-indicator status-idle" id="full-status"></span>
-                    Full Migration
-                </button>
-                <button class="btn btn-danger" onclick="resetSystem()">
-                    Reset System
-                </button>
-            </div>
-        </div>
-
-        <!-- System Status -->
-        <div class="card singlecolcard">
-            <h2>System Health</h2>
-            <div class="system-status" id="system-status">
-                <div class="status-item" id="oracle-status">
-                    <span>Oracle Database</span>
-                    <span>Checking...</span>
-                </div>
-                <div class="status-item" id="postgres-status">
-                    <span>PostgreSQL Database</span>
-                    <span>Checking...</span>
-                </div>
-                <div class="status-item" id="service-status">
-                    <span>Migration Service</span>
-                    <span>Checking...</span>
-                </div>
-            </div>
-            <div style="margin-top: 1rem; text-align: center;">
-                <button class="btn btn-primary" onclick="refreshSystemStatus()">Refresh Health</button>
-            </div>
-        </div>
-
-        <!-- Active Jobs -->
-        <div class="card singlecolcard">
-            <h2>Active Jobs</h2>
-            <div class="job-list" id="job-list">
-                <div style="text-align: center; color: #666; padding: 2rem;">
-                    No active jobs
-                </div>
-            </div>
-            <div style="margin-top: 1rem; text-align: center;">
-                <button class="btn btn-primary" onclick="refreshJobs()">Refresh Jobs</button>
-            </div>
-        </div>
-
-        <!-- Data Overview -->
-        <div class="card">
-            <h2>Data Overview</h2>
-            <div class="data-overview" id="data-overview">
-                <!-- Extraction Phase Data -->
-                <div class="data-item">
-                    <div class="data-count" id="schemas-count">-</div>
-                    <div class="data-label">Schemas</div>
-                </div>
-                <div class="data-item">
-                    <div class="data-count" id="tables-count">-</div>
-                    <div class="data-label">Tables</div>
-                </div>
-                <div class="data-item">
-                    <div class="data-count" id="views-count">-</div>
-                    <div class="data-label">Views</div>
-                </div>
-                <div class="data-item">
-                    <div class="data-count" id="synonyms-count">-</div>
-                    <div class="data-label">Synonyms</div>
-                </div>
-                <div class="data-item">
-                    <div class="data-count" id="objectTypeSpecs-count">-</div>
-                    <div class="data-label">Object Type Specs</div>
-                </div>
-                <div class="data-item">
-                    <div class="data-count" id="objectTypeBodies-count">-</div>
-                    <div class="data-label">Object Type Bodies</div>
-                </div>
-                <div class="data-item">
-                    <div class="data-count" id="packageSpecs-count">-</div>
-                    <div class="data-label">Package Specs</div>
-                </div>
-                <div class="data-item">
-                    <div class="data-count" id="packageBodies-count">-</div>
-                    <div class="data-label">Package Bodies</div>
-                </div>
-                <div class="data-item">
-                    <div class="data-count" id="triggers-count">-</div>
-                    <div class="data-label">Triggers</div>
-                </div>
-                <div class="data-item">
-                    <div class="data-count" id="constraints-count">-</div>
-                    <div class="data-label">Constraints</div>
-                </div>
-                <div class="data-item">
-                    <div class="data-count" id="indexes-count">-</div>
-                    <div class="data-label">Indexes</div>
-                </div>
-                <!-- Parse AST Phase Data -->
-                <div class="data-item">
-                    <div class="data-count" id="parsedViews-count">-</div>
-                    <div class="data-label">Parsed Views</div>
-                </div>
-                <div class="data-item">
-                    <div class="data-count" id="parsedObjectTypes-count">-</div>
-                    <div class="data-label">Parsed Object Types</div>
-                </div>
-                <div class="data-item">
-                    <div class="data-count" id="parsedPackages-count">-</div>
-                    <div class="data-label">Parsed Packages</div>
-                </div>
-                <div class="data-item">
-                    <div class="data-count" id="parsedTriggers-count">-</div>
-                    <div class="data-label">Parsed Triggers</div>
-                </div>
-                <!-- Row Count Data -->
-                <div class="data-item">
-                    <div class="data-count" id="totalRowCount-count">-</div>
-                    <div class="data-label">Total Rows</div>
-                </div>
-            </div>
-            <div style="margin-top: 1rem; text-align: center;">
-                <button class="btn btn-primary" onclick="refreshDataOverview()">Refresh Data</button>
-            </div>
-        </div>
-
-        <!-- Target Database Overview -->
-        <div class="card">
-            <h2>Target Database Overview</h2>
-            <div class="data-overview" id="target-data-overview">
-                <div class="data-item">
-                    <div class="data-count" id="target-schemas-count">-</div>
-                    <div class="data-label">Schemas</div>
-                </div>
-                <div class="data-item">
-                    <div class="data-count" id="target-tables-count">-</div>
-                    <div class="data-label">Tables</div>
-                </div>
-                <div class="data-item">
-                    <div class="data-count" id="target-views-count">-</div>
-                    <div class="data-label">Views</div>
-                </div>
-                <div class="data-item">
-                    <div class="data-count" id="target-functions-count">-</div>
-                    <div class="data-label">Functions</div>
-                </div>
-                <div class="data-item">
-                    <div class="data-count" id="target-procedures-count">-</div>
-                    <div class="data-label">Procedures</div>
-                </div>
-                <div class="data-item">
-                    <div class="data-count" id="target-types-count">-</div>
-                    <div class="data-label">Types</div>
-                </div>
-                <div class="data-item">
-                    <div class="data-count" id="target-triggers-count">-</div>
-                    <div class="data-label">Triggers</div>
-                </div>
-                <div class="data-item">
-                    <div class="data-count" id="target-constraints-count">-</div>
-                    <div class="data-label">Constraints</div>
-                </div>
-                <div class="data-item">
-                    <div class="data-count" id="target-indexes-count">-</div>
-                    <div class="data-label">Indexes</div>
-                </div>
-                <div class="data-item">
-                    <div class="data-count" id="target-totalRowCount-count">-</div>
-                    <div class="data-label">Total Rows</div>
-                </div>
-            </div>
-            <div style="margin-top: 1rem; text-align: center; display: flex; align-items: center; justify-content: center; gap: 1rem;">
-                <button class="btn btn-primary" onclick="refreshTargetStats()">Refresh Target Stats</button>
-                <small id="target-last-updated" style="color: #666;">Not fetched yet</small>
-            </div>
-        </div>
-
-        <!-- Configuration Settings -->
-        <div class="card singlecolcard">
-            <h2>Configuration Settings</h2>
-            <div id="config-form" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
-                <!-- Process Flags -->
-                <div>
-                    <h3 style="margin-bottom: 1rem; color: #666; font-size: 1rem;">Process Flags</h3>
-                    <div style="display: grid; gap: 0.5rem;">
-                        <label class="config-item">
-                            <input type="checkbox" id="doAllSchemas"> Extract all schemas
-                        </label>
-                        <label class="config-item">
-                            <span>Only test schemas:</span>
-                            <input type="text" id="doOnlyTestSchema" placeholder="USER_ROBERT,PV">
-                        </label>
-                        <label class="config-item">
-                            <input type="checkbox" id="doTable"> Extract tables
-                        </label>
-                        <label class="config-item">
-                            <input type="checkbox" id="doSynonyms"> Extract synonyms
-                        </label>
-                        <label class="config-item">
-                            <input type="checkbox" id="doData"> Export data
-                        </label>
-                        <label class="config-item">
-                            <input type="checkbox" id="doObjectTypeSpec"> Extract object type specs
-                        </label>
-                        <label class="config-item">
-                            <input type="checkbox" id="doObjectTypeBody"> Extract object type bodies
-                        </label>
-                        <label class="config-item">
-                            <input type="checkbox" id="doPackageSpec"> Extract package specs
-                        </label>
-                        <label class="config-item">
-                            <input type="checkbox" id="doPackageBody"> Extract package bodies
-                        </label>
-                        <label class="config-item">
-                            <input type="checkbox" id="doViewSignature"> Extract view signatures
-                        </label>
-                        <label class="config-item">
-                            <input type="checkbox" id="doViewDdl"> Extract view DDL
-                        </label>
-                        <label class="config-item">
-                            <input type="checkbox" id="doTriggers"> Extract triggers
-                        </label>
-                        <label class="config-item">
-                            <input type="checkbox" id="doConstraints"> Extract constraints
-                        </label>
-                        <label class="config-item">
-                            <input type="checkbox" id="doIndexes"> Extract indexes
-                        </label>
-                        <label class="config-item">
-                            <input type="checkbox" id="doWriteRestControllers"> Generate REST controllers
-                        </label>
-                        <label class="config-item">
-                            <input type="checkbox" id="doWritePostgreFiles"> Write PostgreSQL files
-                        </label>
-                        <label class="config-item">
-                            <input type="checkbox" id="doExecutePostgreFiles"> Execute PostgreSQL files
-                        </label>
-                        <label class="config-item">
-                            <input type="checkbox" id="doRestControllerFunctions"> Generate function endpoints
-                        </label>
-                        <label class="config-item">
-                            <input type="checkbox" id="doRestControllerProcedures"> Generate procedure endpoints
-                        </label>
-                    </div>
-                </div>
-
-                <!-- Connection & Path Settings -->
-                <div>
-                    <h3 style="margin-bottom: 1rem; color: #666; font-size: 1rem;">Connection & Path Settings</h3>
-                    <div style="display: grid; gap: 0.5rem;">
-                        <label class="config-item">
-                            <span>Oracle URL:</span>
-                            <input type="text" id="oracleUrl" placeholder="jdbc:oracle:thin:@server:1521:sid">
-                        </label>
-                        <label class="config-item">
-                            <span>Oracle User:</span>
-                            <input type="text" id="oracleUser" placeholder="username">
-                        </label>
-                        <label class="config-item">
-                            <span>Oracle Password:</span>
-                            <input type="password" id="oraclePassword" placeholder="password">
-                        </label>
-                        <label class="config-item">
-                            <span>PostgreSQL URL:</span>
-                            <input type="text" id="postgreUrl" placeholder="jdbc:postgresql://localhost:5432/postgres">
-                        </label>
-                        <label class="config-item">
-                            <span>PostgreSQL User:</span>
-                            <input type="text" id="postgreUsername" placeholder="postgres">
-                        </label>
-                        <label class="config-item">
-                            <span>PostgreSQL Password:</span>
-                            <input type="password" id="postgrePassword" placeholder="password">
-                        </label>
-                        <label class="config-item">
-                            <span>Java Package Name:</span>
-                            <input type="text" id="javaGeneratedPackageName" placeholder="me.christianrobert.ora2postgre.autogen">
-                        </label>
-                        <label class="config-item">
-                            <span>Target Project Root:</span>
-                            <input type="text" id="pathTargetProjectRoot" placeholder="../co-mig-target4">
-                        </label>
-                        <label class="config-item">
-                            <span>Java Path:</span>
-                            <input type="text" id="pathTargetProjectJava" placeholder="/src/main/java">
-                        </label>
-                        <label class="config-item">
-                            <span>Resources Path:</span>
-                            <input type="text" id="pathTargetProjectResources" placeholder="/src/main/resources">
-                        </label>
-                        <label class="config-item">
-                            <span>PostgreSQL Path:</span>
-                            <input type="text" id="pathTargetProjectPostgre" placeholder="/postgre/autoddl">
-                        </label>
-                    </div>
-                </div>
-            </div>
-            <div style="margin-top: 1.5rem; text-align: center; display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
-                <button class="btn btn-primary" onclick="loadConfiguration()">Load Saved</button>
-                <button class="btn btn-primary" onclick="loadConfigurationFromServer()">Load from Server</button>
-                <button class="btn btn-success" onclick="saveConfiguration()">Save Configuration</button>
-                <button class="btn btn-warning" onclick="resetConfiguration()">Reset to Defaults</button>
-            </div>
-        </div>
-
-        <!-- Log Viewer -->
-        <div class="card log-viewer">
-            <h2>System Logs</h2>
-            <div class="log-controls">
-                <input type="text" class="log-filter" placeholder="Filter logs..." id="log-filter">
-                <button class="btn btn-primary" onclick="refreshLogs()">Refresh</button>
-                <button class="btn btn-primary" onclick="toggleAutoRefresh()">
-                    <span id="auto-refresh-text">Start Auto-Refresh</span>
-                </button>
-            </div>
-            <div class="log-content" id="log-content">
-                Loading logs...
-            </div>
-        </div>
+  <!-- System Status -->
+  <div class="card singlecolcard">
+    <h2>System Health</h2>
+    <div class="system-status" id="system-status">
+      <div class="status-item" id="oracle-status">
+        <span>Oracle Database</span>
+        <span>Checking...</span>
+      </div>
+      <div class="status-item" id="postgres-status">
+        <span>PostgreSQL Database</span>
+        <span>Checking...</span>
+      </div>
+      <div class="status-item" id="service-status">
+        <span>Migration Service</span>
+        <span>Checking...</span>
+      </div>
     </div>
+    <div style="margin-top: 1rem; text-align: center;">
+      <button class="btn btn-primary" onclick="refreshSystemStatus()">Refresh Health</button>
+    </div>
+  </div>
 
-    <script src="app.js"></script>
+  <!-- Active Jobs -->
+  <div class="card singlecolcard">
+    <h2>Active Jobs</h2>
+    <div class="job-list" id="job-list">
+      <div style="text-align: center; color: #666; padding: 2rem;">
+        No active jobs
+      </div>
+    </div>
+    <div style="margin-top: 1rem; text-align: center;">
+      <button class="btn btn-primary" onclick="refreshJobs()">Refresh Jobs</button>
+    </div>
+  </div>
+
+  <!-- Data Overview -->
+  <div class="card">
+    <h2>Data Overview</h2>
+    <div class="data-overview" id="data-overview">
+      <!-- Extraction Phase Data -->
+      <div class="data-item">
+        <div class="data-count" id="schemas-count">-</div>
+        <div class="data-label">Schemas</div>
+      </div>
+      <div class="data-item">
+        <div class="data-count" id="tables-count">-</div>
+        <div class="data-label">Tables</div>
+      </div>
+      <div class="data-item">
+        <div class="data-count" id="views-count">-</div>
+        <div class="data-label">Views</div>
+      </div>
+      <div class="data-item">
+        <div class="data-count" id="synonyms-count">-</div>
+        <div class="data-label">Synonyms</div>
+      </div>
+      <div class="data-item">
+        <div class="data-count" id="objectTypeSpecs-count">-</div>
+        <div class="data-label">Object Type Specs</div>
+      </div>
+      <div class="data-item">
+        <div class="data-count" id="objectTypeBodies-count">-</div>
+        <div class="data-label">Object Type Bodies</div>
+      </div>
+      <div class="data-item">
+        <div class="data-count" id="packageSpecs-count">-</div>
+        <div class="data-label">Package Specs</div>
+      </div>
+      <div class="data-item">
+        <div class="data-count" id="packageBodies-count">-</div>
+        <div class="data-label">Package Bodies</div>
+      </div>
+      <div class="data-item">
+        <div class="data-count" id="triggers-count">-</div>
+        <div class="data-label">Triggers</div>
+      </div>
+      <div class="data-item">
+        <div class="data-count" id="constraints-count">-</div>
+        <div class="data-label">Constraints</div>
+      </div>
+      <div class="data-item">
+        <div class="data-count" id="indexes-count">-</div>
+        <div class="data-label">Indexes</div>
+      </div>
+      <!-- Parse AST Phase Data -->
+      <div class="data-item">
+        <div class="data-count" id="parsedViews-count">-</div>
+        <div class="data-label">Parsed Views</div>
+      </div>
+      <div class="data-item">
+        <div class="data-count" id="parsedObjectTypes-count">-</div>
+        <div class="data-label">Parsed Object Types</div>
+      </div>
+      <div class="data-item">
+        <div class="data-count" id="parsedPackages-count">-</div>
+        <div class="data-label">Parsed Packages</div>
+      </div>
+      <div class="data-item">
+        <div class="data-count" id="parsedTriggers-count">-</div>
+        <div class="data-label">Parsed Triggers</div>
+      </div>
+      <!-- Row Count Data -->
+      <div class="data-item">
+        <div class="data-count" id="totalRowCount-count">-</div>
+        <div class="data-label">Total Rows</div>
+      </div>
+    </div>
+    <div style="margin-top: 1rem; text-align: center;">
+      <button class="btn btn-primary" onclick="refreshDataOverview()">Refresh Data</button>
+    </div>
+  </div>
+
+  <!-- Target Database Overview -->
+  <div class="card">
+    <h2>Target Database Overview</h2>
+    <div class="data-overview" id="target-data-overview">
+      <div class="data-item">
+        <div class="data-count" id="target-schemas-count">-</div>
+        <div class="data-label">Schemas</div>
+      </div>
+      <div class="data-item">
+        <div class="data-count" id="target-tables-count">-</div>
+        <div class="data-label">Tables</div>
+      </div>
+      <div class="data-item">
+        <div class="data-count" id="target-views-count">-</div>
+        <div class="data-label">Views</div>
+      </div>
+      <div class="data-item">
+        <div class="data-count" id="target-functions-count">-</div>
+        <div class="data-label">Functions</div>
+      </div>
+      <div class="data-item">
+        <div class="data-count" id="target-procedures-count">-</div>
+        <div class="data-label">Procedures</div>
+      </div>
+      <div class="data-item">
+        <div class="data-count" id="target-types-count">-</div>
+        <div class="data-label">Types</div>
+      </div>
+      <div class="data-item">
+        <div class="data-count" id="target-triggers-count">-</div>
+        <div class="data-label">Triggers</div>
+      </div>
+      <div class="data-item">
+        <div class="data-count" id="target-constraints-count">-</div>
+        <div class="data-label">Constraints</div>
+      </div>
+      <div class="data-item">
+        <div class="data-count" id="target-indexes-count">-</div>
+        <div class="data-label">Indexes</div>
+      </div>
+      <div class="data-item">
+        <div class="data-count" id="target-totalRowCount-count">-</div>
+        <div class="data-label">Total Rows</div>
+      </div>
+    </div>
+    <div style="margin-top: 1rem; text-align: center; display: flex; align-items: center; justify-content: center; gap: 1rem;">
+      <button class="btn btn-primary" onclick="refreshTargetStats()">Refresh Target Stats</button>
+      <small id="target-last-updated" style="color: #666;">Not fetched yet</small>
+    </div>
+  </div>
+
+  <!-- Configuration Settings -->
+  <div class="card singlecolcard">
+    <h2>Configuration Settings</h2>
+    <div id="config-form" style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+      <!-- Process Flags -->
+      <div>
+        <h3 style="margin-bottom: 1rem; color: #666; font-size: 1rem;">Process Flags</h3>
+        <div style="display: grid; gap: 0.5rem;">
+          <label class="config-item">
+            <input type="checkbox" id="doAllSchemas"> Extract all schemas
+          </label>
+          <label class="config-item">
+            <span>Only test schemas:</span>
+            <input type="text" id="doOnlyTestSchema" placeholder="USER_ROBERT,PV">
+          </label>
+          <label class="config-item">
+            <input type="checkbox" id="doTable"> Extract tables
+          </label>
+          <label class="config-item">
+            <input type="checkbox" id="doSynonyms"> Extract synonyms
+          </label>
+          <label class="config-item">
+            <input type="checkbox" id="doData"> Export data
+          </label>
+          <label class="config-item">
+            <input type="checkbox" id="doObjectTypeSpec"> Extract object type specs
+          </label>
+          <label class="config-item">
+            <input type="checkbox" id="doObjectTypeBody"> Extract object type bodies
+          </label>
+          <label class="config-item">
+            <input type="checkbox" id="doPackageSpec"> Extract package specs
+          </label>
+          <label class="config-item">
+            <input type="checkbox" id="doPackageBody"> Extract package bodies
+          </label>
+          <label class="config-item">
+            <input type="checkbox" id="doViewSignature"> Extract view signatures
+          </label>
+          <label class="config-item">
+            <input type="checkbox" id="doViewDdl"> Extract view DDL
+          </label>
+          <label class="config-item">
+            <input type="checkbox" id="doTriggers"> Extract triggers
+          </label>
+          <label class="config-item">
+            <input type="checkbox" id="doConstraints"> Extract constraints
+          </label>
+          <label class="config-item">
+            <input type="checkbox" id="doIndexes"> Extract indexes
+          </label>
+          <label class="config-item">
+            <input type="checkbox" id="doWriteRestControllers"> Generate REST controllers
+          </label>
+          <label class="config-item">
+            <input type="checkbox" id="doWritePostgreFiles"> Write PostgreSQL files
+          </label>
+          <label class="config-item">
+            <input type="checkbox" id="doExecutePostgreFiles"> Execute PostgreSQL files
+          </label>
+          <label class="config-item">
+            <input type="checkbox" id="doRestControllerFunctions"> Generate function endpoints
+          </label>
+          <label class="config-item">
+            <input type="checkbox" id="doRestControllerProcedures"> Generate procedure endpoints
+          </label>
+        </div>
+      </div>
+
+      <!-- Connection & Path Settings -->
+      <div>
+        <h3 style="margin-bottom: 1rem; color: #666; font-size: 1rem;">Connection & Path Settings</h3>
+        <div style="display: grid; gap: 0.5rem;">
+          <label class="config-item">
+            <span>Oracle URL:</span>
+            <input type="text" id="oracleUrl" placeholder="jdbc:oracle:thin:@server:1521:sid">
+          </label>
+          <label class="config-item">
+            <span>Oracle User:</span>
+            <input type="text" id="oracleUser" placeholder="username">
+          </label>
+          <label class="config-item">
+            <span>Oracle Password:</span>
+            <input type="password" id="oraclePassword" placeholder="password">
+          </label>
+          <label class="config-item">
+            <span>PostgreSQL URL:</span>
+            <input type="text" id="postgreUrl" placeholder="jdbc:postgresql://localhost:5432/postgres">
+          </label>
+          <label class="config-item">
+            <span>PostgreSQL User:</span>
+            <input type="text" id="postgreUsername" placeholder="postgres">
+          </label>
+          <label class="config-item">
+            <span>PostgreSQL Password:</span>
+            <input type="password" id="postgrePassword" placeholder="password">
+          </label>
+          <label class="config-item">
+            <span>Java Package Name:</span>
+            <input type="text" id="javaGeneratedPackageName" placeholder="me.christianrobert.ora2postgre.autogen">
+          </label>
+          <label class="config-item">
+            <span>Target Project Root:</span>
+            <input type="text" id="pathTargetProjectRoot" placeholder="../co-mig-target4">
+          </label>
+          <label class="config-item">
+            <span>Java Path:</span>
+            <input type="text" id="pathTargetProjectJava" placeholder="/src/main/java">
+          </label>
+          <label class="config-item">
+            <span>Resources Path:</span>
+            <input type="text" id="pathTargetProjectResources" placeholder="/src/main/resources">
+          </label>
+          <label class="config-item">
+            <span>PostgreSQL Path:</span>
+            <input type="text" id="pathTargetProjectPostgre" placeholder="/postgre/autoddl">
+          </label>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top: 1.5rem; text-align: center; display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+      <button class="btn btn-primary" onclick="loadConfiguration()">Load Saved</button>
+      <button class="btn btn-primary" onclick="loadConfigurationFromServer()">Load from Server</button>
+      <button class="btn btn-success" onclick="saveConfiguration()">Save Configuration</button>
+      <button class="btn btn-warning" onclick="resetConfiguration()">Reset to Defaults</button>
+    </div>
+  </div>
+
+  <!-- Log Viewer -->
+  <div class="card log-viewer">
+    <h2>System Logs</h2>
+    <div class="log-controls">
+      <input type="text" class="log-filter" placeholder="Filter logs..." id="log-filter">
+      <button class="btn btn-primary" onclick="refreshLogs()">Refresh</button>
+      <button class="btn btn-primary" onclick="toggleAutoRefresh()">
+        <span id="auto-refresh-text">Start Auto-Refresh</span>
+      </button>
+    </div>
+    <div class="log-content" id="log-content">
+      Loading logs...
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
 </body>
 </html>

@@ -13,6 +13,7 @@ This is an Oracle-to-PostgreSQL migration tool that extracts, parses, and transp
 5. **Dynamic SQL transformation service** - Runtime transpilation for DBMS_SQL.PARSE calls
 6. **AI-based CoFramework to Angular transformation** (future)
 7. **AI-based backend transformation** (future)
+8. **Code files have 2 spaces indentation**
 
 ## Architecture Philosophy
 

@@ -1,8 +1,6 @@
 package me.christianrobert.ora2postgre.plsql.ast;
 
 import me.christianrobert.ora2postgre.global.Everything;
-import me.christianrobert.ora2postgre.oracledb.TableMetadata;
-import me.christianrobert.ora2postgre.oracledb.ViewMetadata;
 
 import java.util.List;
 

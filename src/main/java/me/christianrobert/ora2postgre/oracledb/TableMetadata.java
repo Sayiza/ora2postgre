@@ -1,8 +1,6 @@
 package me.christianrobert.ora2postgre.oracledb;
 
 import me.christianrobert.ora2postgre.global.Everything;
-import me.christianrobert.ora2postgre.oracledb.tools.CodeCleaner;
-import me.christianrobert.ora2postgre.plsql.ast.tools.TypeConverter;
 import me.christianrobert.ora2postgre.plsql.ast.tools.managers.TableTransformationManager;
 
 import java.util.ArrayList;
