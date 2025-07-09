@@ -1,6 +1,7 @@
-package me.christianrobert.ora2postgre.plsql.ast.tools;
+package me.christianrobert.ora2postgre.plsql.ast.tools.transformers;
 
 import me.christianrobert.ora2postgre.global.Everything;
+import me.christianrobert.ora2postgre.plsql.ast.tools.OracleFunctionMapper;
 
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;

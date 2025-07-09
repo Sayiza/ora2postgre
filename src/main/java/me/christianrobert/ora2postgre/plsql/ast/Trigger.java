@@ -2,12 +2,15 @@ package me.christianrobert.ora2postgre.plsql.ast;
 
 import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.global.PostgreSqlIdentifierUtils;
-import me.christianrobert.ora2postgre.plsql.ast.tools.TriggerTransformer;
+import me.christianrobert.ora2postgre.plsql.ast.tools.transformers.TriggerTransformer;
+import me.christianrobert.ora2postgre.plsql.ast.tools.managers.TriggerTransformationManager;
 
 import java.util.List;
 import java.util.ArrayList;
 
 public class Trigger extends PlSqlAst {
+    private static final TriggerTransformationManager triggerManager = new TriggerTransformationManager();
+    
     private String triggerName;
     private String tableName;
     private String tableOwner;
@@ -115,7 +118,10 @@ public class Trigger extends PlSqlAst {
     /**
      * Transforms Oracle trigger to PostgreSQL trigger function and trigger definition.
      * This is the main transformation method that generates PostgreSQL-compatible SQL.
+     * 
+     * @deprecated Use TriggerTransformationManager.transformTriggerFunction() and transformTriggerDefinition() instead
      */
+    @Deprecated
     public String toPostgre(Everything everything) {
         StringBuilder result = new StringBuilder();
         
@@ -131,7 +137,10 @@ public class Trigger extends PlSqlAst {
 
     /**
      * Generates PostgreSQL trigger function that contains the trigger logic.
+     * 
+     * @deprecated Use TriggerTransformationManager.transformTriggerFunction() instead
      */
+    @Deprecated
     public String toPostgreTriggerFunction(Everything everything) {
         StringBuilder function = new StringBuilder();
         
@@ -175,7 +184,10 @@ public class Trigger extends PlSqlAst {
 
     /**
      * Generates PostgreSQL CREATE TRIGGER statement.
+     * 
+     * @deprecated Use TriggerTransformationManager.transformTriggerDefinition() instead
      */
+    @Deprecated
     public String toPostgreTriggerDefinition(Everything everything) {
         StringBuilder trigger = new StringBuilder();
         

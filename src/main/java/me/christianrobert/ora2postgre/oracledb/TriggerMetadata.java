@@ -1,8 +1,12 @@
 package me.christianrobert.ora2postgre.oracledb;
 
+import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.global.PostgreSqlIdentifierUtils;
+import me.christianrobert.ora2postgre.plsql.ast.tools.managers.TriggerTransformationManager;
 
 public class TriggerMetadata {
+  private static final TriggerTransformationManager triggerManager = new TriggerTransformationManager();
+  
   private String schema; // Oracle schema (user)
   private String triggerName;
   private String triggerType; // BEFORE/AFTER/INSTEAD OF
@@ -62,12 +66,37 @@ public class TriggerMetadata {
    * Generates PostgreSQL-compatible CREATE OR REPLACE FUNCTION statement for the trigger.
    * Oracle triggers become PostgreSQL functions that return TRIGGER.
    * 
+   * @deprecated Use TriggerTransformationManager.transformTriggerFunctionStub() instead
+   * @return PostgreSQL function stub
+   */
+  @Deprecated
+  public String toPostgreFunctionStub() {
+    return triggerManager.transformTriggerFunctionStub(this, null);
+  }
+
+  /**
+   * Generates PostgreSQL-compatible CREATE OR REPLACE FUNCTION statement for the trigger.
+   * Oracle triggers become PostgreSQL functions that return TRIGGER.
+   * 
+   * @param context The global context containing all migration data
+   * @return PostgreSQL function stub
+   */
+  public String toPostgreFunctionStub(Everything context) {
+    return triggerManager.transformTriggerFunctionStub(this, context);
+  }
+
+  /**
+   * Generates PostgreSQL-compatible CREATE OR REPLACE FUNCTION statement for the trigger.
+   * Oracle triggers become PostgreSQL functions that return TRIGGER.
+   * 
    * Note: This is a placeholder implementation. The actual transformation will be done
    * in the AST transformation phase using the parsed trigger body.
    *
    * @return PostgreSQL function stub
+   * @deprecated Use toPostgreFunctionStub(Everything) instead
    */
-  public String toPostgreFunctionStub() {
+  @Deprecated
+  public String toPostgreFunctionStubLegacy() {
     StringBuilder functionSql = new StringBuilder();
     
     String functionName = schema.toLowerCase() + "_" + triggerName.toLowerCase() + "_func";
@@ -91,9 +120,34 @@ public class TriggerMetadata {
    * Generates PostgreSQL CREATE TRIGGER statement.
    * This creates the actual trigger that calls the function.
    *
+   * @deprecated Use TriggerTransformationManager.transformTriggerDefinitionStub() instead
    * @return PostgreSQL trigger creation SQL
    */
+  @Deprecated
   public String toPostgreTriggerStub() {
+    return triggerManager.transformTriggerDefinitionStub(this, null);
+  }
+
+  /**
+   * Generates PostgreSQL CREATE TRIGGER statement.
+   * This creates the actual trigger that calls the function.
+   *
+   * @param context The global context containing all migration data
+   * @return PostgreSQL trigger creation SQL
+   */
+  public String toPostgreTriggerStub(Everything context) {
+    return triggerManager.transformTriggerDefinitionStub(this, context);
+  }
+
+  /**
+   * Generates PostgreSQL CREATE TRIGGER statement.
+   * This creates the actual trigger that calls the function.
+   *
+   * @return PostgreSQL trigger creation SQL
+   * @deprecated Use toPostgreTriggerStub(Everything) instead
+   */
+  @Deprecated
+  public String toPostgreTriggerStubLegacy() {
     StringBuilder triggerSql = new StringBuilder();
     
     String functionName = schema.toLowerCase() + "_" + triggerName.toLowerCase() + "_func";
