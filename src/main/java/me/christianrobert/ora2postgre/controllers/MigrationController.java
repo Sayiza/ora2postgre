@@ -281,6 +281,8 @@ public class MigrationController {
     boolean doPackageSpec = configurationService.isDoPackageSpec();
     boolean doPackageBody = configurationService.isDoPackageBody();
     boolean doViewSignature = configurationService.isDoViewSignature();
+    boolean doStandaloneFunctions = configurationService.isDoStandaloneFunctions();
+    boolean doStandaloneProcedures = configurationService.isDoStandaloneProcedures();
     boolean doTriggers = configurationService.isDoTriggers();
     boolean doIndexes = configurationService.isDoIndexes();
 
@@ -324,6 +326,12 @@ public class MigrationController {
       if (doPackageBody) {
         data.getPackageBodyPlsql().addAll(PackageExtractor.extract(conn, data.getUserNames(), false));
       }
+      if (doStandaloneFunctions) {
+        data.getStandaloneFunctionPlsql().addAll(StandaloneFunctionExtractor.extract(conn, data.getUserNames()));
+      }
+      if (doStandaloneProcedures) {
+        data.getStandaloneProcedurePlsql().addAll(StandaloneProcedureExtractor.extract(conn, data.getUserNames()));
+      }
       if (doTriggers) {
         data.getTriggerPlsql().addAll(TriggerExtractor.extract(conn, data.getUserNames()));
       }
@@ -339,9 +347,11 @@ public class MigrationController {
         data.setTotalRowCount(0);
       }
 
-      log.info("Extraction completed: {} schemas, {} tables, {} object type specs, {} package specs, {} triggers, {} indexes",
+      log.info("Extraction completed: {} schemas, {} tables, {} object type specs, {} package specs, {} standalone functions, {} standalone procedures, {} triggers, {} indexes",
               data.getUserNames().size(), data.getTableSql().size(),
-              data.getObjectTypeSpecPlsql().size(), data.getPackageSpecPlsql().size(), data.getTriggerPlsql().size(), data.getIndexes().size());
+              data.getObjectTypeSpecPlsql().size(), data.getPackageSpecPlsql().size(), 
+              data.getStandaloneFunctionPlsqlCount(), data.getStandaloneProcedurePlsqlCount(),
+              data.getTriggerPlsql().size(), data.getIndexes().size());
     }
   }
 
@@ -364,6 +374,8 @@ public class MigrationController {
     boolean doPackageSpec = configurationService.isDoPackageSpec();
     boolean doPackageBody = configurationService.isDoPackageBody();
     boolean doViewSignature = configurationService.isDoViewSignature();
+    boolean doStandaloneFunctions = configurationService.isDoStandaloneFunctions();
+    boolean doStandaloneProcedures = configurationService.isDoStandaloneProcedures();
     boolean doTriggers = configurationService.isDoTriggers();
     boolean doIndexes = configurationService.isDoIndexes();
 
@@ -442,21 +454,35 @@ public class MigrationController {
       }
       completedSubSteps++;
 
-      // Sub-step 9: Extract triggers
+      // Sub-step 9: Extract standalone functions
+      progressService.updateSubStepProgress(jobId, MigrationStep.EXTRACT, completedSubSteps, "Extracting standalone functions");
+      if (doStandaloneFunctions) {
+        data.getStandaloneFunctionPlsql().addAll(StandaloneFunctionExtractor.extract(conn, data.getUserNames()));
+      }
+      completedSubSteps++;
+
+      // Sub-step 10: Extract standalone procedures
+      progressService.updateSubStepProgress(jobId, MigrationStep.EXTRACT, completedSubSteps, "Extracting standalone procedures");
+      if (doStandaloneProcedures) {
+        data.getStandaloneProcedurePlsql().addAll(StandaloneProcedureExtractor.extract(conn, data.getUserNames()));
+      }
+      completedSubSteps++;
+
+      // Sub-step 11: Extract triggers
       progressService.updateSubStepProgress(jobId, MigrationStep.EXTRACT, completedSubSteps, "Extracting triggers");
       if (doTriggers) {
         data.getTriggerPlsql().addAll(TriggerExtractor.extract(conn, data.getUserNames()));
       }
       completedSubSteps++;
 
-      // Sub-step 10: Extract indexes
+      // Sub-step 12: Extract indexes
       progressService.updateSubStepProgress(jobId, MigrationStep.EXTRACT, completedSubSteps, "Extracting indexes");
       if (doIndexes) {
         data.getIndexes().addAll(IndexExtractor.extractAllIndexes(conn, data.getUserNames()));
       }
       completedSubSteps++;
 
-      // Sub-step 11: Calculate total row counts
+      // Sub-step 13: Calculate total row counts
       if (configurationService.isDoData()) {
         progressService.updateSubStepProgress(jobId, MigrationStep.EXTRACT, completedSubSteps, "Calculating total row count");
         log.info("Calculating total row count for extracted schemas");
@@ -528,6 +554,8 @@ public class MigrationController {
     boolean doObjectTypeBody = configurationService.isDoObjectTypeBody();
     boolean doPackageSpec = configurationService.isDoPackageSpec();
     boolean doPackageBody = configurationService.isDoPackageBody();
+    boolean doStandaloneFunctions = configurationService.isDoStandaloneFunctions();
+    boolean doStandaloneProcedures = configurationService.isDoStandaloneProcedures();
     boolean doTriggers = configurationService.isDoTriggers();
 
     if (doViewDdl) {
@@ -557,6 +585,26 @@ public class MigrationController {
     if (doPackageBody) {
       for (PlsqlCode s : data.getPackageBodyPlsql()) {
         data.getPackageBodyAst().add((OraclePackage) PlSqlAstMain.processPlsqlCode(s));
+      }
+    }
+    if (doStandaloneFunctions) {
+      for (PlsqlCode s : data.getStandaloneFunctionPlsql()) {
+        try {
+          Function function = PlSqlAstMain.buildStandaloneFunctionAst(s);
+          data.getStandaloneFunctionAst().add(function);
+        } catch (Exception e) {
+          log.error("Error parsing standalone function from schema: " + s.schema, e);
+        }
+      }
+    }
+    if (doStandaloneProcedures) {
+      for (PlsqlCode s : data.getStandaloneProcedurePlsql()) {
+        try {
+          Procedure procedure = PlSqlAstMain.buildStandaloneProcedureAst(s);
+          data.getStandaloneProcedureAst().add(procedure);
+        } catch (Exception e) {
+          log.error("Error parsing standalone procedure from schema: " + s.schema, e);
+        }
       }
     }
     if (doTriggers) {
@@ -742,6 +790,8 @@ public class MigrationController {
     boolean doPackageSpec = configurationService.isDoPackageSpec();
     boolean doPackageBody = configurationService.isDoPackageBody();
     boolean doViewDdl = configurationService.isDoViewDdl();
+    boolean doStandaloneFunctions = configurationService.isDoStandaloneFunctions();
+    boolean doStandaloneProcedures = configurationService.isDoStandaloneProcedures();
     boolean doTriggers = configurationService.isDoTriggers();
     boolean doConstraints = configurationService.isDoConstraints();
     boolean doIndexes = configurationService.isDoIndexes();
@@ -799,6 +849,12 @@ public class MigrationController {
       }
       if (doPackageSpec) {
         ExportPackage.savePackageSpecToPostgre(path, data.getPackageSpecAst(), data.getPackageBodyAst(), data);
+      }
+      if (doStandaloneFunctions) {
+        ExportStandaloneFunction.saveStandaloneFunctionsToPostgre(path, data.getStandaloneFunctionAst(), data);
+      }
+      if (doStandaloneProcedures) {
+        ExportStandaloneProcedure.saveStandaloneProceduresToPostgre(path, data.getStandaloneProcedureAst(), data);
       }
       if (doViewDdl) {
         ExportView.saveFullViews(path, data.getViewSpecAndQueries(), data);

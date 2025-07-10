@@ -48,7 +48,7 @@ public class StatusController {
   @Produces(MediaType.APPLICATION_JSON)
   @Operation(
           summary = "📊 Get Current Migration Status & Statistics",
-          description = "Returns comprehensive statistics about extracted and parsed database objects including tables, views, packages, and total row counts. Provides instant feedback without triggering processing."
+          description = "Returns comprehensive statistics about extracted and parsed database objects including tables, views, packages, standalone functions, standalone procedures, and total row counts. Provides instant feedback without triggering processing."
   )
   @APIResponse(responseCode = "200", description = "Current migration statistics")
   public Response getStatus() {
@@ -61,12 +61,16 @@ public class StatusController {
     status.put("objectTypeBodies", data.getObjectTypeBodyPlsql().size());
     status.put("packageSpecs", data.getPackageSpecPlsql().size());
     status.put("packageBodies", data.getPackageBodyPlsql().size());
+    status.put("standaloneFunctions", data.getStandaloneFunctionPlsqlCount());
+    status.put("standaloneProcedures", data.getStandaloneProcedurePlsqlCount());
     status.put("triggers", data.getTriggerPlsql().size());
     status.put("constraints", data.getTableSql().stream().mapToInt(table -> table.getConstraints().size()).sum());
     status.put("indexes", data.getIndexes().size());
     status.put("parsedViews", data.getViewSpecAndQueries().size());
     status.put("parsedObjectTypes", data.getObjectTypeSpecAst().size());
     status.put("parsedPackages", data.getPackageSpecAst().size());
+    status.put("parsedStandaloneFunctions", data.getStandaloneFunctionCount());
+    status.put("parsedStandaloneProcedures", data.getStandaloneProcedureCount());
     status.put("parsedTriggers", data.getTriggerAst().size());
     status.put("totalRowCount", data.getTotalRowCount());
     return Response.ok(status).build();
