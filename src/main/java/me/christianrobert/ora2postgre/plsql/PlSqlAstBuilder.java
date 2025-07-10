@@ -898,6 +898,51 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
   }
 
   @Override
+  public PlSqlAst visitCreate_function_body(PlSqlParser.Create_function_bodyContext ctx) {
+    // Parse standalone function
+    String functionName = ctx.function_name() != null ? ctx.function_name().getText() : "UNKNOWN";
+    String returnType = ctx.type_spec() != null ? ctx.type_spec().getText() : "UNKNOWN";
+    
+    List<Parameter> parameters = new ArrayList<>();
+    if (ctx.parameter() != null) {
+      for (PlSqlParser.ParameterContext param : ctx.parameter()) {
+        parameters.add((Parameter) visit(param));
+      }
+    }
+    
+    List<Statement> statements = new ArrayList<>();
+    if (ctx.body() != null && ctx.body().seq_of_statements() != null && ctx.body().seq_of_statements().statement() != null) {
+      for (PlSqlParser.StatementContext stmt : ctx.body().seq_of_statements().statement()) {
+        statements.add((Statement) visit(stmt));
+      }
+    }
+    
+    return new Function(functionName, parameters, returnType, statements);
+  }
+
+  @Override
+  public PlSqlAst visitCreate_procedure_body(PlSqlParser.Create_procedure_bodyContext ctx) {
+    // Parse standalone procedure
+    String procedureName = ctx.procedure_name() != null ? ctx.procedure_name().getText() : "UNKNOWN";
+    
+    List<Parameter> parameters = new ArrayList<>();
+    if (ctx.parameter() != null) {
+      for (PlSqlParser.ParameterContext param : ctx.parameter()) {
+        parameters.add((Parameter) visit(param));
+      }
+    }
+    
+    List<Statement> statements = new ArrayList<>();
+    if (ctx.body() != null && ctx.body().seq_of_statements() != null && ctx.body().seq_of_statements().statement() != null) {
+      for (PlSqlParser.StatementContext stmt : ctx.body().seq_of_statements().statement()) {
+        statements.add((Statement) visit(stmt));
+      }
+    }
+    
+    return new Procedure(procedureName, parameters, statements);
+  }
+
+  @Override
   public PlSqlAst visitWhere_clause(PlSqlParser.Where_clauseContext ctx) {
     if (ctx.cursor_name() != null) {
       // CURRENT OF cursor_name variant

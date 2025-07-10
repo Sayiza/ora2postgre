@@ -29,6 +29,8 @@ public class ConfigurationService {
     runtimeConfig.setDoPackageBody(getValue("do.package-body", config.isDoPackageBody()));
     runtimeConfig.setDoViewSignature(getValue("do.view-signature", config.isDoViewSignature()));
     runtimeConfig.setDoViewDdl(getValue("do.view-ddl", config.isDoViewDdl()));
+    runtimeConfig.setDoStandaloneFunctions(getValue("do.standalone-functions", config.isDoStandaloneFunctions()));
+    runtimeConfig.setDoStandaloneProcedures(getValue("do.standalone-procedures", config.isDoStandaloneProcedures()));
     runtimeConfig.setDoTriggers(getValue("do.triggers", config.isDoTriggers()));
     runtimeConfig.setDoConstraints(getValue("do.constraints", config.isDoConstraints()));
     runtimeConfig.setDoIndexes(getValue("do.indexes", config.isDoIndexes()));
@@ -89,6 +91,12 @@ public class ConfigurationService {
     }
     if (updates.getDoViewDdl() != null) {
       runtimeSettings.put("do.view-ddl", updates.getDoViewDdl());
+    }
+    if (updates.getDoStandaloneFunctions() != null) {
+      runtimeSettings.put("do.standalone-functions", updates.getDoStandaloneFunctions());
+    }
+    if (updates.getDoStandaloneProcedures() != null) {
+      runtimeSettings.put("do.standalone-procedures", updates.getDoStandaloneProcedures());
     }
     if (updates.getDoTriggers() != null) {
       runtimeSettings.put("do.triggers", updates.getDoTriggers());
@@ -201,6 +209,14 @@ public class ConfigurationService {
 
   public boolean isDoViewDdl() {
     return getValue("do.view-ddl", config.isDoViewDdl());
+  }
+
+  public boolean isDoStandaloneFunctions() {
+    return getValue("do.standalone-functions", config.isDoStandaloneFunctions());
+  }
+
+  public boolean isDoStandaloneProcedures() {
+    return getValue("do.standalone-procedures", config.isDoStandaloneProcedures());
   }
 
   public boolean isDoTriggers() {

@@ -3,7 +3,9 @@ package me.christianrobert.ora2postgre.plsql;
 import me.christianrobert.ora2postgre.global.PlsqlCode;
 import me.christianrobert.ora2postgre.antlr.PlSqlLexer;
 import me.christianrobert.ora2postgre.antlr.PlSqlParser;
+import me.christianrobert.ora2postgre.plsql.ast.Function;
 import me.christianrobert.ora2postgre.plsql.ast.PlSqlAst;
+import me.christianrobert.ora2postgre.plsql.ast.Procedure;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
@@ -33,5 +35,41 @@ public class PlSqlAstMain {
     CommonTokenStream tokens = new CommonTokenStream(lexer);
     PlSqlParser parser = new PlSqlParser(tokens);
     return parser.sql_script();
+  }
+
+  /**
+   * Builds a standalone function AST from PL/SQL code.
+   * Sets the standalone flag and schema for the function.
+   */
+  public static Function buildStandaloneFunctionAst(PlsqlCode plsqlCode) throws Exception {
+    PlSqlAst ast = processPlsqlCode(plsqlCode);
+    
+    if (ast instanceof Function) {
+      Function function = (Function) ast;
+      function.setStandalone(true);
+      function.setSchema(plsqlCode.schema);
+      return function;
+    } else {
+      throw new Exception("Expected Function AST but got: " + 
+                         (ast != null ? ast.getClass().getSimpleName() : "null"));
+    }
+  }
+
+  /**
+   * Builds a standalone procedure AST from PL/SQL code.
+   * Sets the standalone flag and schema for the procedure.
+   */
+  public static Procedure buildStandaloneProcedureAst(PlsqlCode plsqlCode) throws Exception {
+    PlSqlAst ast = processPlsqlCode(plsqlCode);
+    
+    if (ast instanceof Procedure) {
+      Procedure procedure = (Procedure) ast;
+      procedure.setStandalone(true);
+      procedure.setSchema(plsqlCode.schema);
+      return procedure;
+    } else {
+      throw new Exception("Expected Procedure AST but got: " + 
+                         (ast != null ? ast.getClass().getSimpleName() : "null"));
+    }
   }
 }

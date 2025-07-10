@@ -14,6 +14,8 @@ public class RuntimeConfiguration {
   private Boolean doPackageBody;
   private Boolean doViewSignature;
   private Boolean doViewDdl;
+  private Boolean doStandaloneFunctions;
+  private Boolean doStandaloneProcedures;
   private Boolean doTriggers;
   private Boolean doConstraints;
   private Boolean doIndexes;
@@ -124,6 +126,22 @@ public class RuntimeConfiguration {
 
   public void setDoViewDdl(Boolean doViewDdl) {
     this.doViewDdl = doViewDdl;
+  }
+
+  public Boolean getDoStandaloneFunctions() {
+    return doStandaloneFunctions;
+  }
+
+  public void setDoStandaloneFunctions(Boolean doStandaloneFunctions) {
+    this.doStandaloneFunctions = doStandaloneFunctions;
+  }
+
+  public Boolean getDoStandaloneProcedures() {
+    return doStandaloneProcedures;
+  }
+
+  public void setDoStandaloneProcedures(Boolean doStandaloneProcedures) {
+    this.doStandaloneProcedures = doStandaloneProcedures;
   }
 
   public Boolean getDoTriggers() {
