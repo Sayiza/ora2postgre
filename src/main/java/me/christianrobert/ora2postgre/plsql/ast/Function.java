@@ -1,9 +1,9 @@
 package me.christianrobert.ora2postgre.plsql.ast;
 
 import me.christianrobert.ora2postgre.global.Everything;
-import me.christianrobert.ora2postgre.plsql.ast.tools.StatementDeclarationCollector;
-import me.christianrobert.ora2postgre.plsql.ast.tools.ToExportPostgre;
-import me.christianrobert.ora2postgre.plsql.ast.tools.TypeConverter;
+import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.StatementDeclarationCollector;
+import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.ToExportPostgre;
+import me.christianrobert.ora2postgre.plsql.ast.tools.transformers.TypeConverter;
 import me.christianrobert.ora2postgre.plsql.ast.tools.managers.FunctionTransformationManager;
 
 import java.util.List;

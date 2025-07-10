@@ -3,8 +3,8 @@ package me.christianrobert.ora2postgre.plsql.ast.tools.strategies;
 import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.plsql.ast.Procedure;
 import me.christianrobert.ora2postgre.plsql.ast.Statement;
-import me.christianrobert.ora2postgre.plsql.ast.tools.StatementDeclarationCollector;
-import me.christianrobert.ora2postgre.plsql.ast.tools.ToExportPostgre;
+import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.StatementDeclarationCollector;
+import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.ToExportPostgre;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -8,7 +8,7 @@ import me.christianrobert.ora2postgre.plsql.ast.Procedure;
  * Different implementations can handle different types of Oracle procedures or 
  * special cases in the transformation process.
  */
-public interface ProcedureTransformationStrategy {
+public interface ProcedureTransformationStrategy extends TransformationStrategy<Procedure> {
 
   /**
    * Determines if this strategy can handle the given Oracle procedure.

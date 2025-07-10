@@ -10,7 +10,7 @@ import me.christianrobert.ora2postgre.plsql.ast.Trigger;
  * 1. Function generation (contains trigger logic)
  * 2. Trigger definition generation (CREATE TRIGGER statement)
  */
-public interface TriggerTransformationStrategy {
+public interface TriggerTransformationStrategy extends TransformationStrategy<TriggerMetadata> {
 
   /**
    * Determines if this strategy can handle the given Oracle trigger.

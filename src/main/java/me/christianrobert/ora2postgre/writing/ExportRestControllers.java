@@ -3,7 +3,7 @@ package me.christianrobert.ora2postgre.writing;
 import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.global.StringAux;
 import me.christianrobert.ora2postgre.plsql.ast.OraclePackage;
-import me.christianrobert.ora2postgre.plsql.ast.tools.RestControllerGenerator;
+import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.RestControllerGenerator;
 
 import java.io.File;
 import java.nio.file.Paths;

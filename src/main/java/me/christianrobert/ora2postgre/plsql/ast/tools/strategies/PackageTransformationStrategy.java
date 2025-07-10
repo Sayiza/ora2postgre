@@ -8,7 +8,7 @@ import me.christianrobert.ora2postgre.plsql.ast.OraclePackage;
  * Different implementations can handle different types of Oracle packages or 
  * special cases in the transformation process.
  */
-public interface PackageTransformationStrategy {
+public interface PackageTransformationStrategy extends TransformationStrategy<OraclePackage> {
 
   /**
    * Determines if this strategy can handle the given Oracle package.

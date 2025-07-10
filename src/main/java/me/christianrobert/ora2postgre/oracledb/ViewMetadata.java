@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.global.PostgreSqlIdentifierUtils;
-import me.christianrobert.ora2postgre.plsql.ast.tools.TypeConverter;
+import me.christianrobert.ora2postgre.plsql.ast.tools.transformers.TypeConverter;
 import me.christianrobert.ora2postgre.plsql.ast.tools.managers.ViewTransformationManager;
 
 public class ViewMetadata {

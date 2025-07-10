@@ -9,7 +9,7 @@ import me.christianrobert.ora2postgre.plsql.ast.SelectStatement;
  * This interface supports both metadata-based and AST-based view transformations,
  * including the two-phase view export pattern (empty views first, then full views).
  */
-public interface ViewTransformationStrategy {
+public interface ViewTransformationStrategy extends TransformationStrategy<ViewMetadata> {
 
   /**
    * Determines if this strategy can handle the given Oracle view metadata.

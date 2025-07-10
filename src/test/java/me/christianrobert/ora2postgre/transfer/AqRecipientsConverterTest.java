@@ -340,15 +340,15 @@ public class AqRecipientsConverterTest {
   @Test
   public void testPostgreSQLTypeMapping() {
     // Test that TypeConverter properly maps AQ$_RECIPIENTS to JSONB
-    assertEquals("jsonb", me.christianrobert.ora2postgre.plsql.ast.tools.TypeConverter.toPostgre("aq$_recipients"));
-    assertEquals("jsonb", me.christianrobert.ora2postgre.plsql.ast.tools.TypeConverter.toPostgre("AQ$_RECIPIENTS"));
-    assertEquals("jsonb", me.christianrobert.ora2postgre.plsql.ast.tools.TypeConverter.toPostgre("sys.aq$_recipients"));
-    assertEquals("jsonb", me.christianrobert.ora2postgre.plsql.ast.tools.TypeConverter.toPostgre("SYS.AQ$_RECIPIENTS"));
+    assertEquals("jsonb", me.christianrobert.ora2postgre.plsql.ast.tools.transformers.TypeConverter.toPostgre("aq$_recipients"));
+    assertEquals("jsonb", me.christianrobert.ora2postgre.plsql.ast.tools.transformers.TypeConverter.toPostgre("AQ$_RECIPIENTS"));
+    assertEquals("jsonb", me.christianrobert.ora2postgre.plsql.ast.tools.transformers.TypeConverter.toPostgre("sys.aq$_recipients"));
+    assertEquals("jsonb", me.christianrobert.ora2postgre.plsql.ast.tools.transformers.TypeConverter.toPostgre("SYS.AQ$_RECIPIENTS"));
 
     // Verify other AQ types still work correctly
-    assertEquals("jsonb", me.christianrobert.ora2postgre.plsql.ast.tools.TypeConverter.toPostgre("aq$_jms_text_message"));
-    assertEquals("jsonb", me.christianrobert.ora2postgre.plsql.ast.tools.TypeConverter.toPostgre("aq$_sig_prop"));
-    assertEquals("text", me.christianrobert.ora2postgre.plsql.ast.tools.TypeConverter.toPostgre("varchar2"));
+    assertEquals("jsonb", me.christianrobert.ora2postgre.plsql.ast.tools.transformers.TypeConverter.toPostgre("aq$_jms_text_message"));
+    assertEquals("jsonb", me.christianrobert.ora2postgre.plsql.ast.tools.transformers.TypeConverter.toPostgre("aq$_sig_prop"));
+    assertEquals("text", me.christianrobert.ora2postgre.plsql.ast.tools.transformers.TypeConverter.toPostgre("varchar2"));
   }
 
   @Test

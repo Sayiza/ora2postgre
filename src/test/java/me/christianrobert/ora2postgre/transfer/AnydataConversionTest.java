@@ -417,11 +417,11 @@ public class AnydataConversionTest {
   @Test
   public void testPostgreSQLTypeMapping() {
     // Test that TypeConverter properly maps ANYDATA to JSONB
-    assertEquals("jsonb", me.christianrobert.ora2postgre.plsql.ast.tools.TypeConverter.toPostgre("anydata"));
-    assertEquals("jsonb", me.christianrobert.ora2postgre.plsql.ast.tools.TypeConverter.toPostgre("ANYDATA"));
+    assertEquals("jsonb", me.christianrobert.ora2postgre.plsql.ast.tools.transformers.TypeConverter.toPostgre("anydata"));
+    assertEquals("jsonb", me.christianrobert.ora2postgre.plsql.ast.tools.transformers.TypeConverter.toPostgre("ANYDATA"));
 
     // Verify other types still work correctly
-    assertEquals("text", me.christianrobert.ora2postgre.plsql.ast.tools.TypeConverter.toPostgre("dburitype"));
-    assertEquals("text", me.christianrobert.ora2postgre.plsql.ast.tools.TypeConverter.toPostgre("varchar2"));
+    assertEquals("text", me.christianrobert.ora2postgre.plsql.ast.tools.transformers.TypeConverter.toPostgre("dburitype"));
+    assertEquals("text", me.christianrobert.ora2postgre.plsql.ast.tools.transformers.TypeConverter.toPostgre("varchar2"));
   }
 }

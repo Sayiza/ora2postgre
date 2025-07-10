@@ -1,7 +1,7 @@
 package me.christianrobert.ora2postgre.transfer;
 
 import me.christianrobert.ora2postgre.oracledb.ColumnMetadata;
-import me.christianrobert.ora2postgre.plsql.ast.tools.TypeConverter;
+import me.christianrobert.ora2postgre.plsql.ast.tools.transformers.TypeConverter;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

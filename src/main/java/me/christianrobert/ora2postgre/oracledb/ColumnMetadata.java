@@ -3,7 +3,7 @@ package me.christianrobert.ora2postgre.oracledb;
 import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.global.PostgreSqlIdentifierUtils;
 import me.christianrobert.ora2postgre.oracledb.tools.CodeCleaner;
-import me.christianrobert.ora2postgre.plsql.ast.tools.TypeConverter;
+import me.christianrobert.ora2postgre.plsql.ast.tools.transformers.TypeConverter;
 
 // Represents a column's metadata
 public class ColumnMetadata {

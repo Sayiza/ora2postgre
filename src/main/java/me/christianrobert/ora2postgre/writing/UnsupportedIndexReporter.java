@@ -1,6 +1,6 @@
 package me.christianrobert.ora2postgre.writing;
 
-import me.christianrobert.ora2postgre.plsql.ast.tools.PostgreSQLIndexDDL;
+import me.christianrobert.ora2postgre.plsql.ast.tools.transformers.PostgreSQLIndexDDL;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

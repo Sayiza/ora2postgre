@@ -294,14 +294,14 @@ public class AqSigPropConverterTest {
   @Test
   public void testPostgreSQLTypeMapping() {
     // Test that TypeConverter properly maps AQ$_SIG_PROP to JSONB
-    assertEquals("jsonb", me.christianrobert.ora2postgre.plsql.ast.tools.TypeConverter.toPostgre("aq$_sig_prop"));
-    assertEquals("jsonb", me.christianrobert.ora2postgre.plsql.ast.tools.TypeConverter.toPostgre("AQ$_SIG_PROP"));
-    assertEquals("jsonb", me.christianrobert.ora2postgre.plsql.ast.tools.TypeConverter.toPostgre("sys.aq$_sig_prop"));
-    assertEquals("jsonb", me.christianrobert.ora2postgre.plsql.ast.tools.TypeConverter.toPostgre("SYS.AQ$_SIG_PROP"));
+    assertEquals("jsonb", me.christianrobert.ora2postgre.plsql.ast.tools.transformers.TypeConverter.toPostgre("aq$_sig_prop"));
+    assertEquals("jsonb", me.christianrobert.ora2postgre.plsql.ast.tools.transformers.TypeConverter.toPostgre("AQ$_SIG_PROP"));
+    assertEquals("jsonb", me.christianrobert.ora2postgre.plsql.ast.tools.transformers.TypeConverter.toPostgre("sys.aq$_sig_prop"));
+    assertEquals("jsonb", me.christianrobert.ora2postgre.plsql.ast.tools.transformers.TypeConverter.toPostgre("SYS.AQ$_SIG_PROP"));
 
     // Verify other types still work correctly
-    assertEquals("jsonb", me.christianrobert.ora2postgre.plsql.ast.tools.TypeConverter.toPostgre("aq$_jms_text_message"));
-    assertEquals("text", me.christianrobert.ora2postgre.plsql.ast.tools.TypeConverter.toPostgre("varchar2"));
+    assertEquals("jsonb", me.christianrobert.ora2postgre.plsql.ast.tools.transformers.TypeConverter.toPostgre("aq$_jms_text_message"));
+    assertEquals("text", me.christianrobert.ora2postgre.plsql.ast.tools.transformers.TypeConverter.toPostgre("varchar2"));
   }
 
   @Test

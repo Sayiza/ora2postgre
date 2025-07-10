@@ -1,6 +1,6 @@
 package me.christianrobert.ora2postgre.plsql.ast;
 
-import me.christianrobert.ora2postgre.plsql.ast.tools.TypeConverter;
+import me.christianrobert.ora2postgre.plsql.ast.tools.transformers.TypeConverter;
 
 public class SubType extends PlSqlAst {
   private String name;

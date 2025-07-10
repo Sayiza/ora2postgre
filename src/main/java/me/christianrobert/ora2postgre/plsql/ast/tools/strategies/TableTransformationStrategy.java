@@ -10,15 +10,7 @@ import java.util.List;
  * Different implementations can handle different types of Oracle tables or 
  * special cases in the transformation process.
  */
-public interface TableTransformationStrategy {
-
-  /**
-   * Determines if this strategy can handle the given Oracle table.
-   *
-   * @param table The Oracle table metadata to evaluate
-   * @return true if this strategy can convert the table, false otherwise
-   */
-  boolean supports(TableMetadata table);
+public interface TableTransformationStrategy extends TransformationStrategy<TableMetadata> {
 
   /**
    * Converts an Oracle table to PostgreSQL DDL statements.
@@ -30,25 +22,6 @@ public interface TableTransformationStrategy {
    * @throws UnsupportedOperationException if the table is not supported by this strategy
    */
   List<String> transform(TableMetadata table, Everything context);
-
-  /**
-   * Gets a human-readable name for this strategy.
-   * Used for logging and debugging purposes.
-   *
-   * @return Strategy name (e.g., "Standard Table", "Partitioned Table")
-   */
-  String getStrategyName();
-
-  /**
-   * Gets the priority of this strategy for selection.
-   * Higher priority strategies are checked first.
-   * This allows more specific strategies to take precedence over general ones.
-   *
-   * @return Priority value (higher = checked first)
-   */
-  default int getPriority() {
-    return 0;
-  }
 
   /**
    * Gets additional information about the conversion process.

@@ -8,15 +8,8 @@ import me.christianrobert.ora2postgre.oracledb.ConstraintMetadata;
  * Different implementations handle different types of Oracle constraints based on their
  * complexity and transformation requirements.
  */
-public interface ConstraintTransformationStrategy {
+public interface ConstraintTransformationStrategy extends TransformationStrategy<ConstraintMetadata> {
 
-  /**
-   * Determines if this strategy can handle the given Oracle constraint.
-   *
-   * @param constraint The Oracle constraint metadata to evaluate
-   * @return true if this strategy can convert the constraint, false otherwise
-   */
-  boolean supports(ConstraintMetadata constraint);
 
   /**
    * Converts an Oracle constraint to PostgreSQL DDL.
@@ -42,24 +35,6 @@ public interface ConstraintTransformationStrategy {
    */
   String transformAlterTableDDL(ConstraintMetadata constraint, String schemaName, String tableName, Everything context);
 
-  /**
-   * Gets a human-readable name for this strategy.
-   * Used for logging and debugging purposes.
-   *
-   * @return Strategy name (e.g., "Primary Key", "Foreign Key", "Unique", "Check")
-   */
-  String getStrategyName();
-
-  /**
-   * Gets the priority of this strategy for selection.
-   * Higher priority strategies are checked first.
-   * This allows more specific strategies to take precedence over general ones.
-   *
-   * @return Priority value (higher = checked first)
-   */
-  default int getPriority() {
-    return 0;
-  }
 
   /**
    * Gets the Oracle constraint type this strategy handles.

@@ -8,7 +8,7 @@ import me.christianrobert.ora2postgre.plsql.ast.Function;
  * Different implementations can handle different types of Oracle functions or 
  * special cases in the transformation process.
  */
-public interface FunctionTransformationStrategy {
+public interface FunctionTransformationStrategy extends TransformationStrategy<Function> {
 
   /**
    * Determines if this strategy can handle the given Oracle function.

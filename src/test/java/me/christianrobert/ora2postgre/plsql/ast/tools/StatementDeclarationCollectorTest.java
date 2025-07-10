@@ -3,6 +3,7 @@ package me.christianrobert.ora2postgre.plsql.ast.tools;
 import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.plsql.ast.ForLoopStatement;
 import me.christianrobert.ora2postgre.plsql.ast.Statement;
+import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.StatementDeclarationCollector;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;

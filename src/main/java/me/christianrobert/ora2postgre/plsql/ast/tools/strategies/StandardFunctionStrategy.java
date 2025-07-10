@@ -4,9 +4,9 @@ import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.plsql.ast.Function;
 import me.christianrobert.ora2postgre.plsql.ast.Parameter;
 import me.christianrobert.ora2postgre.plsql.ast.Statement;
-import me.christianrobert.ora2postgre.plsql.ast.tools.StatementDeclarationCollector;
-import me.christianrobert.ora2postgre.plsql.ast.tools.ToExportPostgre;
-import me.christianrobert.ora2postgre.plsql.ast.tools.TypeConverter;
+import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.StatementDeclarationCollector;
+import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.ToExportPostgre;
+import me.christianrobert.ora2postgre.plsql.ast.tools.transformers.TypeConverter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
