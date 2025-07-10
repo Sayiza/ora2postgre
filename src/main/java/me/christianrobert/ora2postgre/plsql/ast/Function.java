@@ -4,6 +4,7 @@ import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.plsql.ast.tools.StatementDeclarationCollector;
 import me.christianrobert.ora2postgre.plsql.ast.tools.ToExportPostgre;
 import me.christianrobert.ora2postgre.plsql.ast.tools.TypeConverter;
+import me.christianrobert.ora2postgre.plsql.ast.tools.managers.FunctionTransformationManager;
 
 import java.util.List;
 
@@ -15,6 +16,8 @@ public class Function extends PlSqlAst {
 
   private ObjectType parentType;
   private OraclePackage parentPackage;
+  
+  private static final FunctionTransformationManager transformationManager = new FunctionTransformationManager();
 
   public Function(String name, List<Parameter> parameters, String returnType, List<Statement> statements) {
     this.name = name;
@@ -47,6 +50,14 @@ public class Function extends PlSqlAst {
     return statements;
   }
 
+  public ObjectType getParentType() {
+    return parentType;
+  }
+
+  public OraclePackage getParentPackage() {
+    return parentPackage;
+  }
+
   @Override
   public <T> T accept(PlSqlAstVisitor<T> visitor) {
     return visitor.visit(this);
@@ -72,39 +83,13 @@ public class Function extends PlSqlAst {
   }
 
 
+  /**
+   * @deprecated Use FunctionTransformationManager instead for better maintainability and extensibility.
+   * This method is maintained for backward compatibility and delegates to the transformation manager.
+   */
+  @Deprecated
   public String toPostgre(Everything data, boolean specOnly) {
-    StringBuilder b = new StringBuilder();
-    b.append("CREATE OR REPLACE FUNCTION ")
-            .append(parentType != null ? parentType.getSchema().toUpperCase() :
-                    parentPackage.getSchema().toUpperCase() )
-            .append(".")
-            .append(parentType != null ? parentType.getName().toUpperCase() :
-                    parentPackage.getName().toUpperCase() ) //TODO
-            .append("_")
-            .append(name.toLowerCase())
-            .append("(");
-    ToExportPostgre.doParametersPostgre(b, parameters, data);
-    b.append(") \n")
-            .append("RETURNS ")
-            .append(TypeConverter.toPostgre(returnType))
-            .append("\nLANGUAGE plpgsql AS $$\n")
-            .append("DECLARE\n");
-    // Collect and add variable stmtDeclarations from FOR loops
-    StringBuilder stmtDeclarations = StatementDeclarationCollector.collectNecessaryDeclarations(statements, data);
-    b.append(stmtDeclarations);
-    // TODO add declarations from plsql source code
-    b.append("BEGIN\n");
-    if (specOnly) {
-      b.append("return null;\n");
-    } else {
-      // loop over statements
-      for (Statement statement : statements) {
-        b.append(statement.toPostgre(data))
-                .append("\n");
-      }
-    }
-    b.append("END;\n$$\n;\n");
-    return b.toString();
+    return transformationManager.transform(this, data, specOnly);
   }
   
 }

@@ -3,6 +3,7 @@ package me.christianrobert.ora2postgre.plsql.ast;
 import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.plsql.ast.tools.StatementDeclarationCollector;
 import me.christianrobert.ora2postgre.plsql.ast.tools.ToExportPostgre;
+import me.christianrobert.ora2postgre.plsql.ast.tools.managers.ProcedureTransformationManager;
 
 import java.util.List;
 
@@ -13,6 +14,8 @@ public class Procedure extends PlSqlAst {
 
   private ObjectType parentType;
   private OraclePackage parentPackage;
+  
+  private static final ProcedureTransformationManager transformationManager = new ProcedureTransformationManager();
 
   public Procedure(
           String name,
@@ -33,6 +36,14 @@ public class Procedure extends PlSqlAst {
 
   public List<Statement> getStatements() {
     return statements;
+  }
+
+  public ObjectType getParentType() {
+    return parentType;
+  }
+
+  public OraclePackage getParentPackage() {
+    return parentPackage;
   }
 
   @Override
@@ -67,35 +78,13 @@ public class Procedure extends PlSqlAst {
     return parameters;
   }
 
+  /**
+   * @deprecated Use ProcedureTransformationManager instead for better maintainability and extensibility.
+   * This method is maintained for backward compatibility and delegates to the transformation manager.
+   */
+  @Deprecated
   public String toPostgre(Everything data, boolean specOnly) {
-    StringBuilder b = new StringBuilder();
-    b.append("CREATE OR REPLACE PROCEDURE ")
-            .append(parentType != null ? parentType.getSchema().toUpperCase() :
-                    parentPackage.getSchema().toUpperCase() )
-            .append(".")
-            .append(parentType != null ? parentType.getName().toUpperCase() :
-                    parentPackage.getName().toUpperCase() ) //TODO
-            .append("_")
-            .append(name.toLowerCase())
-            .append("(");
-    ToExportPostgre.doParametersPostgre(b, parameters, data);
-    b.append(") LANGUAGE plpgsql AS $$\n")
-            .append("DECLARE\n");
-    // Collect and add variable declarations from FOR loops
-    StringBuilder declarations = StatementDeclarationCollector.collectNecessaryDeclarations(statements, data);
-    b.append(declarations);
-    b.append("BEGIN\n");
-    if (specOnly) {
-      b.append("null;\n");
-    } else {
-      // loop over statements
-      for (Statement statement : statements) {
-        b.append(statement.toPostgre(data))
-                .append("\n");
-      }
-    }
-    b.append("END;\n$$\n;\n");
-    return b.toString();
+    return transformationManager.transform(this, data, specOnly);
   }
 
   private boolean isWeb() {

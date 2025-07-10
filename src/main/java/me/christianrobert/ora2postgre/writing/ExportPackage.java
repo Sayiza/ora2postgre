@@ -3,6 +3,7 @@ package me.christianrobert.ora2postgre.writing;
 import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.plsql.ast.OraclePackage;
 import me.christianrobert.ora2postgre.plsql.ast.SubType;
+import me.christianrobert.ora2postgre.plsql.ast.tools.managers.PackageTransformationManager;
 
 import java.io.File;
 import java.nio.file.Paths;
@@ -10,6 +11,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ExportPackage {
+  
+  private static final PackageTransformationManager packageManager = new PackageTransformationManager();
+  
   // save2Java method disabled - no longer generating Java classes from Oracle packages
   public static void save2Java(String path, String javaPackageName, List<OraclePackage> specs, List<OraclePackage> bodies, Everything data) {
     // Method body removed - no longer generating Java classes from Oracle packages
@@ -24,7 +28,8 @@ public class ExportPackage {
               File.separator +
               "step3packagespec";
       // TODO name
-      FileWriter.write(Paths.get(fullPathAsString), o.getName() + ".sql", o.toPostgre(data, true));
+      String transformedContent = packageManager.transform(o, data, true);
+      FileWriter.write(Paths.get(fullPathAsString), o.getName() + ".sql", transformedContent);
     }
   }
 
@@ -36,7 +41,8 @@ public class ExportPackage {
               File.separator +
               "step6packagebody";
       // TODO name
-      FileWriter.write(Paths.get(fullPathAsString), o.getName() + ".sql", o.toPostgre(data, false));
+      String transformedContent = packageManager.transform(o, data, false);
+      FileWriter.write(Paths.get(fullPathAsString), o.getName() + ".sql", transformedContent);
     }
   }
 

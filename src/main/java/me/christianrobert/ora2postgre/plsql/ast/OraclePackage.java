@@ -1,6 +1,7 @@
 package me.christianrobert.ora2postgre.plsql.ast;
 
 import me.christianrobert.ora2postgre.global.Everything;
+import me.christianrobert.ora2postgre.plsql.ast.tools.managers.PackageTransformationManager;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,6 +16,8 @@ public class OraclePackage extends PlSqlAst {
   private List<Function> functions;
   private List<Procedure> procedures;
   private List<Statement> bodyStatements;
+  
+  private static final PackageTransformationManager transformationManager = new PackageTransformationManager();
 
   public OraclePackage(String name,
                        String schema,
@@ -87,29 +90,12 @@ public class OraclePackage extends PlSqlAst {
   // toJava() method removed - packages become PostgreSQL schema objects
   // REST endpoints will call PostgreSQL functions directly
 
+  /**
+   * @deprecated Use PackageTransformationManager instead for better maintainability and extensibility.
+   * This method is maintained for backward compatibility and delegates to the transformation manager.
+   */
+  @Deprecated
   public String toPostgre(Everything data, boolean specOnly) {
-    StringBuilder b = new StringBuilder();
-    for (Variable variable : variables) {
-      // todo
-    }
-    for (SubType subtype : subtypes) {
-      // todo
-    }
-    for (Cursor cursor : cursors) {
-      // todo
-    }
-    for (PackageType type : types) {
-      // todo
-    }
-    for (Function function : functions) {
-      b.append(function.toPostgre(data, specOnly));
-      b.append("\n\n");
-    }
-    for (Procedure procedure : procedures) {
-      b.append(procedure.toPostgre(data, specOnly));
-      b.append("\n\n");
-    }
-    // todo body statements need to be passed to functions and procedures!
-    return b.toString();
+    return transformationManager.transform(this, data, specOnly);
   }
 }
