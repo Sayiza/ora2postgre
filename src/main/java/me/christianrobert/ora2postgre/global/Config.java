@@ -130,6 +130,12 @@ public class Config {
   @ConfigProperty(name = "do.view-ddl", defaultValue = "true")
   boolean doViewDdl;
   
+  @ConfigProperty(name = "do.standalone-functions", defaultValue = "true")
+  boolean doStandaloneFunctions;
+  
+  @ConfigProperty(name = "do.standalone-procedures", defaultValue = "true")
+  boolean doStandaloneProcedures;
+  
   @ConfigProperty(name = "do.triggers", defaultValue = "true")
   boolean doTriggers;
   
@@ -207,6 +213,14 @@ public class Config {
     return doViewDdl;
   }
 
+  public boolean isDoStandaloneFunctions() {
+    return doStandaloneFunctions;
+  }
+
+  public boolean isDoStandaloneProcedures() {
+    return doStandaloneProcedures;
+  }
+
   public boolean isDoTriggers() {
     return doTriggers;
   }
@@ -217,6 +231,18 @@ public class Config {
 
   public boolean isDoIndexes() {
     return doIndexes;
+  }
+
+  public boolean isDoExtract() {
+    return doExtract;
+  }
+
+  public boolean isDoParse() {
+    return doParse;
+  }
+
+  public boolean isDoWriteJavaFiles() {
+    return doWriteJavaFiles;
   }
 
   public boolean isDoWriteRestControllers() {

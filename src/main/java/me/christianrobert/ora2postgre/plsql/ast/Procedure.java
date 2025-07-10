@@ -12,6 +12,8 @@ public class Procedure extends PlSqlAst {
 
   private ObjectType parentType;
   private OraclePackage parentPackage;
+  private boolean isStandalone = false;
+  private String schema; // For standalone procedures
   
   private static final ProcedureTransformationManager transformationManager = new ProcedureTransformationManager();
 
@@ -44,6 +46,22 @@ public class Procedure extends PlSqlAst {
     return parentPackage;
   }
 
+  public boolean isStandalone() {
+    return isStandalone;
+  }
+
+  public void setStandalone(boolean standalone) {
+    this.isStandalone = standalone;
+  }
+
+  public String getSchema() {
+    return schema;
+  }
+
+  public void setSchema(String schema) {
+    this.schema = schema;
+  }
+
   @Override
   public <T> T accept(PlSqlAstVisitor<T> visitor) {
     return visitor.visit(this);
@@ -61,6 +79,9 @@ public class Procedure extends PlSqlAst {
    * Gets the PostgreSQL procedure name that this procedure will become.
    */
   public String getPostgreProcedureName() {
+    if (isStandalone) {
+      return schema.toUpperCase() + "." + name.toLowerCase();
+    }
     String schema = parentType != null ? parentType.getSchema().toUpperCase() :
                    parentPackage.getSchema().toUpperCase();
     String objectName = parentType != null ? parentType.getName().toUpperCase() :

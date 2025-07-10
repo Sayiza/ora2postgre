@@ -9,6 +9,7 @@ import me.christianrobert.ora2postgre.plsql.ast.Expression;
 import me.christianrobert.ora2postgre.plsql.ast.Function;
 import me.christianrobert.ora2postgre.plsql.ast.ObjectType;
 import me.christianrobert.ora2postgre.plsql.ast.OraclePackage;
+import me.christianrobert.ora2postgre.plsql.ast.Procedure;
 import me.christianrobert.ora2postgre.plsql.ast.TableReference;
 import me.christianrobert.ora2postgre.plsql.ast.Trigger;
 
@@ -28,6 +29,8 @@ public class Everything {
   private List<PlsqlCode> objectTypeBodyPlsql = new ArrayList<>();
   private List<PlsqlCode> packageSpecPlsql = new ArrayList<>();
   private List<PlsqlCode> packageBodyPlsql = new ArrayList<>();
+  private List<PlsqlCode> standaloneFunctionPlsql = new ArrayList<>();
+  private List<PlsqlCode> standaloneProcedurePlsql = new ArrayList<>();
   private List<PlsqlCode> triggerPlsql = new ArrayList<>();
 
   // parsed data
@@ -37,6 +40,8 @@ public class Everything {
   private List<ObjectType> objectTypeBodyAst = new ArrayList<>();
   private List<OraclePackage> packageSpecAst = new ArrayList<>();
   private List<OraclePackage> packageBodyAst = new ArrayList<>();
+  private List<Function> standaloneFunctionAst = new ArrayList<>();
+  private List<Procedure> standaloneProcedureAst = new ArrayList<>();
   private List<Trigger> triggerAst = new ArrayList<>();
 
   private long totalRowCount = 0;
@@ -74,6 +79,14 @@ public class Everything {
     return packageBodyPlsql;
   }
 
+  public List<PlsqlCode> getStandaloneFunctionPlsql() {
+    return standaloneFunctionPlsql;
+  }
+
+  public List<PlsqlCode> getStandaloneProcedurePlsql() {
+    return standaloneProcedurePlsql;
+  }
+
   public List<PlsqlCode> getTriggerPlsql() {
     return triggerPlsql;
   }
@@ -98,6 +111,14 @@ public class Everything {
     return packageBodyAst;
   }
 
+  public List<Function> getStandaloneFunctionAst() {
+    return standaloneFunctionAst;
+  }
+
+  public List<Procedure> getStandaloneProcedureAst() {
+    return standaloneProcedureAst;
+  }
+
   public List<Trigger> getTriggerAst() {
     return triggerAst;
   }
@@ -108,6 +129,23 @@ public class Everything {
 
   public void setTotalRowCount(long totalRowCount) {
     this.totalRowCount = totalRowCount;
+  }
+
+  // Statistics methods for standalone functions and procedures
+  public int getStandaloneFunctionCount() {
+    return standaloneFunctionAst.size();
+  }
+
+  public int getStandaloneProcedureCount() {
+    return standaloneProcedureAst.size();
+  }
+
+  public int getStandaloneFunctionPlsqlCount() {
+    return standaloneFunctionPlsql.size();
+  }
+
+  public int getStandaloneProcedurePlsqlCount() {
+    return standaloneProcedurePlsql.size();
   }
 
   public void intendMore() {

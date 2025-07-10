@@ -16,6 +16,8 @@ public class Function extends PlSqlAst {
 
   private ObjectType parentType;
   private OraclePackage parentPackage;
+  private boolean isStandalone = false;
+  private String schema; // For standalone functions
   
   private static final FunctionTransformationManager transformationManager = new FunctionTransformationManager();
 
@@ -58,6 +60,22 @@ public class Function extends PlSqlAst {
     return parentPackage;
   }
 
+  public boolean isStandalone() {
+    return isStandalone;
+  }
+
+  public void setStandalone(boolean standalone) {
+    this.isStandalone = standalone;
+  }
+
+  public String getSchema() {
+    return schema;
+  }
+
+  public void setSchema(String schema) {
+    this.schema = schema;
+  }
+
   @Override
   public <T> T accept(PlSqlAstVisitor<T> visitor) {
     return visitor.visit(this);
@@ -75,6 +93,9 @@ public class Function extends PlSqlAst {
    * Gets the PostgreSQL function name that this function will become.
    */
   public String getPostgreFunctionName() {
+    if (isStandalone) {
+      return schema.toUpperCase() + "." + name.toLowerCase();
+    }
     String schema = parentType != null ? parentType.getSchema().toUpperCase() :
                    parentPackage.getSchema().toUpperCase();
     String objectName = parentType != null ? parentType.getName().toUpperCase() :
