@@ -43,12 +43,18 @@ The transpilation system has a **strong foundation** with working implementation
 - **Test coverage**: `IfStatementTest.java` with simple IF, IF-ELSE, IF-ELSIF-ELSE scenarios
 - **Manual testing**: ✅ Verified working in end-to-end migration
 
-#### 1.2 WHILE Loop Statements
-- **Missing**: WHILE loop AST class
+#### 1.2 WHILE Loop Statements ✅ **COMPLETED**
+- **Status**: ✅ **IMPLEMENTED AND TESTED**
 - **Oracle**: `WHILE condition LOOP ... END LOOP;`
 - **PostgreSQL**: `WHILE condition LOOP ... END LOOP;`
-- **Implementation**: Create `WhileLoopStatement.java`
-- **Files to modify**: `PlSqlAstBuilder.java`, new `WhileLoopStatement.java`
+- **Implementation**: Created `WhileLoopStatement.java` following existing AST patterns
+- **Files modified**: 
+  - `PlSqlAstBuilder.java` (added WHILE parsing logic to `visitLoop_statement()`)
+  - `WhileLoopStatement.java` (new AST class in `/plsql/ast/`)
+- **Pattern**: Follows `IfStatement.java` and `ForLoopStatement.java` patterns
+- **Architecture**: AST class with direct `toPostgre()` method (statement-level, not requiring strategy pattern)
+- **Test coverage**: `WhileLoopStatementTest.java` with simple WHILE, multiple statements, empty body, and indentation scenarios
+- **Manual testing**: ✅ All 168 tests passing, ready for end-to-end verification
 
 #### 1.3 Basic Exception Handling
 - **Missing**: Exception block AST support
@@ -290,17 +296,21 @@ END;
 
 ## Notes for Implementation
 
-### File Structure
+### File Structure (Updated for Strategy Pattern Architecture)
 - **AST Classes**: `src/main/java/me/christianrobert/ora2postgre/ast/`
 - **Parsing Logic**: `src/main/java/me/christianrobert/ora2postgre/ast/PlSqlAstBuilder.java`
-- **Utilities**: `src/main/java/me/christianrobert/ora2postgre/transpilation/`
+- **Strategy Pattern**: `src/main/java/me/christianrobert/ora2postgre/plsql/ast/tools/strategies/`
+- **Transformation Managers**: `src/main/java/me/christianrobert/ora2postgre/plsql/ast/tools/managers/`
+- **Utilities**: `src/main/java/me/christianrobert/ora2postgre/plsql/ast/tools/transformers/`
 - **Tests**: `src/test/java/me/christianrobert/ora2postgre/`
 
-### Key Infrastructure to Leverage
-- **OracleFunctionMapper.java**: 75+ Oracle function mappings
-- **TypeConverter.java**: Comprehensive type mapping
-- **Everything.java**: Schema and context resolution
-- **ForLoopStatement.java**: Example of complete statement implementation
+### Key Infrastructure to Leverage (Updated Architecture)
+- **OracleFunctionMapper.java**: 75+ Oracle function mappings (`/plsql/ast/tools/transformers/`)
+- **TypeConverter.java**: Comprehensive type mapping (`/plsql/ast/tools/transformers/`)
+- **Everything.java**: Schema and context resolution (global context)
+- **ForLoopStatement.java**: Example of complete statement implementation (`/ast/`)
+- **TransformationStrategy.java**: Base interface for all transformation strategies (`/plsql/ast/tools/strategies/`)
+- **Existing Strategy Managers**: Table, Constraint, Trigger, View, Package, Function, Procedure managers (`/plsql/ast/tools/managers/`)
 
 ### Testing Strategy
 - Create unit tests for each new AST class

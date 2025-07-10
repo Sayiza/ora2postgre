@@ -57,7 +57,14 @@ public class StandardProcedureStrategy implements ProcedureTransformationStrateg
     b.append(") LANGUAGE plpgsql AS $$\n")
             .append("DECLARE\n");
     
-    // Collect and add variable declarations from FOR loops
+    // Add explicit variable declarations from procedure's DECLARE section
+    if (procedure.getVariables() != null && !procedure.getVariables().isEmpty()) {
+      for (me.christianrobert.ora2postgre.plsql.ast.Variable variable : procedure.getVariables()) {
+        b.append("  ").append(variable.toPostgre(context)).append("\n");
+      }
+    }
+    
+    // Collect and add variable declarations from FOR loops and other nested statements
     StringBuilder declarations = StatementDeclarationCollector.collectNecessaryDeclarations(
             procedure.getStatements(), context);
     b.append(declarations);

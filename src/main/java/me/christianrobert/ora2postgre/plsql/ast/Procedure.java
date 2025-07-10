@@ -3,11 +3,13 @@ package me.christianrobert.ora2postgre.plsql.ast;
 import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.plsql.ast.tools.managers.ProcedureTransformationManager;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class Procedure extends PlSqlAst {
   private String name;
   private List<Parameter> parameters;
+  private List<Variable> variables; // Variable declarations from DECLARE section
   private List<Statement> statements;
 
   private ObjectType parentType;
@@ -23,6 +25,18 @@ public class Procedure extends PlSqlAst {
           List<Statement> statements) {
     this.name = name;
     this.parameters = parameters;
+    this.variables = new ArrayList<>(); // Initialize empty list
+    this.statements = statements;
+  }
+
+  public Procedure(
+          String name,
+          List<Parameter> parameters,
+          List<Variable> variables,
+          List<Statement> statements) {
+    this.name = name;
+    this.parameters = parameters;
+    this.variables = variables != null ? variables : new ArrayList<>();
     this.statements = statements;
   }
 
@@ -36,6 +50,10 @@ public class Procedure extends PlSqlAst {
 
   public List<Statement> getStatements() {
     return statements;
+  }
+
+  public List<Variable> getVariables() {
+    return variables;
   }
 
   public ObjectType getParentType() {

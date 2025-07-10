@@ -36,6 +36,37 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     return new Variable(varName, dataType, defaultValue);
   }
 
+  /**
+   * Extracts variables from seq_of_declare_specs context.
+   * Returns a list of Variable objects found in the DECLARE section.
+   */
+  public List<Variable> extractVariablesFromDeclareSpecs(PlSqlParser.Seq_of_declare_specsContext ctx) {
+    List<Variable> variables = new ArrayList<>();
+    
+    if (ctx != null && ctx.declare_spec() != null) {
+      for (PlSqlParser.Declare_specContext declareSpec : ctx.declare_spec()) {
+        if (declareSpec.variable_declaration() != null) {
+          Variable variable = (Variable) visit(declareSpec.variable_declaration());
+          if (variable != null) {
+            variables.add(variable);
+          }
+        }
+        // Note: Other declare_spec types (procedure_spec, function_spec, etc.) 
+        // are handled elsewhere in the parsing process
+      }
+    }
+    
+    return variables;
+  }
+
+  @Override
+  public PlSqlAst visitSeq_of_declare_specs(PlSqlParser.Seq_of_declare_specsContext ctx) {
+    // This method is called when seq_of_declare_specs is visited directly
+    // Usually we want to extract variables using the helper method above
+    List<Variable> variables = extractVariablesFromDeclareSpecs(ctx);
+    return new Comment("declare_specs with " + variables.size() + " variables");
+  }
+
   @Override
   public PlSqlAst visitType_spec(PlSqlParser.Type_specContext ctx) {
     String nativeDataType = null;
@@ -107,6 +138,8 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
   @Override
   public PlSqlAst visitLoop_statement(PlSqlParser.Loop_statementContext ctx) {
     List<Statement> statements = new ArrayList<>();
+    
+    // Handle FOR loops
     if (ctx.FOR() != null) {
       if (ctx.cursor_loop_param().record_name() != null
               && ctx.cursor_loop_param().select_statement() != null) {
@@ -127,6 +160,25 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
         );
       }
     }
+    
+    // Handle WHILE loops
+    if (ctx.WHILE() != null) {
+      // Parse WHILE condition
+      Expression condition = (Expression) visit(ctx.condition());
+      
+      // Parse loop body statements
+      if (ctx.seq_of_statements() != null && ctx.seq_of_statements().statement() != null) {
+        for (PlSqlParser.StatementContext stmt : ctx.seq_of_statements().statement()) {
+          Statement statement = (Statement) visit(stmt);
+          if (statement != null) {
+            statements.add(statement);
+          }
+        }
+      }
+      
+      return new WhileLoopStatement(condition, statements);
+    }
+    
     return new Comment("this type of loop statement not implemented" + ctx.getText());
   }
 
@@ -689,6 +741,12 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       parameters.add((Parameter) visit(e));
     }
 
+    // Extract variable declarations from DECLARE section
+    List<Variable> variables = new ArrayList<>();
+    if (ctx.seq_of_declare_specs() != null) {
+      variables = extractVariablesFromDeclareSpecs(ctx.seq_of_declare_specs());
+    }
+
     List<Statement> statements = new ArrayList<>();
     if (ctx.body() != null
             && ctx.body().seq_of_statements() != null
@@ -698,7 +756,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       }
     }
 
-    return new Procedure(procedureName, parameters, statements);
+    return new Procedure(procedureName, parameters, variables, statements);
   }
 
   @Override
@@ -809,6 +867,12 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       parameters.add((Parameter) visit(e));
     }
 
+    // Extract variable declarations from DECLARE section
+    List<Variable> variables = new ArrayList<>();
+    if (ctx.seq_of_declare_specs() != null) {
+      variables = extractVariablesFromDeclareSpecs(ctx.seq_of_declare_specs());
+    }
+
     List<Statement> statements = new ArrayList<>();
     if (ctx.body() != null
             && ctx.body().seq_of_statements() != null
@@ -818,7 +882,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       }
     }
 
-    return new Procedure(procedureName, parameters, statements);
+    return new Procedure(procedureName, parameters, variables, statements);
   }
 
   @Override
@@ -932,6 +996,12 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       }
     }
     
+    // Extract variable declarations from DECLARE section
+    List<Variable> variables = new ArrayList<>();
+    if (ctx.seq_of_declare_specs() != null) {
+      variables = extractVariablesFromDeclareSpecs(ctx.seq_of_declare_specs());
+    }
+    
     List<Statement> statements = new ArrayList<>();
     if (ctx.body() != null && ctx.body().seq_of_statements() != null && ctx.body().seq_of_statements().statement() != null) {
       for (PlSqlParser.StatementContext stmt : ctx.body().seq_of_statements().statement()) {
@@ -939,7 +1009,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       }
     }
     
-    return new Procedure(procedureName, parameters, statements);
+    return new Procedure(procedureName, parameters, variables, statements);
   }
 
   @Override
