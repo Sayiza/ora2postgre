@@ -4,6 +4,8 @@ This document collects all existing TODO items from the codebase and additional 
 
 ## 🔥 CRITICAL PATH - Core Migration Goals
 
+### 0. Materialized views?!
+
 ### 1. **Complete Expression System** (Blocking Multiple Features)
 - [ ] Schema lookup for functions within statements (or even within expessions)?!
 - [ ] **`Expression.java:28`** - Implement proper `toJava()` conversion beyond raw text
@@ -27,40 +29,6 @@ This document collects all existing TODO items from the codebase and additional 
 - [ ] **`VarrayType.java:9-10`** - Same DataTypeSpec replacement
 - [ ] **`TypeConverter.java:9`** - Replace generic "Object" fallback with proper type mapping
 - [ ] **`TypeConverter.java:59`** - Improve `%ROWTYPE` handling beyond simple "text"
-
-## 🎯 JAVA TRANSPILATION (Main Focus)
-
-### 4. **HTP Package Replacement System** (Web Output Conversion)
-- [ ] **`ToExportJava.java:97,134,142`** - Develop sophisticated HTP detection rules beyond simple string contains
-- [ ] **`Procedure.java:105`** - Implement proper web procedure detection (HTP usage analysis)
-- [ ] Create comprehensive HTP-to-Quarkus mapping:
-  - [ ] `htp.p()` → JAX-RS response writing
-  - [ ] `htp.formOpen()` → HTML form generation
-  - [ ] `htp.tableOpen()` → HTML table structures
-  - [ ] Session management conversion
-  - [ ] Parameter handling conversion
-- [ ] Design template engine integration (Qute/Freemarker) for complex HTML generation
-- [ ] Implement REST microservice endpoint generation for HTP-based procedures
-
-### 5. **Java Code Generation Enhancement**
-- [ ] **`Function.java:72`** - Fix return type generation in `toJava()`
-- [ ] **`Parameter.java:38`** - Implement proper type mapping for web parameters (beyond String)
-- [ ] **`ExportTable.java:19`** - Generate Jakarta Persistence entities from table metadata
-- [ ] **`TableMetadata.java:52`** - Complete Java entity generation
-- [ ] **`SelectStatement.java:74`** - Improve anonymous entity naming in `getJavaClassName()`
-- [ ] Add Quarkus/Jakarta annotations generation:
-  - [ ] `@Path` and JAX-RS annotations for packages with HTP procedures
-  - [ ] `@ApplicationScoped` for business logic packages
-  - [ ] `@Repository` for data access patterns
-  - [ ] `@Entity` and `@Table` (Jakarta Persistence) for database objects
-
-### 6. **Advanced Java Features**
-- [ ] Implement CDI dependency injection mapping (Oracle package dependencies → Quarkus beans)
-- [ ] Create transaction boundary detection and `@Transactional` annotation placement
-- [ ] Generate Panache repositories or Jakarta Persistence repositories for CRUD operations
-- [ ] Implement exception handling translation (Oracle exceptions → Jakarta/Quarkus exceptions)
-- [ ] Add Jakarta validation annotations (`@Valid`, `@NotNull`, etc.) based on database constraints
-- [ ] Integration with existing Quarkus microservices architecture
 
 ## 🐘 POSTGRESQL TRANSPILATION (View Support)
 
