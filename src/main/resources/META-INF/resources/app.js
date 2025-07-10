@@ -210,6 +210,8 @@ function updateDataOverview(data) {
   document.getElementById('objectTypeBodies-count').textContent = data.objectTypeBodies || 0;
   document.getElementById('packageSpecs-count').textContent = data.packageSpecs || 0;
   document.getElementById('packageBodies-count').textContent = data.packageBodies || 0;
+  document.getElementById('standaloneFunctions-count').textContent = data.standaloneFunctions || 0;
+  document.getElementById('standaloneProcedures-count').textContent = data.standaloneProcedures || 0;
   document.getElementById('triggers-count').textContent = data.triggers || 0;
   document.getElementById('constraints-count').textContent = data.constraints || 0;
   document.getElementById('indexes-count').textContent = data.indexes || 0;
@@ -218,6 +220,8 @@ function updateDataOverview(data) {
   document.getElementById('parsedViews-count').textContent = data.parsedViews || 0;
   document.getElementById('parsedObjectTypes-count').textContent = data.parsedObjectTypes || 0;
   document.getElementById('parsedPackages-count').textContent = data.parsedPackages || 0;
+  document.getElementById('parsedStandaloneFunctions-count').textContent = data.parsedStandaloneFunctions || 0;
+  document.getElementById('parsedStandaloneProcedures-count').textContent = data.parsedStandaloneProcedures || 0;
   document.getElementById('parsedTriggers-count').textContent = data.parsedTriggers || 0;
 
   // Row Count Data (format with commas for large numbers)
