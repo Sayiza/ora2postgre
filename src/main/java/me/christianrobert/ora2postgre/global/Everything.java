@@ -156,6 +156,10 @@ public class Everything {
     intendations -= 2;
   }
 
+  public void resetIntendation() {
+    intendations = 0;
+  }
+
   public String getIntendation() {
     if (intendations <= 0) {
       return "";

@@ -185,18 +185,24 @@ public class JobController {
     data.getTableSql().clear();
     data.getViewDefinition().clear();
     data.getSynonyms().clear();
+    data.getIndexes().clear();
     data.getObjectTypeSpecPlsql().clear();
     data.getObjectTypeBodyPlsql().clear();
     data.getPackageSpecPlsql().clear();
     data.getPackageBodyPlsql().clear();
+    data.getStandaloneFunctionPlsql().clear();
+    data.getStandaloneProcedurePlsql().clear();
+    data.getTriggerPlsql().clear();
     data.getViewSpecAndQueries().clear();
     data.getObjectTypeSpecAst().clear();
     data.getObjectTypeBodyAst().clear();
     data.getPackageSpecAst().clear();
     data.getPackageBodyAst().clear();
-    data.getTriggerPlsql().clear();
+    data.getStandaloneFunctionAst().clear();
+    data.getStandaloneProcedureAst().clear();
     data.getTriggerAst().clear();
     data.setTotalRowCount(0);
+    data.resetIntendation();
 
     // Clear completed jobs from job manager
     jobManager.clearCompletedJobs();

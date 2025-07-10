@@ -62,8 +62,10 @@ public class ConfigurationService {
     if (updates.getDoAllSchemas() != null) {
       runtimeSettings.put("do.all-schemas", updates.getDoAllSchemas());
     }
-    if (updates.getDoOnlyTestSchema() != null) {
+    if (updates.getDoOnlyTestSchema() != null && !updates.getDoOnlyTestSchema().trim().isEmpty()) {
       runtimeSettings.put("do.only-test-schema", updates.getDoOnlyTestSchema());
+    } else if (updates.getDoOnlyTestSchema() != null && updates.getDoOnlyTestSchema().trim().isEmpty()) {
+      runtimeSettings.remove("do.only-test-schema");
     }
     if (updates.getDoTable() != null) {
       runtimeSettings.put("do.table", updates.getDoTable());
