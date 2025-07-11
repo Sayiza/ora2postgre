@@ -29,6 +29,7 @@ import java.util.ArrayList;
 public class ExportConstraint {
 
   private static final Logger log = LoggerFactory.getLogger(ExportConstraint.class);
+  private static final ConstraintTransformationManager constraintManager = new ConstraintTransformationManager();
 
   /**
    * Main entry point for constraint export. Generates all constraint types
@@ -284,8 +285,7 @@ public class ExportConstraint {
     ddl.append("\n");
 
     // Generate ALTER TABLE statement using transformation manager
-    ConstraintTransformationManager manager = new ConstraintTransformationManager();
-    ddl.append(manager.transformAlterTableDDL(constraint, schema, tableName, everything));
+    ddl.append(constraintManager.transformAlterTableDDL(constraint, schema, tableName, everything));
 
     return ddl.toString();
   }
@@ -353,7 +353,6 @@ public class ExportConstraint {
    * @return true if referenced table exists, false otherwise
    */
   private static boolean validateForeignKeyReferences(ConstraintMetadata constraint, Everything everything) {
-    ConstraintTransformationManager manager = new ConstraintTransformationManager();
-    return manager.validateDependencies(constraint, everything);
+    return constraintManager.validateDependencies(constraint, everything);
   }
 }

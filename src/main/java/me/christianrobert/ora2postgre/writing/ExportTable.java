@@ -10,6 +10,9 @@ import java.nio.file.Paths;
 import java.util.List;
 
 public class ExportTable {
+  
+  private static final TableTransformationManager tableManager = new TableTransformationManager();
+  
   public static void save2Java(String path, String javaPackageName, List<TableMetadata> tables) {
     for (TableMetadata t : tables) {
       String fullPathAsString = path +
@@ -24,12 +27,11 @@ public class ExportTable {
   }
 
   public static void saveSql(String path, List<TableMetadata> tables, Everything data) {
-    TableTransformationManager manager = new TableTransformationManager();
     for (TableMetadata t : tables) {
       FileWriter.write(
               Paths.get(path + File.separator + t.getSchema().toLowerCase()),
               StringAux.capitalizeFirst(t.getTableName()) + "TABLE.sql",
-              String.join("\n", manager.transform(t, data))
+              String.join("\n", tableManager.transform(t, data))
       );
     }
   }
