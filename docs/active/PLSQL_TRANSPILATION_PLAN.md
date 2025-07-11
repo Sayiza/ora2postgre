@@ -11,9 +11,9 @@
 - **Example**: `insert into audit_table values (pId, 'TEST', sysdate)` → `INSERT INTO test_schema.audit_table VALUES (pId, 'TEST', sysdate)`
 
 ### 🔄 **Next Implementation Ready**
-- **Target**: DELETE statements for data cleanup operations  
-- **Pattern**: Same schema resolution approach as INSERT and UPDATE statements
-- **Use case**: `DELETE FROM temp_table WHERE processed_at < CURRENT_TIMESTAMP - INTERVAL '1 day'`
+- **Target**: SELECT INTO statements for data retrieval operations
+- **Pattern**: Same schema resolution approach as DML statements (INSERT, UPDATE, DELETE)
+- **Use case**: `SELECT field_name INTO v_result FROM config_table WHERE id = p_id`
 
 ## Current State Assessment
 
@@ -54,7 +54,7 @@ The transpilation system has a **strong foundation** with working implementation
 - ✅ Trigger infrastructure (complete pipeline)
 - ✅ Manager-Strategy architecture (85% complete)
 
-**Current Success Rate**: ~20-30% of typical PL/SQL code is fully transpiled (with IF, INSERT, and UPDATE statements)
+**Current Success Rate**: ~25-35% of typical PL/SQL code is fully transpiled (with IF, INSERT, UPDATE, and DELETE statements)
 **Goal**: Increase to 60-80% coverage for common business logic patterns
 
 ## Priority Phases
@@ -135,25 +135,39 @@ The transpilation system has a **strong foundation** with working implementation
 - **Integration**: Works with IF statements for trigger-like status update logic
 - **Manual testing**: ✅ All 178 tests passing, ready for production use
 
-#### 2.3 DELETE Statements 🎯 **NEXT PRIORITY**
-- **Status**: 🎯 **READY FOR IMPLEMENTATION**
-- **Missing**: DELETE AST class with WHERE clause support
+#### 2.3 DELETE Statements ✅ **COMPLETED**
+- **Status**: ✅ **IMPLEMENTED AND TESTED**
 - **Oracle**: `DELETE FROM table WHERE condition;`
-- **PostgreSQL**: Same syntax with proper schema resolution
-- **Implementation**: Create `DeleteStatement.java` following UPDATE statement patterns
-- **Use case**: Data cleanup - `DELETE FROM temp_table WHERE processed_at < CURRENT_TIMESTAMP;`
-- **Schema handling**: Apply same schema resolution logic as INSERT and UPDATE statements
+- **PostgreSQL**: Same syntax with automatic schema prefixing and synonym resolution
+- **Implementation**: Created `DeleteStatement.java` with full schema resolution
+- **Files modified**: 
+  - `PlSqlAstBuilder.java` - Added `visitDelete_statement()` method
+  - `DeleteStatement.java` - Complete AST class with PostgreSQL transpilation
+  - Enhanced schema resolution using `Everything.lookupSchema4Field()` for synonym support
+- **Features implemented**:
+  - DELETE with WHERE clause: `DELETE FROM table WHERE condition`
+  - DELETE without WHERE: `DELETE FROM table` (deletes all rows)
+  - Schema-qualified tables: `DELETE FROM schema.table WHERE condition`
+  - Complex WHERE clauses with AND/OR operators
+  - Automatic schema resolution for unqualified table names
+  - Synonym resolution through existing Everything infrastructure
+  - Always emits schema prefix for PostgreSQL reliability
+- **Test coverage**: `DeleteStatementTest.java` with simple DELETE, schema-qualified, no WHERE clause, complex WHERE, and IF+DELETE scenarios
+- **Integration**: Works with IF statements for conditional data cleanup logic
+- **Manual testing**: ✅ All 184 tests passing, ready for production use
 
 ### Phase 3: SELECT INTO and Cursor Enhancement (MEDIUM PRIORITY)
 **Goal**: Support common data retrieval patterns
 **Impact**: Essential for getter functions and data validation logic
 
-#### 3.1 SELECT INTO Statements
-- **Missing**: SELECT INTO AST class
+#### 3.1 SELECT INTO Statements 🎯 **NEXT PRIORITY**
+- **Status**: 🎯 **READY FOR IMPLEMENTATION**
+- **Missing**: SELECT INTO AST class with variable assignment
 - **Oracle**: `SELECT col INTO variable FROM table WHERE condition;`
-- **PostgreSQL**: Same syntax
-- **Implementation**: Create `SelectIntoStatement.java`
-- **Use case**: `SELECT field_name INTO v_result FROM config_table WHERE id = p_id;`
+- **PostgreSQL**: Same syntax with proper schema resolution
+- **Implementation**: Create `SelectIntoStatement.java` following DELETE statement patterns
+- **Use case**: Getter functions - `SELECT field_name INTO v_result FROM config_table WHERE id = p_id;`
+- **Schema handling**: Apply same schema resolution logic as other DML statements
 
 #### 3.2 Cursor Declarations and Usage
 - **Existing**: Basic cursor support in FOR loops
