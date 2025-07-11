@@ -919,7 +919,13 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       }
     }
 
-    return new Procedure(procedureName, parameters, variables, statements);
+    // Parse exception handling if present
+    ExceptionBlock exceptionBlock = null;
+    if (ctx.body() != null && ctx.body().exception_handler() != null && !ctx.body().exception_handler().isEmpty()) {
+      exceptionBlock = parseExceptionBlock(ctx.body().exception_handler());
+    }
+
+    return new Procedure(procedureName, parameters, variables, statements, exceptionBlock);
   }
 
   @Override
@@ -1045,7 +1051,13 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       }
     }
 
-    return new Procedure(procedureName, parameters, variables, statements);
+    // Parse exception handling if present
+    ExceptionBlock exceptionBlock = null;
+    if (ctx.body() != null && ctx.body().exception_handler() != null && !ctx.body().exception_handler().isEmpty()) {
+      exceptionBlock = parseExceptionBlock(ctx.body().exception_handler());
+    }
+
+    return new Procedure(procedureName, parameters, variables, statements, exceptionBlock);
   }
 
   @Override
@@ -1072,7 +1084,50 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     if (ctx.seq_of_declare_specs() != null) {
       variables = extractVariablesFromDeclareSpecs(ctx.seq_of_declare_specs());
     }
-    return new Function(procedureName, parameters, variables, returnType, statements);
+
+    // Parse exception block if present
+    ExceptionBlock exceptionBlock = null;
+    if (ctx.body() != null && ctx.body().exception_handler() != null && !ctx.body().exception_handler().isEmpty()) {
+      exceptionBlock = parseExceptionBlock(ctx.body().exception_handler());
+    }
+
+    if (exceptionBlock != null) {
+      return new Function(procedureName, parameters, variables, returnType, statements, exceptionBlock);
+    } else {
+      return new Function(procedureName, parameters, variables, returnType, statements);
+    }
+  }
+
+  /**
+   * Helper method to parse exception handlers into an ExceptionBlock
+   */
+  private ExceptionBlock parseExceptionBlock(List<PlSqlParser.Exception_handlerContext> handlerContexts) {
+    List<ExceptionHandler> handlers = new ArrayList<>();
+    
+    for (PlSqlParser.Exception_handlerContext handlerCtx : handlerContexts) {
+      // Parse exception names (can be multiple with OR)
+      List<String> exceptionNames = new ArrayList<>();
+      if (handlerCtx.exception_name() != null) {
+        for (var exceptionNameCtx : handlerCtx.exception_name()) {
+          exceptionNames.add(exceptionNameCtx.getText());
+        }
+      }
+      
+      // Parse THEN statements
+      List<Statement> statements = new ArrayList<>();
+      if (handlerCtx.seq_of_statements() != null && handlerCtx.seq_of_statements().statement() != null) {
+        for (PlSqlParser.StatementContext stmtCtx : handlerCtx.seq_of_statements().statement()) {
+          Statement statement = (Statement) visit(stmtCtx);
+          if (statement != null) {
+            statements.add(statement);
+          }
+        }
+      }
+      
+      handlers.add(new ExceptionHandler(exceptionNames, statements));
+    }
+    
+    return new ExceptionBlock(handlers);
   }
 
   @Override

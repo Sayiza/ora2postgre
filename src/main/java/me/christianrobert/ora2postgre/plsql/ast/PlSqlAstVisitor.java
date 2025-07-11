@@ -40,4 +40,6 @@ public interface PlSqlAstVisitor<T> {
   T visit(LogicalExpression logicalExpression);
   T visit(CursorExpression cursorExpression);
   T visit(Trigger trigger);
+  T visit(ExceptionBlock exceptionBlock);
+  T visit(ExceptionHandler exceptionHandler);
 }

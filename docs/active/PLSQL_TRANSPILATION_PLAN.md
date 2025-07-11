@@ -54,7 +54,7 @@ The transpilation system has a **strong foundation** with working implementation
 - ✅ Trigger infrastructure (complete pipeline)
 - ✅ Manager-Strategy architecture (85% complete)
 
-**Current Success Rate**: ~30-40% of typical PL/SQL code is fully transpiled (with IF, INSERT, UPDATE, DELETE, and SELECT INTO statements)
+**Current Success Rate**: ~45-55% of typical PL/SQL code is fully transpiled (with IF, WHILE, exception handling, INSERT, UPDATE, DELETE, and SELECT INTO statements)
 **Goal**: Increase to 60-80% coverage for common business logic patterns
 
 ## Priority Phases
@@ -85,14 +85,24 @@ The transpilation system has a **strong foundation** with working implementation
 - **Test coverage**: `WhileLoopStatementTest.java` with simple WHILE, multiple statements, empty body, and indentation scenarios
 - **Manual testing**: ✅ All 168 tests passing, ready for end-to-end verification
 
-#### 1.3 Basic Exception Handling 🎯 **NEXT PRIORITY**
-- **Status**: 🎯 **READY FOR IMPLEMENTATION**
-- **Missing**: Exception block AST support for robust error handling
+#### 1.3 Basic Exception Handling ✅ **COMPLETED**
+- **Status**: ✅ **IMPLEMENTED AND TESTED**
 - **Oracle**: `BEGIN ... EXCEPTION WHEN NO_DATA_FOUND THEN ... END;`
-- **PostgreSQL**: Same syntax with proper exception mapping
-- **Implementation**: Enhance existing `ExceptionTransformer.java` with AST integration
-- **Use case**: Getter functions - handle NO_DATA_FOUND, TOO_MANY_ROWS exceptions
-- **Files to modify**: `PlSqlAstBuilder.java`, `ExceptionTransformer.java` or create new AST classes
+- **PostgreSQL**: Same syntax with Oracle to PostgreSQL exception mapping
+- **Implementation**: Created complete AST infrastructure for exception handling
+- **Files modified**: 
+  - `PlSqlAstBuilder.java` - Added `parseExceptionBlock()` helper and updated all procedure creation methods
+  - `ExceptionBlock.java` - New AST class for exception block containers
+  - `ExceptionHandler.java` - New AST class for individual exception handlers with Oracle→PostgreSQL mapping
+  - `Function.java` and `Procedure.java` - Added exception block support with constructors and helper methods
+  - `PlSqlAstVisitor.java` - Added visitor methods for exception handling classes
+- **Features implemented**:
+  - Multiple exception handlers: `WHEN NO_DATA_FOUND THEN ... WHEN TOO_MANY_ROWS THEN ...`
+  - Oracle to PostgreSQL exception mapping (DUP_VAL_ON_INDEX→unique_violation, etc.)
+  - Multiple exceptions per handler: `WHEN ZERO_DIVIDE OR VALUE_ERROR THEN`
+  - Complete integration with Function and Procedure AST classes
+- **Test coverage**: `ExceptionHandlingTest.java` with basic exception handling, multiple exceptions, PostgreSQL generation testing
+- **Manual testing**: ✅ All 193 tests passing, ready for end-to-end verification
 
 ### Phase 2: SQL DML Statements (HIGH PRIORITY)
 **Goal**: Handle database operations in triggers and procedures

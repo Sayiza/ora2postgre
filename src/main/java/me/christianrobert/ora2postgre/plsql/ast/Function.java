@@ -14,6 +14,7 @@ public class Function extends PlSqlAst {
   private List<Variable> variables; // Variable declarations from DECLARE section
   private String returnType;
   private List<Statement> statements;
+  private ExceptionBlock exceptionBlock; // Exception handling
 
   private ObjectType parentType;
   private OraclePackage parentPackage;
@@ -32,6 +33,22 @@ public class Function extends PlSqlAst {
     this.variables = variables;
     this.returnType = returnType;
     this.statements = statements;
+    this.exceptionBlock = null; // No exception handling by default
+  }
+
+  // Constructor with exception handling
+  public Function(String name,
+                  List<Parameter> parameters,
+                  List<Variable> variables,
+                  String returnType,
+                  List<Statement> statements,
+                  ExceptionBlock exceptionBlock) {
+    this.name = name;
+    this.parameters = parameters;
+    this.variables = variables;
+    this.returnType = returnType;
+    this.statements = statements;
+    this.exceptionBlock = exceptionBlock;
   }
 
   public void setParentPackage(OraclePackage parentPackage) {
@@ -56,6 +73,18 @@ public class Function extends PlSqlAst {
 
   public List<Statement> getStatements() {
     return statements;
+  }
+
+  public ExceptionBlock getExceptionBlock() {
+    return exceptionBlock;
+  }
+
+  public void setExceptionBlock(ExceptionBlock exceptionBlock) {
+    this.exceptionBlock = exceptionBlock;
+  }
+
+  public boolean hasExceptionHandling() {
+    return exceptionBlock != null && exceptionBlock.hasHandlers();
   }
 
   public ObjectType getParentType() {

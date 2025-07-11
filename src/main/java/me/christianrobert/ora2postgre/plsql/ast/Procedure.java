@@ -11,6 +11,7 @@ public class Procedure extends PlSqlAst {
   private List<Parameter> parameters;
   private List<Variable> variables; // Variable declarations from DECLARE section
   private List<Statement> statements;
+  private ExceptionBlock exceptionBlock; // Exception handling
 
   private ObjectType parentType;
   private OraclePackage parentPackage;
@@ -28,6 +29,21 @@ public class Procedure extends PlSqlAst {
     this.parameters = parameters;
     this.variables = variables != null ? variables : new ArrayList<>();
     this.statements = statements;
+    this.exceptionBlock = null; // No exception handling by default
+  }
+
+  // Constructor with exception handling
+  public Procedure(
+          String name,
+          List<Parameter> parameters,
+          List<Variable> variables,
+          List<Statement> statements,
+          ExceptionBlock exceptionBlock) {
+    this.name = name;
+    this.parameters = parameters;
+    this.variables = variables != null ? variables : new ArrayList<>();
+    this.statements = statements;
+    this.exceptionBlock = exceptionBlock;
   }
 
   public void setParentType(ObjectType parentType) {
@@ -40,6 +56,18 @@ public class Procedure extends PlSqlAst {
 
   public List<Statement> getStatements() {
     return statements;
+  }
+
+  public ExceptionBlock getExceptionBlock() {
+    return exceptionBlock;
+  }
+
+  public void setExceptionBlock(ExceptionBlock exceptionBlock) {
+    this.exceptionBlock = exceptionBlock;
+  }
+
+  public boolean hasExceptionHandling() {
+    return exceptionBlock != null && exceptionBlock.hasHandlers();
   }
 
   public List<Variable> getVariables() {
