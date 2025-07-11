@@ -111,6 +111,12 @@ docker rm -f pgtest; docker run --name pgtest -e POSTGRES_PASSWORD=secret -p 543
 - Schema mapping maintains object relationships
 - **NEW**: PostgreSQL function name mapping for REST endpoints
 
+**Transformation Architecture (Manager-Strategy vs. Direct toPostgre())**:
+- **Manager-Strategy Pattern**: Used for main exported objects (Tables, Views, Packages, Triggers, Constraints, Indexes, standalone Functions/Procedures)
+- **Direct toPostgre() Chains**: Used for parse tree elements (Statements, Expressions, Variables, Parameters, Data types)
+- **Dual Usage Pattern**: Functions/Procedures serve both as main objects (use managers) and sub-elements (use direct toPostgre())
+- **Architectural Boundaries**: Clear separation avoids over-abstraction while maintaining consistency where needed
+
 ## Key Processing Steps
 
 1. **Schema Extraction** - Fetch user schemas, tables, views, synonyms
@@ -366,3 +372,113 @@ data.transfer.strategy.fallback=true
 - `StreamingCsvStrategy.java` - High-performance CSV transfer
 - `TransferProgress.java` - Progress tracking
 - `TransferResult.java` - Results and metrics
+
+## Developer Guidelines: Transformation Architecture
+
+### When to Use Manager-Strategy Pattern vs. Direct toPostgre()
+
+**Use Manager-Strategy Pattern for:**
+- **Main Exported Objects**: Tables, Views, Packages, Triggers, Constraints, Indexes
+- **Standalone Functions/Procedures**: When exported as individual files
+- **Objects that need:**
+  - Complex transformation orchestration
+  - Multiple transformation strategies
+  - Strategy selection logic
+  - File generation and export
+
+**Use Direct toPostgre() Chains for:**
+- **Parse Tree Elements**: Statements, Expressions, Variables, Parameters, Data types
+- **Query Elements**: SELECT, WHERE, JOIN, etc.
+- **Elements that are:**
+  - Sub-components of larger structures
+  - Simple, direct transformations
+  - Part of recursive transformation chains
+
+### Implementation Patterns
+
+#### Manager-Strategy Pattern
+```java
+// 1. Create Manager (in /tools/managers/)
+public class ObjectTransformationManager {
+    private final List<ObjectTransformationStrategy> strategies;
+    
+    public String transform(Object obj, Everything context) {
+        ObjectTransformationStrategy strategy = selectStrategy(obj);
+        return strategy.transform(obj, context);
+    }
+}
+
+// 2. Use in Export Classes
+public class ExportObject {
+    private static final ObjectTransformationManager objectManager = 
+        new ObjectTransformationManager();
+    
+    public static void save(Object obj, Everything data) {
+        String content = objectManager.transform(obj, data);
+        FileWriter.write(path, filename, content);
+    }
+}
+```
+
+#### Direct toPostgre() Chains
+```java
+// Parse tree elements call child elements directly
+public class IfStatement extends Statement {
+    public String toPostgre(Everything data) {
+        StringBuilder b = new StringBuilder();
+        b.append("IF ").append(condition.toPostgre(data)).append(" THEN\n");
+        
+        data.intendMore();
+        for (Statement stmt : thenStatements) {
+            b.append(stmt.toPostgre(data)).append("\n");
+        }
+        data.intendLess();
+        
+        return b.toString();
+    }
+}
+```
+
+### Dual Usage Pattern (Functions/Procedures)
+
+Functions and Procedures serve dual purposes:
+- **As Main Objects**: Use deprecated methods that delegate to managers
+- **As Sub-Elements**: Direct toPostgre() calls work through delegation
+
+```java
+// Deprecated method enables dual usage
+@Deprecated
+public String toPostgre(Everything data, boolean specOnly) {
+    return transformationManager.transform(this, data, specOnly);
+}
+```
+
+### Architectural Compliance Checklist
+
+**For Main Objects:**
+- [ ] Has transformation manager in `/tools/managers/`
+- [ ] Has strategy interface in `/tools/strategies/`
+- [ ] Export class uses static final manager instance
+- [ ] Manager handles complex orchestration logic
+
+**For Parse Tree Elements:**
+- [ ] Implements `toPostgre(Everything data)` method
+- [ ] Calls child elements' `toPostgre()` methods
+- [ ] Passes Everything context through recursive calls
+- [ ] No unnecessary manager abstraction
+
+**For All Classes:**
+- [ ] Follows consistent naming conventions
+- [ ] Maintains proper indentation handling
+- [ ] Includes appropriate error handling
+- [ ] Has comprehensive test coverage
+
+### Best Practices
+
+1. **Avoid Over-Abstraction**: Don't create managers for simple parse tree elements
+2. **Maintain Context**: Always pass Everything parameter through transformation chains
+3. **Use Existing Patterns**: Follow established patterns in similar classes
+4. **Test Thoroughly**: Ensure all transformations work end-to-end
+5. **Document Decisions**: Add comments explaining complex transformation logic
+
+This architecture balances consistency with simplicity, providing manager-based orchestration where needed while maintaining efficient direct transformation chains for parse tree elements.

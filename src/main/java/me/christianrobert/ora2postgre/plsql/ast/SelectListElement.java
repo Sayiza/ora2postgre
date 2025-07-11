@@ -40,7 +40,7 @@ public class SelectListElement extends PlSqlAst {
   }
 
   public String getProcessedName(Everything data) {
-    return expression.getNameForStatementExpressionWithSchema(data);
+    return expression.getNameForStatementExpressionWithSchema(data, schema, null);
     // TODO do the lookup in data, get schemaprefix  and correct case
     // the Class name for the package-like-class could start capitalized
     // the schema is changed to a java package and all lowercase

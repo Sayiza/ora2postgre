@@ -133,11 +133,4 @@ public class Expression extends PlSqlAst {
     return PostgreSqlIdentifierUtils.quoteIdentifier(expressionText.toUpperCase());
   }
 
-  /**
-   * @deprecated Use getNameForStatementExpressionWithSchema(Everything, String, List<TableReference>) instead
-   */
-  @Deprecated
-  public String getNameForStatementExpressionWithSchema(Everything data) {
-    return this.toString(); // Fallback to string representation for backward compatibility
-  }
 }

@@ -337,19 +337,6 @@ public class DataTransferService {
     return 2000;
   }
 
-  /**
-   * Updates the row estimation method to use improved logic with database connection.
-   *
-   * @param tables list of tables
-   * @param conn Oracle database connection
-   * @param config row count configuration
-   * @return improved row count estimate
-   * @deprecated This method name is misleading, use estimateTotalRows instead
-   */
-  @Deprecated
-  public long estimateTotalRowsWithConnection(List<TableMetadata> tables, Connection conn, RowCountConfig config) {
-    return estimateTotalRows(tables, conn, config);
-  }
 
   /**
    * Container class for data transfer results and progress information.
