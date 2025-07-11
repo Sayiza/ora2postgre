@@ -729,7 +729,13 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
         statements.add((Statement) visit(stmt));
       }
     }
-    return new Function(ctx.function_name().getText(), parameters, returnType, statements);
+
+    // Extract variable declarations from DECLARE section
+    List<Variable> variables = new ArrayList<>();
+    if (ctx.seq_of_declare_specs() != null) {
+      variables = extractVariablesFromDeclareSpecs(ctx.seq_of_declare_specs());
+    }
+    return new Function(ctx.function_name().getText(), parameters, variables, returnType, statements);
   }
 
   @Override
@@ -904,7 +910,12 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       }
     }
 
-    return new Function(procedureName, parameters, returnType, statements);
+    // Extract variable declarations from DECLARE section
+    List<Variable> variables = new ArrayList<>();
+    if (ctx.seq_of_declare_specs() != null) {
+      variables = extractVariablesFromDeclareSpecs(ctx.seq_of_declare_specs());
+    }
+    return new Function(procedureName, parameters, variables, returnType, statements);
   }
 
   @Override
@@ -980,8 +991,13 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
         statements.add((Statement) visit(stmt));
       }
     }
-    
-    return new Function(functionName, parameters, returnType, statements);
+
+    // Extract variable declarations from DECLARE section
+    List<Variable> variables = new ArrayList<>();
+    if (ctx.seq_of_declare_specs() != null) {
+      variables = extractVariablesFromDeclareSpecs(ctx.seq_of_declare_specs());
+    }
+    return new Function(functionName, parameters, variables, returnType, statements);
   }
 
   @Override

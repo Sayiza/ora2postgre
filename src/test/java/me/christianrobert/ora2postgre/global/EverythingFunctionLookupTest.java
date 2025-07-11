@@ -351,7 +351,7 @@ class EverythingFunctionLookupTest {
   }
 
   private Function createTestFunction(String name, String returnType) {
-    return new Function(name, new ArrayList<>(), returnType, new ArrayList<>());
+    return new Function(name, new ArrayList<>(),new ArrayList<>(), returnType, new ArrayList<>());
   }
 
   private OraclePackage createTestPackageWithMultipleFunctions(String schema, String name, Function... functions) {

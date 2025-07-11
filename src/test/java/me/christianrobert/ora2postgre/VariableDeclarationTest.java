@@ -29,7 +29,7 @@ public class VariableDeclarationTest {
     @Test
     void testProcedureWithSingleVariableDeclaration() {
         // Create a simple variable: vX number;
-        DataTypeSpec numberType = new DataTypeSpec("number", null, null, null, null, null);
+        DataTypeSpec numberType = new DataTypeSpec("number", null, null, null);
         Variable vX = new Variable("vX", numberType, null);
         
         // Create a simple assignment statement: vX := vX + 1;
@@ -52,7 +52,7 @@ public class VariableDeclarationTest {
         assertNotNull(result);
         assertTrue(result.contains("CREATE OR REPLACE PROCEDURE"), "Should contain procedure header");
         assertTrue(result.contains("DECLARE"), "Should contain DECLARE section");
-        assertTrue(result.contains("vX number"), "Should contain variable declaration");
+        assertTrue(result.contains("vX numeric;"), "Should contain variable declaration");
         assertTrue(result.contains("vX := vX + 1"), "Should contain assignment statement");
         assertTrue(result.contains("BEGIN"), "Should contain BEGIN");
         assertTrue(result.contains("END"), "Should contain END");
@@ -64,8 +64,8 @@ public class VariableDeclarationTest {
     @Test
     void testProcedureWithMultipleVariableDeclarations() {
         // Create multiple variables
-        DataTypeSpec numberType = new DataTypeSpec("number", null, null, null, null, null);
-        DataTypeSpec varcharType = new DataTypeSpec("varchar2", Arrays.asList("100"), null, null, null, null);
+        DataTypeSpec numberType = new DataTypeSpec("number", null, null, null);
+        DataTypeSpec varcharType = new DataTypeSpec("varchar2", null, null, null);
         
         Variable vCounter = new Variable("vCounter", numberType, null);
         Variable vName = new Variable("vName", varcharType, null);
@@ -89,7 +89,7 @@ public class VariableDeclarationTest {
         
         assertNotNull(result);
         assertTrue(result.contains("vCounter numeric"), "Should contain vCounter declaration");
-        assertTrue(result.contains("vName varchar(100)"), "Should contain vName declaration");
+        assertTrue(result.contains("vName text;"), "Should contain vName declaration");
         assertTrue(result.contains("vCounter := 1"), "Should contain first assignment");
         assertTrue(result.contains("vName := 'test'"), "Should contain second assignment");
     }
@@ -97,7 +97,7 @@ public class VariableDeclarationTest {
     @Test
     void testProcedureWithVariableAndDefaultValue() {
         // Create variable with default value: vStatus varchar2(10) := 'ACTIVE';
-        DataTypeSpec varcharType = new DataTypeSpec("varchar2", Arrays.asList("10"), null, null, null, null);
+        DataTypeSpec varcharType = new DataTypeSpec("varchar2", null, null, null);
         
         // Create a simple expression for the default value
         LogicalExpression logicalExpr = new LogicalExpression(new UnaryLogicalExpression("'ACTIVE'"));
@@ -121,7 +121,7 @@ public class VariableDeclarationTest {
         String result = strategy.transform(procedure, data, false);
         
         assertNotNull(result);
-        assertTrue(result.contains("vStatus varchar(10)"), "Should contain variable declaration");
+        assertTrue(result.contains("vStatus text;"), "Should contain variable declaration");
         // Note: Default values in PostgreSQL are handled differently, so we check for the variable declaration
     }
 

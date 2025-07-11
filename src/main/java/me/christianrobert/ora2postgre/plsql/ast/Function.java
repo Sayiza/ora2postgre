@@ -11,6 +11,7 @@ import java.util.List;
 public class Function extends PlSqlAst {
   private String name;
   private List<Parameter> parameters;
+  private List<Variable> variables; // Variable declarations from DECLARE section
   private String returnType;
   private List<Statement> statements;
 
@@ -21,9 +22,14 @@ public class Function extends PlSqlAst {
   
   private static final FunctionTransformationManager transformationManager = new FunctionTransformationManager();
 
-  public Function(String name, List<Parameter> parameters, String returnType, List<Statement> statements) {
+  public Function(String name,
+                  List<Parameter> parameters,
+                  List<Variable> variables,
+                  String returnType,
+                  List<Statement> statements) {
     this.name = name;
     this.parameters = parameters;
+    this.variables = variables;
     this.returnType = returnType;
     this.statements = statements;
   }
@@ -74,6 +80,10 @@ public class Function extends PlSqlAst {
 
   public void setSchema(String schema) {
     this.schema = schema;
+  }
+
+  public List<Variable> getVariables() {
+    return variables;
   }
 
   @Override

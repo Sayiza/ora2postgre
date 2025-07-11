@@ -24,10 +24,10 @@ public class RestControllerGeneratorTest {
     Parameter param2 = new Parameter("maxResults", numberType, null, true, false);
     List<Parameter> parameters = Arrays.asList(param1, param2);
 
-    Function testFunction = new Function("getUserData", parameters, "VARCHAR2", new ArrayList<>());
+    Function testFunction = new Function("getUserData", parameters,new ArrayList<>(), "varchar2", new ArrayList<>());
 
     // Create a simple procedure
-    Procedure testProcedure = new Procedure("updateUser", parameters, new ArrayList<>());
+    Procedure testProcedure = new Procedure("updateUser", parameters,new ArrayList<>(), new ArrayList<>());
 
     // Create a package
     OraclePackage testPackage = new OraclePackage(

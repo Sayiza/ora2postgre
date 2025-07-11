@@ -22,16 +22,6 @@ public class Procedure extends PlSqlAst {
   public Procedure(
           String name,
           List<Parameter> parameters,
-          List<Statement> statements) {
-    this.name = name;
-    this.parameters = parameters;
-    this.variables = new ArrayList<>(); // Initialize empty list
-    this.statements = statements;
-  }
-
-  public Procedure(
-          String name,
-          List<Parameter> parameters,
           List<Variable> variables,
           List<Statement> statements) {
     this.name = name;

@@ -61,15 +61,24 @@ public class StandardFunctionStrategy implements FunctionTransformationStrategy 
             .append(TypeConverter.toPostgre(function.getReturnType()))
             .append("\nLANGUAGE plpgsql AS $$\n")
             .append("DECLARE\n");
-    
-    // Collect and add variable declarations from FOR loops
-    StringBuilder stmtDeclarations = StatementDeclarationCollector.collectNecessaryDeclarations(
-            function.getStatements(), context);
-    b.append(stmtDeclarations);
-    
-    // TODO: Add declarations from plsql source code
-    // This is currently a TODO in the original Function.toPostgre() method
-    
+
+    if (!specOnly) {
+      // Add explicit variable declarations from procedure's DECLARE section
+      if (function.getVariables() != null && !function.getVariables().isEmpty()) {
+        for (me.christianrobert.ora2postgre.plsql.ast.Variable variable : function.getVariables()) {
+          b.append("  ")
+                  .append(variable.toPostgre(context))
+                  .append(";")
+                  .append("\n");
+        }
+      }
+      // Collect and add variable declarations from FOR loops
+      StringBuilder stmtDeclarations = StatementDeclarationCollector.collectNecessaryDeclarations(
+              function.getStatements(), context);
+      b.append(stmtDeclarations);
+      // TODO: Add declarations from plsql source code
+    }
+
     b.append("BEGIN\n");
     
     if (specOnly) {
