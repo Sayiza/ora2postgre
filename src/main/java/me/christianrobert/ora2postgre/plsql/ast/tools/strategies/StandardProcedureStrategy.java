@@ -85,6 +85,11 @@ public class StandardProcedureStrategy implements ProcedureTransformationStrateg
       }
     }
     
+    // Add exception handling if present
+    if (procedure.hasExceptionHandling()) {
+      b.append(procedure.getExceptionBlock().toPostgre(context));
+    }
+    
     b.append("END;\n$$\n;\n");
     
     log.debug("Successfully transformed procedure {} with {} statements",

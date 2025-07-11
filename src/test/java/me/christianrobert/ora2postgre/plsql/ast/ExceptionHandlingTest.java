@@ -98,7 +98,7 @@ end;
   }
 
   @Test
-  public void testPostgreGeneration() {
+  public void testCompletePostgreFunctionWithExceptions() {
     String oracleSql = """
 CREATE PACKAGE BODY TEST_SCHEMA.TESTPACKAGE is  
   FUNCTION error_test RETURN NUMBER IS
@@ -134,12 +134,86 @@ end;
     assertNotNull(function);
     assertTrue(function.hasExceptionHandling());
 
-    String postgre = function.getExceptionBlock().toPostgre(data);
+    // Test complete function transformation (not just exception block)
+    String completePgFunction = function.toPostgre(data, false);
     
-    assertNotNull(postgre);
-    assertTrue(postgre.contains("EXCEPTION"));
-    assertTrue(postgre.contains("WHEN NO_DATA_FOUND THEN"));
-    assertTrue(postgre.contains("WHEN unique_violation THEN")); // Oracle DUP_VAL_ON_INDEX -> PostgreSQL unique_violation
-    assertTrue(postgre.contains("WHEN OTHERS THEN"));
+    assertNotNull(completePgFunction);
+    // Test PostgreSQL function structure
+    assertTrue(completePgFunction.contains("CREATE OR REPLACE FUNCTION"));
+    assertTrue(completePgFunction.contains("TEST_SCHEMA.TESTPACKAGE_error_test"));
+    assertTrue(completePgFunction.contains("RETURNS"));
+    assertTrue(completePgFunction.contains("LANGUAGE plpgsql"));
+    assertTrue(completePgFunction.contains("DECLARE"));
+    assertTrue(completePgFunction.contains("BEGIN"));
+    assertTrue(completePgFunction.contains("END"));
+    
+    // Test exception handling is included in complete function
+    assertTrue(completePgFunction.contains("EXCEPTION"));
+    assertTrue(completePgFunction.contains("WHEN NO_DATA_FOUND THEN"));
+    assertTrue(completePgFunction.contains("WHEN unique_violation THEN")); // Oracle DUP_VAL_ON_INDEX -> PostgreSQL unique_violation
+    assertTrue(completePgFunction.contains("WHEN OTHERS THEN"));
+    
+    // Test that return statements in exception handlers are included
+    assertTrue(completePgFunction.contains("return -1"));
+    assertTrue(completePgFunction.contains("return -2"));
+    assertTrue(completePgFunction.contains("return -999"));
+  }
+
+  @Test
+  public void testCompleteProcedureWithExceptions() {
+    String oracleSql = """
+CREATE PACKAGE BODY TEST_SCHEMA.TESTPACKAGE is  
+  PROCEDURE log_error(error_msg VARCHAR2) IS
+    v_count NUMBER;
+  BEGIN
+    INSERT INTO error_log VALUES (SYSDATE, error_msg);
+    SELECT COUNT(*) INTO v_count FROM error_log;
+  EXCEPTION
+    WHEN DUP_VAL_ON_INDEX THEN
+      UPDATE error_log SET message = error_msg || ' (duplicate)' WHERE ROWNUM = 1;
+    WHEN OTHERS THEN
+      NULL; -- Ignore all other errors
+  END;
+end;
+/
+""";
+
+    // Create test data
+    Everything data = new Everything();
+    data.getUserNames().add("TEST_SCHEMA");
+
+    PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
+
+    // Parse the Oracle procedure
+    PlSqlAst ast = PlSqlAstMain.processPlsqlCode(plsqlCode);
+
+    OraclePackage pkg = (OraclePackage) ast;
+    assertNotNull(pkg);
+    assertEquals(1, pkg.getProcedures().size());
+    
+    Procedure procedure = pkg.getProcedures().get(0);
+    assertNotNull(procedure);
+    assertTrue(procedure.hasExceptionHandling());
+
+    // Test complete procedure transformation (not just exception block)
+    String completePgProcedure = procedure.toPostgre(data, false);
+    
+    assertNotNull(completePgProcedure);
+    // Test PostgreSQL procedure structure
+    assertTrue(completePgProcedure.contains("CREATE OR REPLACE PROCEDURE"));
+    assertTrue(completePgProcedure.contains("TEST_SCHEMA.TESTPACKAGE_log_error"));
+    assertTrue(completePgProcedure.contains("LANGUAGE plpgsql"));
+    assertTrue(completePgProcedure.contains("DECLARE"));
+    assertTrue(completePgProcedure.contains("BEGIN"));
+    assertTrue(completePgProcedure.contains("END"));
+    
+    // Test exception handling is included in complete procedure
+    assertTrue(completePgProcedure.contains("EXCEPTION"));
+    assertTrue(completePgProcedure.contains("WHEN unique_violation THEN")); // Oracle DUP_VAL_ON_INDEX -> PostgreSQL unique_violation
+    assertTrue(completePgProcedure.contains("WHEN OTHERS THEN"));
+    
+    // Test that statements in exception handlers are included
+    assertTrue(completePgProcedure.contains("UPDATE"));
+    assertTrue(completePgProcedure.contains("duplicate"));
   }
 }

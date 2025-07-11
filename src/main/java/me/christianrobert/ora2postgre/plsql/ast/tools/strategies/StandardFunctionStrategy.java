@@ -91,6 +91,11 @@ public class StandardFunctionStrategy implements FunctionTransformationStrategy 
       }
     }
     
+    // Add exception handling if present
+    if (function.hasExceptionHandling()) {
+      b.append(function.getExceptionBlock().toPostgre(context));
+    }
+    
     b.append("END;\n$$\n;\n");
     
     log.debug("Successfully transformed function {} with {} statements",

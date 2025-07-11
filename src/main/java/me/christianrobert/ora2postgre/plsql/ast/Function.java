@@ -144,10 +144,11 @@ public class Function extends PlSqlAst {
 
 
   /**
-   * @deprecated Use FunctionTransformationManager instead for better maintainability and extensibility.
-   * This method is maintained for backward compatibility and delegates to the transformation manager.
+   * Transforms this function to PostgreSQL DDL using the transformation manager.
+   * This method serves dual purposes in the established dual usage pattern:
+   * - As main object: delegates to transformation manager for complex orchestration
+   * - As sub-element: enables direct toPostgre() calls in AST chains
    */
-  @Deprecated
   public String toPostgre(Everything data, boolean specOnly) {
     return transformationManager.transform(this, data, specOnly);
   }
