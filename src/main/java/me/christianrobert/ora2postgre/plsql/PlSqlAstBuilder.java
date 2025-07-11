@@ -184,6 +184,18 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
 
   @Override
   public PlSqlAst visitSelect_statement(PlSqlParser.Select_statementContext ctx) {
+    // Check if this is a SELECT INTO statement by looking for into_clause in query_block
+    if (ctx.select_only_statement() != null && 
+        ctx.select_only_statement().subquery() != null &&
+        ctx.select_only_statement().subquery().subquery_basic_elements() != null &&
+        ctx.select_only_statement().subquery().subquery_basic_elements().query_block() != null &&
+        ctx.select_only_statement().subquery().subquery_basic_elements().query_block().into_clause() != null) {
+      
+      // This is a SELECT INTO statement - route to SelectIntoStatement
+      return visitSelectIntoFromQueryBlock(ctx.select_only_statement().subquery().subquery_basic_elements().query_block());
+    }
+    
+    // Regular SELECT statement - use existing logic
     return new SelectStatement(
             schema, // TODO only selectOnlyClause for now, to for,order etc later
             (SelectSubQuery) visit(ctx.select_only_statement().subquery()),
@@ -203,6 +215,69 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
                     (SelectFetchClause) visit(ctx.offset_clause(0)) :
                     null
     );
+  }
+
+  /**
+   * Helper method to parse SELECT INTO statements from query_block context
+   */
+  private PlSqlAst visitSelectIntoFromQueryBlock(PlSqlParser.Query_blockContext ctx) {
+    // Parse selected columns
+    List<String> selectedColumns = new ArrayList<>();
+    if (ctx.selected_list().ASTERISK() != null) {
+      selectedColumns.add("*");
+    } else {
+      for (var selectElement : ctx.selected_list().select_list_elements()) {
+        // For simplicity, just get the text of each select element
+        // TODO: This could be enhanced to handle complex expressions
+        selectedColumns.add(selectElement.getText());
+      }
+    }
+    
+    // Parse INTO variables
+    List<String> intoVariables = new ArrayList<>();
+    if (ctx.into_clause() != null) {
+      for (var element : ctx.into_clause().general_element()) {
+        intoVariables.add(element.getText());
+      }
+      // Also handle bind_variable if present
+      if (ctx.into_clause().bind_variable() != null) {
+        for (var bindVar : ctx.into_clause().bind_variable()) {
+          intoVariables.add(bindVar.getText());
+        }
+      }
+    }
+    
+    // Parse FROM table (simplified approach)
+    String schemaName = null;
+    String tableName = null;
+    
+    if (ctx.from_clause() != null &&
+        ctx.from_clause().table_ref_list() != null &&
+        ctx.from_clause().table_ref_list().table_ref() != null &&
+        !ctx.from_clause().table_ref_list().table_ref().isEmpty()) {
+      
+      // For simplicity, just get the text of the first table reference
+      // TODO: This could be enhanced to properly parse complex table expressions
+      var firstTableRef = ctx.from_clause().table_ref_list().table_ref().get(0);
+      String tableRefText = firstTableRef.getText();
+      
+      // Simple parsing: check if it contains a dot (schema.table)
+      if (tableRefText.contains(".")) {
+        String[] parts = tableRefText.split("\\.", 2);
+        schemaName = parts[0];
+        tableName = parts[1];
+      } else {
+        tableName = tableRefText;
+      }
+    }
+    
+    // Parse WHERE clause if present
+    Expression whereClause = null;
+    if (ctx.where_clause() != null && ctx.where_clause().condition() != null) {
+      whereClause = (Expression) visit(ctx.where_clause().condition());
+    }
+    
+    return new SelectIntoStatement(selectedColumns, intoVariables, schemaName, tableName, whereClause);
   }
 
   @Override

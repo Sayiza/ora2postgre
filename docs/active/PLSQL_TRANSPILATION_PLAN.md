@@ -11,9 +11,9 @@
 - **Example**: `insert into audit_table values (pId, 'TEST', sysdate)` → `INSERT INTO test_schema.audit_table VALUES (pId, 'TEST', sysdate)`
 
 ### 🔄 **Next Implementation Ready**
-- **Target**: SELECT INTO statements for data retrieval operations
-- **Pattern**: Same schema resolution approach as DML statements (INSERT, UPDATE, DELETE)
-- **Use case**: `SELECT field_name INTO v_result FROM config_table WHERE id = p_id`
+- **Target**: Basic Exception Handling for robust error management
+- **Pattern**: Enhance existing ExceptionTransformer.java with AST integration
+- **Use case**: `BEGIN ... EXCEPTION WHEN NO_DATA_FOUND THEN RETURN NULL; END`
 
 ## Current State Assessment
 
@@ -54,7 +54,7 @@ The transpilation system has a **strong foundation** with working implementation
 - ✅ Trigger infrastructure (complete pipeline)
 - ✅ Manager-Strategy architecture (85% complete)
 
-**Current Success Rate**: ~25-35% of typical PL/SQL code is fully transpiled (with IF, INSERT, UPDATE, and DELETE statements)
+**Current Success Rate**: ~30-40% of typical PL/SQL code is fully transpiled (with IF, INSERT, UPDATE, DELETE, and SELECT INTO statements)
 **Goal**: Increase to 60-80% coverage for common business logic patterns
 
 ## Priority Phases
@@ -85,12 +85,14 @@ The transpilation system has a **strong foundation** with working implementation
 - **Test coverage**: `WhileLoopStatementTest.java` with simple WHILE, multiple statements, empty body, and indentation scenarios
 - **Manual testing**: ✅ All 168 tests passing, ready for end-to-end verification
 
-#### 1.3 Basic Exception Handling
-- **Missing**: Exception block AST support
-- **Oracle**: `BEGIN ... EXCEPTION WHEN ... THEN ... END;`
-- **PostgreSQL**: `BEGIN ... EXCEPTION WHEN ... THEN ... END;`
+#### 1.3 Basic Exception Handling 🎯 **NEXT PRIORITY**
+- **Status**: 🎯 **READY FOR IMPLEMENTATION**
+- **Missing**: Exception block AST support for robust error handling
+- **Oracle**: `BEGIN ... EXCEPTION WHEN NO_DATA_FOUND THEN ... END;`
+- **PostgreSQL**: Same syntax with proper exception mapping
 - **Implementation**: Enhance existing `ExceptionTransformer.java` with AST integration
-- **Files to modify**: `PlSqlAstBuilder.java`, `ExceptionTransformer.java`
+- **Use case**: Getter functions - handle NO_DATA_FOUND, TOO_MANY_ROWS exceptions
+- **Files to modify**: `PlSqlAstBuilder.java`, `ExceptionTransformer.java` or create new AST classes
 
 ### Phase 2: SQL DML Statements (HIGH PRIORITY)
 **Goal**: Handle database operations in triggers and procedures
@@ -160,14 +162,28 @@ The transpilation system has a **strong foundation** with working implementation
 **Goal**: Support common data retrieval patterns
 **Impact**: Essential for getter functions and data validation logic
 
-#### 3.1 SELECT INTO Statements 🎯 **NEXT PRIORITY**
-- **Status**: 🎯 **READY FOR IMPLEMENTATION**
-- **Missing**: SELECT INTO AST class with variable assignment
+#### 3.1 SELECT INTO Statements ✅ **COMPLETED**
+- **Status**: ✅ **IMPLEMENTED AND TESTED**
 - **Oracle**: `SELECT col INTO variable FROM table WHERE condition;`
-- **PostgreSQL**: Same syntax with proper schema resolution
-- **Implementation**: Create `SelectIntoStatement.java` following DELETE statement patterns
-- **Use case**: Getter functions - `SELECT field_name INTO v_result FROM config_table WHERE id = p_id;`
-- **Schema handling**: Apply same schema resolution logic as other DML statements
+- **PostgreSQL**: Same syntax with automatic schema prefixing and synonym resolution
+- **Implementation**: Created `SelectIntoStatement.java` with full schema resolution and variable assignment
+- **Files modified**: 
+  - `PlSqlAstBuilder.java` - Enhanced `visitSelect_statement()` to detect INTO clauses and route to SelectIntoStatement
+  - `SelectIntoStatement.java` - Complete AST class with PostgreSQL transpilation and variable handling
+  - Added `visitSelectIntoFromQueryBlock()` helper method for parsing SELECT INTO from query blocks
+  - Enhanced schema resolution using `Everything.lookupSchema4Field()` for synonym support
+- **Features implemented**:
+  - Single column SELECT INTO: `SELECT col INTO var FROM table WHERE condition`
+  - Multiple column SELECT INTO: `SELECT col1, col2 INTO var1, var2 FROM table WHERE condition`
+  - Schema-qualified tables: `SELECT col INTO var FROM schema.table WHERE condition`
+  - SELECT INTO without WHERE: `SELECT COUNT(*) INTO var FROM table`
+  - Complex WHERE clauses with expressions and operators
+  - Automatic schema resolution for unqualified table names
+  - Synonym resolution through existing Everything infrastructure
+  - Always emits schema prefix for PostgreSQL reliability
+- **Test coverage**: `SelectIntoStatementTest.java` with simple SELECT INTO, multiple columns, schema-qualified, no WHERE clause, and IF+SELECT INTO scenarios
+- **Integration**: Works seamlessly with IF statements for conditional data retrieval logic
+- **Manual testing**: ✅ All 190 tests passing, ready for production use
 
 #### 3.2 Cursor Declarations and Usage
 - **Existing**: Basic cursor support in FOR loops
