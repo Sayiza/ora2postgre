@@ -10,6 +10,7 @@ public class Procedure extends PlSqlAst {
   private String name;
   private List<Parameter> parameters;
   private List<Variable> variables; // Variable declarations from DECLARE section
+  private List<CursorDeclaration> cursorDeclarations; // Cursor declarations from DECLARE section
   private List<Statement> statements;
   private ExceptionBlock exceptionBlock; // Exception handling
 
@@ -28,6 +29,7 @@ public class Procedure extends PlSqlAst {
     this.name = name;
     this.parameters = parameters;
     this.variables = variables != null ? variables : new ArrayList<>();
+    this.cursorDeclarations = new ArrayList<>(); // Initialize empty list
     this.statements = statements;
     this.exceptionBlock = null; // No exception handling by default
   }
@@ -42,6 +44,7 @@ public class Procedure extends PlSqlAst {
     this.name = name;
     this.parameters = parameters;
     this.variables = variables != null ? variables : new ArrayList<>();
+    this.cursorDeclarations = new ArrayList<>(); // Initialize empty list
     this.statements = statements;
     this.exceptionBlock = exceptionBlock;
   }
@@ -72,6 +75,14 @@ public class Procedure extends PlSqlAst {
 
   public List<Variable> getVariables() {
     return variables;
+  }
+
+  public List<CursorDeclaration> getCursorDeclarations() {
+    return cursorDeclarations;
+  }
+
+  public void setCursorDeclarations(List<CursorDeclaration> cursorDeclarations) {
+    this.cursorDeclarations = cursorDeclarations != null ? cursorDeclarations : new ArrayList<>();
   }
 
   public ObjectType getParentType() {

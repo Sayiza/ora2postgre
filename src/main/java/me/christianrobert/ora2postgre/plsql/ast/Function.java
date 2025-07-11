@@ -6,12 +6,14 @@ import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.ToExportPostgre;
 import me.christianrobert.ora2postgre.plsql.ast.tools.transformers.TypeConverter;
 import me.christianrobert.ora2postgre.plsql.ast.tools.managers.FunctionTransformationManager;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class Function extends PlSqlAst {
   private String name;
   private List<Parameter> parameters;
   private List<Variable> variables; // Variable declarations from DECLARE section
+  private List<CursorDeclaration> cursorDeclarations; // Cursor declarations from DECLARE section
   private String returnType;
   private List<Statement> statements;
   private ExceptionBlock exceptionBlock; // Exception handling
@@ -31,6 +33,7 @@ public class Function extends PlSqlAst {
     this.name = name;
     this.parameters = parameters;
     this.variables = variables;
+    this.cursorDeclarations = new ArrayList<>(); // Initialize empty list
     this.returnType = returnType;
     this.statements = statements;
     this.exceptionBlock = null; // No exception handling by default
@@ -46,6 +49,7 @@ public class Function extends PlSqlAst {
     this.name = name;
     this.parameters = parameters;
     this.variables = variables;
+    this.cursorDeclarations = new ArrayList<>(); // Initialize empty list
     this.returnType = returnType;
     this.statements = statements;
     this.exceptionBlock = exceptionBlock;
@@ -113,6 +117,14 @@ public class Function extends PlSqlAst {
 
   public List<Variable> getVariables() {
     return variables;
+  }
+
+  public List<CursorDeclaration> getCursorDeclarations() {
+    return cursorDeclarations;
+  }
+
+  public void setCursorDeclarations(List<CursorDeclaration> cursorDeclarations) {
+    this.cursorDeclarations = cursorDeclarations != null ? cursorDeclarations : new ArrayList<>();
   }
 
   @Override

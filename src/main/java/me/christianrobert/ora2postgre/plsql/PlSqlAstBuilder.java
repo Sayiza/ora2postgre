@@ -36,6 +36,42 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     return new Variable(varName, dataType, defaultValue);
   }
 
+  @Override
+  public PlSqlAst visitCursor_declaration(PlSqlParser.Cursor_declarationContext ctx) {
+    String cursorName = ctx.identifier().getText();
+    
+    // Parse parameters if present
+    List<Parameter> parameters = new ArrayList<>();
+    if (ctx.parameter_spec() != null) {
+      for (PlSqlParser.Parameter_specContext paramCtx : ctx.parameter_spec()) {
+        // Extract parameter name and type
+        String paramName = paramCtx.parameter_name().getText();
+        String paramType = paramCtx.type_spec() != null ? paramCtx.type_spec().getText() : "VARCHAR2";
+        
+        // Create parameter (assuming IN direction for cursor parameters)
+        Parameter param = new Parameter(paramName, new DataTypeSpec(paramType, null, null, null), null, true, false);
+        parameters.add(param);
+      }
+    }
+    
+    // Parse return type if present
+    String returnType = null;
+    if (ctx.type_spec() != null) {
+      returnType = ctx.type_spec().getText();
+    }
+    
+    // Parse SELECT statement if present
+    SelectStatement selectStatement = null;
+    if (ctx.select_statement() != null) {
+      PlSqlAst selectAst = visit(ctx.select_statement());
+      if (selectAst instanceof SelectStatement) {
+        selectStatement = (SelectStatement) selectAst;
+      }
+    }
+    
+    return new CursorDeclaration(cursorName, parameters, returnType, selectStatement);
+  }
+
   /**
    * Extracts variables from seq_of_declare_specs context.
    * Returns a list of Variable objects found in the DECLARE section.
@@ -51,12 +87,33 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
             variables.add(variable);
           }
         }
-        // Note: Other declare_spec types (procedure_spec, function_spec, etc.) 
+        // Note: Other declare_spec types (procedure_spec, function_spec, cursor_declaration, etc.) 
         // are handled elsewhere in the parsing process
       }
     }
     
     return variables;
+  }
+
+  /**
+   * Extracts cursor declarations from seq_of_declare_specs context.
+   * Returns a list of CursorDeclaration objects found in the DECLARE section.
+   */
+  public List<CursorDeclaration> extractCursorDeclarationsFromDeclareSpecs(PlSqlParser.Seq_of_declare_specsContext ctx) {
+    List<CursorDeclaration> cursors = new ArrayList<>();
+    
+    if (ctx != null && ctx.declare_spec() != null) {
+      for (PlSqlParser.Declare_specContext declareSpec : ctx.declare_spec()) {
+        if (declareSpec.cursor_declaration() != null) {
+          CursorDeclaration cursor = (CursorDeclaration) visit(declareSpec.cursor_declaration());
+          if (cursor != null) {
+            cursors.add(cursor);
+          }
+        }
+      }
+    }
+    
+    return cursors;
   }
 
   @Override
@@ -110,6 +167,56 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
   @Override
   public PlSqlAst visitNull_statement(PlSqlParser.Null_statementContext ctx) {
     return new Comment("do nothing");
+  }
+
+  @Override
+  public PlSqlAst visitCursor_manipulation_statements(PlSqlParser.Cursor_manipulation_statementsContext ctx) {
+    // Delegate to specific cursor statement visitors
+    if (ctx.getChildCount() == 1) {
+      return visit(ctx.getChild(0));
+    }
+    return new Comment("unclear cursor manipulation statement structure");
+  }
+
+  @Override
+  public PlSqlAst visitOpen_statement(PlSqlParser.Open_statementContext ctx) {
+    String cursorName = ctx.cursor_name().getText();
+    
+    // Parse parameters if present
+    List<Expression> parameters = new ArrayList<>();
+    if (ctx.expressions_() != null && ctx.expressions_().expression() != null) {
+      for (PlSqlParser.ExpressionContext exprCtx : ctx.expressions_().expression()) {
+        Expression expr = (Expression) visit(exprCtx);
+        if (expr != null) {
+          parameters.add(expr);
+        }
+      }
+    }
+    
+    return new OpenStatement(cursorName, parameters);
+  }
+
+  @Override
+  public PlSqlAst visitFetch_statement(PlSqlParser.Fetch_statementContext ctx) {
+    String cursorName = ctx.cursor_name().getText();
+    
+    // Parse INTO variables
+    List<String> intoVariables = new ArrayList<>();
+    if (ctx.variable_or_collection() != null) {
+      for (PlSqlParser.Variable_or_collectionContext varCtx : ctx.variable_or_collection()) {
+        // Extract variable name from variable_or_collection context
+        String varName = varCtx.getText(); // Simple approach - could be enhanced for complex expressions
+        intoVariables.add(varName);
+      }
+    }
+    
+    return new FetchStatement(cursorName, intoVariables);
+  }
+
+  @Override
+  public PlSqlAst visitClose_statement(PlSqlParser.Close_statementContext ctx) {
+    String cursorName = ctx.cursor_name().getText();
+    return new CloseStatement(cursorName);
   }
 
   @Override
@@ -1042,6 +1149,12 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       variables = extractVariablesFromDeclareSpecs(ctx.seq_of_declare_specs());
     }
 
+    // Extract cursor declarations from DECLARE section
+    List<CursorDeclaration> cursorDeclarations = new ArrayList<>();
+    if (ctx.seq_of_declare_specs() != null) {
+      cursorDeclarations = extractCursorDeclarationsFromDeclareSpecs(ctx.seq_of_declare_specs());
+    }
+
     List<Statement> statements = new ArrayList<>();
     if (ctx.body() != null
             && ctx.body().seq_of_statements() != null
@@ -1057,7 +1170,12 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       exceptionBlock = parseExceptionBlock(ctx.body().exception_handler());
     }
 
-    return new Procedure(procedureName, parameters, variables, statements, exceptionBlock);
+    Procedure procedure = new Procedure(procedureName, parameters, variables, statements, exceptionBlock);
+    
+    // Set cursor declarations
+    procedure.setCursorDeclarations(cursorDeclarations);
+    
+    return procedure;
   }
 
   @Override
@@ -1085,17 +1203,29 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       variables = extractVariablesFromDeclareSpecs(ctx.seq_of_declare_specs());
     }
 
+    // Extract cursor declarations from DECLARE section
+    List<CursorDeclaration> cursorDeclarations = new ArrayList<>();
+    if (ctx.seq_of_declare_specs() != null) {
+      cursorDeclarations = extractCursorDeclarationsFromDeclareSpecs(ctx.seq_of_declare_specs());
+    }
+
     // Parse exception block if present
     ExceptionBlock exceptionBlock = null;
     if (ctx.body() != null && ctx.body().exception_handler() != null && !ctx.body().exception_handler().isEmpty()) {
       exceptionBlock = parseExceptionBlock(ctx.body().exception_handler());
     }
 
+    Function function;
     if (exceptionBlock != null) {
-      return new Function(procedureName, parameters, variables, returnType, statements, exceptionBlock);
+      function = new Function(procedureName, parameters, variables, returnType, statements, exceptionBlock);
     } else {
-      return new Function(procedureName, parameters, variables, returnType, statements);
+      function = new Function(procedureName, parameters, variables, returnType, statements);
     }
+    
+    // Set cursor declarations
+    function.setCursorDeclarations(cursorDeclarations);
+    
+    return function;
   }
 
   /**

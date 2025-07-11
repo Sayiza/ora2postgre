@@ -72,6 +72,16 @@ public class StandardFunctionStrategy implements FunctionTransformationStrategy 
                   .append("\n");
         }
       }
+      
+      // Add cursor declarations from DECLARE section
+      if (function.getCursorDeclarations() != null && !function.getCursorDeclarations().isEmpty()) {
+        for (me.christianrobert.ora2postgre.plsql.ast.CursorDeclaration cursor : function.getCursorDeclarations()) {
+          b.append("  ")
+                  .append(cursor.toPostgre(context))
+                  .append("\n");
+        }
+      }
+      
       // Collect and add variable declarations from FOR loops
       StringBuilder stmtDeclarations = StatementDeclarationCollector.collectNecessaryDeclarations(
               function.getStatements(), context);

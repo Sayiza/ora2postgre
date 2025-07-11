@@ -67,6 +67,16 @@ public class StandardProcedureStrategy implements ProcedureTransformationStrateg
                   .append("\n");
         }
       }
+      
+      // Add cursor declarations from DECLARE section
+      if (procedure.getCursorDeclarations() != null && !procedure.getCursorDeclarations().isEmpty()) {
+        for (me.christianrobert.ora2postgre.plsql.ast.CursorDeclaration cursor : procedure.getCursorDeclarations()) {
+          b.append("  ")
+                  .append(cursor.toPostgre(context))
+                  .append("\n");
+        }
+      }
+      
       // Collect and add variable declarations from FOR loops and other nested statements
       StringBuilder declarations = StatementDeclarationCollector.collectNecessaryDeclarations(
               procedure.getStatements(), context);
