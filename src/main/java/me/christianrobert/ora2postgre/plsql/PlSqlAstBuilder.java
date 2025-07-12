@@ -241,6 +241,24 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     return new ReturnStatement(null);
   }
 
+  @Override
+  public PlSqlAst visitExit_statement(PlSqlParser.Exit_statementContext ctx) {
+    String labelName = null;
+    Expression condition = null;
+    
+    // Check for optional label name
+    if (ctx.label_name() != null) {
+      labelName = ctx.label_name().getText();
+    }
+    
+    // Check for optional WHEN condition
+    if (ctx.condition() != null) {
+      condition = (Expression) visit(ctx.condition());
+    }
+    
+    return new ExitStatement(labelName, condition);
+  }
+
   // LOOP and SELECT START
   @Override
   public PlSqlAst visitLoop_statement(PlSqlParser.Loop_statementContext ctx) {

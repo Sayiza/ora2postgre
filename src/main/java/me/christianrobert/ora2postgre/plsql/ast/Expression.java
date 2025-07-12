@@ -130,7 +130,73 @@ public class Expression extends PlSqlAst {
     if (expressionText.contains(".")) {
       return expressionText; // TODO it has a table alias or name prefix..
     }
+    
+    // Check if this is a literal constant that should not be quoted
+    if (isLiteralConstant(expressionText)) {
+      return expressionText; // Return literals unchanged
+    }
+    
     return PostgreSqlIdentifierUtils.quoteIdentifier(expressionText.toUpperCase());
+  }
+
+  /**
+   * Determines if the given expression text represents a literal constant that should
+   * not be quoted as an identifier.
+   * 
+   * @param expressionText The text to check
+   * @return true if this is a literal constant (number, string, boolean, etc.)
+   */
+  private boolean isLiteralConstant(String expressionText) {
+    if (expressionText == null || expressionText.trim().isEmpty()) {
+      return false;
+    }
+    
+    String trimmed = expressionText.trim();
+    
+    // Check for numeric literals (integers, decimals, scientific notation)
+    if (isNumericLiteral(trimmed)) {
+      return true;
+    }
+    
+    // Check for string literals (single quoted)
+    if (trimmed.startsWith("'") && trimmed.endsWith("'") && trimmed.length() >= 2) {
+      return true;
+    }
+    
+    // Check for boolean literals
+    if (trimmed.equalsIgnoreCase("TRUE") || trimmed.equalsIgnoreCase("FALSE")) {
+      return true;
+    }
+    
+    // Check for NULL literal
+    if (trimmed.equalsIgnoreCase("NULL")) {
+      return true;
+    }
+    
+    return false;
+  }
+  
+  /**
+   * Checks if a string represents a numeric literal.
+   */
+  private boolean isNumericLiteral(String text) {
+    if (text == null || text.isEmpty()) {
+      return false;
+    }
+    
+    try {
+      // Try parsing as different numeric types
+      if (text.contains(".") || text.toLowerCase().contains("e")) {
+        // Decimal or scientific notation
+        Double.parseDouble(text);
+      } else {
+        // Integer
+        Long.parseLong(text);
+      }
+      return true;
+    } catch (NumberFormatException e) {
+      return false;
+    }
   }
 
 }
