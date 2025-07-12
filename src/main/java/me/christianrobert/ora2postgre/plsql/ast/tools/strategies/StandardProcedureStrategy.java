@@ -3,8 +3,6 @@ package me.christianrobert.ora2postgre.plsql.ast.tools.strategies;
 import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.plsql.ast.Procedure;
 import me.christianrobert.ora2postgre.plsql.ast.Statement;
-import me.christianrobert.ora2postgre.plsql.ast.tools.CursorLoopAnalyzer;
-import me.christianrobert.ora2postgre.plsql.ast.tools.CursorLoopTransformer;
 import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.StatementDeclarationCollector;
 import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.ToExportPostgre;
 import org.slf4j.Logger;
@@ -90,8 +88,11 @@ public class StandardProcedureStrategy implements ProcedureTransformationStrateg
     if (specOnly) {
       b.append("null;\n");
     } else {
-      // Add procedure body statements with cursor loop transformation
-      processStatementsWithCursorTransformation(procedure.getStatements(), b, context);
+      // Add procedure body statements
+      for (Statement statement : procedure.getStatements()) {
+        b.append(statement.toPostgre(context))
+                .append("\n");
+      }
     }
     
     // Add exception handling if present
@@ -127,42 +128,5 @@ public class StandardProcedureStrategy implements ProcedureTransformationStrateg
     }
     
     return notes.toString();
-  }
-
-  /**
-   * Processes a list of statements, detecting and transforming cursor loop patterns.
-   * This method scans for OPEN/LOOP/CLOSE patterns and converts them to PostgreSQL FOR loops.
-   */
-  private void processStatementsWithCursorTransformation(java.util.List<Statement> statements, StringBuilder b, Everything context) {
-    java.util.Set<Integer> consumedIndices = new java.util.HashSet<>();
-    
-    for (int i = 0; i < statements.size(); i++) {
-      // Skip if this statement was already consumed as part of a cursor pattern
-      if (consumedIndices.contains(i)) {
-        continue;
-      }
-      
-      // Try to detect cursor loop pattern starting from current position
-      java.util.List<Statement> remainingStatements = statements.subList(i, statements.size());
-      CursorLoopAnalyzer.CursorLoopInfo cursorInfo = CursorLoopAnalyzer.detectCursorLoopPattern(remainingStatements);
-      
-      if (cursorInfo != null && CursorLoopTransformer.shouldTransformToForLoop(cursorInfo)) {
-        // Transform cursor pattern to FOR loop
-        CursorLoopTransformer.CursorForLoopStatement forLoop = CursorLoopTransformer.transformToCursorForLoop(cursorInfo);
-        b.append(forLoop.toPostgre(context)).append("\n");
-        
-        // Mark all statements in the pattern as consumed
-        for (int j = 0; j < cursorInfo.getStatementCount(); j++) {
-          consumedIndices.add(i + j);
-        }
-        
-        log.debug("Transformed cursor loop pattern '{}' to FOR loop (consumed {} statements)", 
-                 cursorInfo.getCursorName(), cursorInfo.getStatementCount());
-      } else {
-        // Regular statement processing
-        Statement statement = statements.get(i);
-        b.append(statement.toPostgre(context)).append("\n");
-      }
-    }
   }
 }

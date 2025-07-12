@@ -4,7 +4,6 @@ import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.plsql.ast.AssignmentStatement;
 import me.christianrobert.ora2postgre.plsql.ast.ForLoopStatement;
 import me.christianrobert.ora2postgre.plsql.ast.Statement;
-import me.christianrobert.ora2postgre.plsql.ast.tools.CursorLoopTransformer;
 
 import java.util.HashSet;
 import java.util.List;
@@ -19,8 +18,8 @@ public class StatementDeclarationCollector {
 
   /**
    * Recursively collects all necessary declarations from a list of statements.
-   * Currently handles FOR loop variable declarations and cursor FOR loop declarations.
-   * Can be extended for other statement types. Avoids duplicate declarations for variables with the same name.
+   * Currently handles FOR loop variable declarations and can be extended for other statement types.
+   * Avoids duplicate declarations for variables with the same name.
    *
    * @param statements the list of statements to analyze
    * @param data the Everything context for data type resolution
@@ -57,20 +56,6 @@ public class StatementDeclarationCollector {
 
         // Recursively check nested statements within the FOR loop
         declarations.append(collectNecessaryDeclarations(forLoop.getStatements(), data, declaredVariables));
-      } else if (statement instanceof CursorLoopTransformer.CursorForLoopStatement) {
-        CursorLoopTransformer.CursorForLoopStatement cursorForLoop = (CursorLoopTransformer.CursorForLoopStatement) statement;
-
-        // Get the record variable name from the cursor FOR loop
-        String recordVariable = cursorForLoop.getRecordVariable();
-
-        // Only add declaration if we haven't seen this variable name before
-        if (!declaredVariables.contains(recordVariable)) {
-          declarations.append("  ").append(recordVariable).append(" RECORD;\n");
-          declaredVariables.add(recordVariable);
-        }
-
-        // Recursively check nested statements within the cursor FOR loop
-        declarations.append(collectNecessaryDeclarations(cursorForLoop.getStatements(), data, declaredVariables));
       }
 
       // TODO: Add handling for other statement types that might contain nested statements

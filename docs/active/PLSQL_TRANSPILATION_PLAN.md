@@ -2,27 +2,43 @@
 
 ## Recent Progress Update (Session 2025-07-12)
 
-### 🎯 **NEXT PRIORITY: Cursor Attributes Implementation (HIGHEST PRIORITY)**
-- **Goal**: Complete the cursor infrastructure by implementing cursor state attributes
-- **Current Status**: With cursor declarations and loop transformations completed, cursor attributes are the missing piece for complete cursor support
+### 🔄 **URGENT REFACTORING: Cursor Strategy Revision (HIGHEST PRIORITY)**
+- **Strategic Decision**: After analysis, we need to **revert cursor loop transformation** and use **direct OPEN/CLOSE mapping** instead
+- **Rationale**: 
+  - Cursor attributes (`%FOUND`, `%NOTFOUND`, `%ROWCOUNT`) create complex semantic mismatches with FOR loop transformations
+  - Context-aware cursor attribute transformations would be overly complex and error-prone
+  - Direct OPEN/CLOSE mapping provides better maintainability, debugging, and compatibility
+- **Current Problem**: Our FOR loop transformation conflicts with cursor attribute semantics
+- **New Approach**: 
+  - Oracle `OPEN cursor; LOOP; FETCH cursor; EXIT WHEN cursor%NOTFOUND; END LOOP; CLOSE cursor;`
+  - PostgreSQL `OPEN cursor; LOOP; FETCH cursor; EXIT WHEN NOT FOUND; END LOOP; CLOSE cursor;`
+- **Required Refactoring**:
+  1. **Remove cursor loop transformation** from `StandardFunctionStrategy.java` and `StandardProcedureStrategy.java`
+  2. **Simplify cursor infrastructure** - remove `CursorLoopAnalyzer.java` and `CursorLoopTransformer.java`
+  3. **Keep FOR loop infrastructure** for Oracle `FOR cursor` syntax (different use case)
+  4. **Implement direct cursor attribute mapping** with simple AST transformations
+  5. **Update tests** to expect OPEN/CLOSE syntax instead of FOR loops
+- **Benefits**:
+  - ✅ **Simpler Implementation**: Direct 1:1 transformations without complex context awareness
+  - ✅ **Better Maintainability**: Straightforward transformation rules
+  - ✅ **Complete Compatibility**: All Oracle cursor patterns supported
+  - ✅ **Easier Debugging**: Generated code closely matches Oracle structure
+  - ✅ **Reduced Risk**: Less complex transformations mean fewer bugs
+- **Implementation Plan**:
+  1. **Phase 1**: Remove cursor loop transformation from strategy files
+  2. **Phase 2**: Simplify cursor infrastructure (remove transformation classes)
+  3. **Phase 3**: Implement direct cursor attribute transformations
+  4. **Phase 4**: Update test suite for new expectations
+
+### 🎯 **NEXT PRIORITY: Cursor Attributes Implementation (AFTER REFACTORING)**
+- **Goal**: Complete cursor infrastructure with direct cursor attribute mapping
 - **Oracle Features**: `cursor_name%FOUND`, `cursor_name%NOTFOUND`, `cursor_name%ROWCOUNT`
-- **PostgreSQL Approach**: Use PostgreSQL's `FOUND` variable and `GET DIAGNOSTICS` for row counts
-- **Use Cases**: 
+- **PostgreSQL Approach**: Direct mapping using `FOUND` variable and `GET DIAGNOSTICS`
+- **Simple Transformations**: 
   - `IF cursor_name%FOUND THEN` → `IF FOUND THEN` 
   - `IF cursor_name%NOTFOUND THEN` → `IF NOT FOUND THEN`
   - `v_count := cursor_name%ROWCOUNT` → `GET DIAGNOSTICS v_count = ROW_COUNT`
-- **Implementation Strategy**:
-  1. Create `CursorAttributeExpression.java` AST class for parsing `cursor%attribute` syntax
-  2. Add cursor attribute parsing to `PlSqlAstBuilder.java` in expression parsing methods  
-  3. Implement PostgreSQL transformation logic for each attribute type
-  4. Integrate with existing cursor infrastructure (CursorDeclaration, etc.)
-  5. Add comprehensive test coverage for all cursor attribute scenarios
-- **Expected Impact**: This will complete cursor support and enable complex cursor-based logic patterns commonly found in Oracle PL/SQL
-- **Files to modify**:
-  - `PlSqlAstBuilder.java` - Add cursor attribute parsing in expression methods
-  - `CursorAttributeExpression.java` - New AST class for cursor attributes
-  - `CursorTest.java` - Add test cases for cursor attributes
-- **Testing Requirements**: Test cursor attributes in IF conditions, assignments, and complex expressions
+- **Implementation**: Will be much simpler after cursor loop transformation removal
 
 ### ✅ **URGENT: SELECT Statement and Cursor Loop Issues (COMPLETED)**
 - **Issue**: Manual testing revealed cursor conversion was not working properly 
