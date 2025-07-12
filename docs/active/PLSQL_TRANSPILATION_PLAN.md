@@ -1,5 +1,39 @@
 # PL/SQL to PostgreSQL Transpilation Enhancement Plan
 
+## Recent Progress Update (Session 2025-07-12)
+
+### 🔥 **URGENT: SELECT Statement and Cursor Loop Issues (HIGHEST PRIORITY)**
+- **Issue**: Manual testing reveals cursor conversion is not working properly 
+- **Root Causes**:
+  1. **SELECT Statement Treatment**: Constants, numbers, and reserved words need proper handling
+  2. **WHERE Clause Processing**: Current WHERE clause transformation needs revisiting  
+  3. **LOOP...END LOOP Structure**: Missing AST class for plain "LOOP...END LOOP" (distinct from FOR and WHILE loops)
+  4. **Cursor Strategy**: Current OPEN/CLOSE pattern vs. cleaner PostgreSQL FOR loop approach
+- **Target Transformation**:
+  ```sql
+  -- Oracle cursor pattern
+  CURSOR emp_cursor IS SELECT 1, 'test' FROM testtable WHERE nr = 1;
+  OPEN emp_cursor;
+  LOOP
+    FETCH emp_cursor INTO v_emp_id, v_first_name;
+    EXIT WHEN emp_cursor%NOTFOUND;
+    v_count := v_count + 1;
+  END LOOP;
+  CLOSE emp_cursor;
+  
+  -- PostgreSQL FOR loop pattern (cleaner)
+  FOR rec IN emp_cursor LOOP
+    v_emp_id := rec.column1;
+    v_first_name := rec.column2; 
+    v_count := v_count + 1;
+  END LOOP;
+  ```
+- **Implementation Plan**:
+  1. Fix SELECT statement constant/number/reserved word handling
+  2. Create `LoopStatement.java` AST class for plain LOOP...END LOOP
+  3. Enhance cursor transformation to use PostgreSQL FOR loop syntax
+  4. Improve WHERE clause transformation reliability
+
 ## Recent Progress Update (Session 2025-07-08)
 
 ### ✅ **INSERT Statement Implementation Completed**

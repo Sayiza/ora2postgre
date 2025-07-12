@@ -286,7 +286,18 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       return new WhileLoopStatement(condition, statements);
     }
     
-    return new Comment("this type of loop statement not implemented" + ctx.getText());
+    // Handle plain LOOP...END LOOP (no WHILE or FOR)
+    // Parse loop body statements
+    if (ctx.seq_of_statements() != null && ctx.seq_of_statements().statement() != null) {
+      for (PlSqlParser.StatementContext stmt : ctx.seq_of_statements().statement()) {
+        Statement statement = (Statement) visit(stmt);
+        if (statement != null) {
+          statements.add(statement);
+        }
+      }
+    }
+    
+    return new LoopStatement(statements);
   }
 
   @Override
@@ -411,6 +422,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     }
 
     return new SelectSubQuery(
+            schema,
             subQueryBasicElement,
             unionList,
             unionAllList,
@@ -422,6 +434,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
   @Override
   public PlSqlAst visitSubquery_basic_elements(PlSqlParser.Subquery_basic_elementsContext ctx) {
     return new SelectSubQueryBasicElement(
+            schema,
             ctx.subquery() != null ? (SelectSubQuery) visit(ctx.subquery()) : null,
             ctx.query_block() != null ? (SelectQueryBlock) visit(ctx.query_block()) : null
     );
@@ -455,7 +468,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       whereClause = (WhereClause) visit(ctx.where_clause());
     }
 
-    return new SelectQueryBlock(selectedFields, fromTables, whereClause);
+    return new SelectQueryBlock(schema, selectedFields, fromTables, whereClause);
   }
 
   @Override

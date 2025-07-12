@@ -6,10 +6,12 @@ import java.util.List;
 
 public class SelectSubQueryBasicElement extends PlSqlAst {
 
+  private String schema;
   SelectSubQuery subQuery;
   SelectQueryBlock queryBlock;
 
-  public SelectSubQueryBasicElement(SelectSubQuery subQuery, SelectQueryBlock queryBlock) {
+  public SelectSubQueryBasicElement(String schema, SelectSubQuery subQuery, SelectQueryBlock queryBlock) {
+    this.schema = schema;
     this.subQuery = subQuery;
     this.queryBlock = queryBlock;
   }
@@ -40,9 +42,19 @@ public class SelectSubQueryBasicElement extends PlSqlAst {
   }
 
   public String toPostgre(Everything data) {
-    return toPostgre(data, null);
+    if (subQuery != null) {
+      return subQuery.toPostgre(data);
+    }
+    if (queryBlock != null) {
+      return queryBlock.toPostgre(data, schema);
+    }
+    return ""; //TODO should be either OR enforced?!
   }
 
+  /**
+   * @deprecated Use toPostgre(Everything data) instead - schema is now stored as member variable
+   */
+  @Deprecated
   public String toPostgre(Everything data, String schemaContext) {
     if (subQuery != null) {
       return subQuery.toPostgre(data, schemaContext);

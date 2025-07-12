@@ -29,7 +29,7 @@ public class CursorExpression extends PlSqlAst {
   public String toPostgre(Everything data) {
     // In PostgreSQL, cursor expressions can be handled with CURSOR FOR syntax
     if (subquery != null) {
-      return "CURSOR FOR " + subquery.toPostgre(data, schema);
+      return "CURSOR FOR " + subquery.toPostgre(data);
     }
     return "CURSOR FOR /* TODO: handle empty cursor */";
   }

@@ -75,7 +75,7 @@ public class SelectStatement extends Statement {
   //@Deprecated
   public String toPostgre(Everything data) {
     StringBuilder b = new StringBuilder();
-    b.append(subQuery.toPostgre(data, schema))
+    b.append(subQuery.toPostgre(data))
             //.append("\n")
             //.append(orderByClause.toJava()) TODO later
             //.append("\n")
