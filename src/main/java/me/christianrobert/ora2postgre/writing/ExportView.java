@@ -36,7 +36,12 @@ public class ExportView {
                       "step4viewbody"),
               StringAux.capitalizeFirst(v.spec.getViewName()) + "VIEW.sql",
               viewManager.transformViewMetadata(v.spec, false, data) +
-                      "\n" + viewManager.transformSelectStatement(v.query, data, v.spec.getSchema()) + "\n;\n"
+                      "\n" +
+                      v.query.toPostgre(data) +
+                      // The view Manager only deals with the metadata part, the
+                      // query is a "simple ast" element, and does not follow the manager-strategy pattern
+                      //viewManager.transformSelectStatement(v.query, data, v.spec.getSchema()) +
+                      "\n;\n"
       );
     }
   }

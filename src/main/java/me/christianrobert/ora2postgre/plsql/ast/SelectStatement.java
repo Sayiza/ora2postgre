@@ -2,13 +2,10 @@ package me.christianrobert.ora2postgre.plsql.ast;
 
 import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.global.StringAux;
-import me.christianrobert.ora2postgre.plsql.ast.tools.managers.ViewTransformationManager;
-
 import java.util.List;
 
 public class SelectStatement extends Statement {
-  private static final ViewTransformationManager viewManager = new ViewTransformationManager();
-  
+
   String schema;
   SelectSubQuery subQuery;
   SelectWithClause withClause;
@@ -60,29 +57,25 @@ public class SelectStatement extends Statement {
     return "Select Statement {code=" + "}";
   }
 
+  //public String toPostgre(Everything data) {
+  //  return viewManager.transformSelectStatement(this, data);
+  //}
+
   /**
    * @deprecated Use ViewTransformationManager.transformSelectStatement() instead
    */
-  @Deprecated
+  //@Deprecated
+  //public String toPostgre(Everything data, String schemaContext) {
+  //  return viewManager.transformSelectStatement(this, data, schemaContext);
+  //}
+
+  /**
+   * @deprecated Use ViewTransformationManager.transformSelectStatement() instead
+   */
+  //@Deprecated
   public String toPostgre(Everything data) {
-    return viewManager.transformSelectStatement(this, data);
-  }
-
-  /**
-   * @deprecated Use ViewTransformationManager.transformSelectStatement() instead
-   */
-  @Deprecated
-  public String toPostgre(Everything data, String schemaContext) {
-    return viewManager.transformSelectStatement(this, data, schemaContext);
-  }
-
-  /**
-   * @deprecated Use ViewTransformationManager.transformSelectStatement() instead
-   */
-  @Deprecated
-  public String toPostgreLegacy(Everything data, String schemaContext) {
     StringBuilder b = new StringBuilder();
-    b.append(subQuery.toPostgre(data, schemaContext))
+    b.append(subQuery.toPostgre(data, schema))
             //.append("\n")
             //.append(orderByClause.toJava()) TODO later
             //.append("\n")

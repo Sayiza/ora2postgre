@@ -33,25 +33,14 @@ public class BasicViewStrategy implements ViewTransformationStrategy {
     return viewMetadata.toPostgreLegacy(withDummyQuery);
   }
 
-  @Override
-  public String transformSelectStatement(SelectStatement selectStatement, Everything context) {
+  //@Override
+  /*public String transformSelectStatement(SelectStatement selectStatement, Everything context, String schemaContext) {
     if (selectStatement == null) {
       throw new UnsupportedOperationException("SelectStatement cannot be null");
     }
     
-    // Delegate to existing AST transformation logic (legacy method to avoid circular dependency)
-    return selectStatement.toPostgreLegacy(context, selectStatement.getSchema());
-  }
-
-  @Override
-  public String transformSelectStatement(SelectStatement selectStatement, Everything context, String schemaContext) {
-    if (selectStatement == null) {
-      throw new UnsupportedOperationException("SelectStatement cannot be null");
-    }
-    
-    // Delegate to existing AST transformation logic (legacy method to avoid circular dependency)
-    return selectStatement.toPostgreLegacy(context, schemaContext);
-  }
+    return selectStatement.toPostgre(context, schemaContext);
+  }*/
 
   @Override
   public String getStrategyName() {

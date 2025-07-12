@@ -40,17 +40,6 @@ public interface ViewTransformationStrategy extends TransformationStrategy<ViewM
   String transformViewMetadata(ViewMetadata viewMetadata, boolean withDummyQuery, Everything context);
 
   /**
-   * Transforms Oracle select statement AST to PostgreSQL SELECT statement.
-   * This method should only be called if supports() returns true.
-   *
-   * @param selectStatement The Oracle select statement AST to convert
-   * @param context The global context containing all migration data
-   * @return PostgreSQL SELECT statement
-   * @throws UnsupportedOperationException if the select statement is not supported by this strategy
-   */
-  String transformSelectStatement(SelectStatement selectStatement, Everything context);
-
-  /**
    * Transforms Oracle select statement AST to PostgreSQL SELECT statement with schema context.
    * This method should only be called if supports() returns true.
    *
@@ -60,7 +49,7 @@ public interface ViewTransformationStrategy extends TransformationStrategy<ViewM
    * @return PostgreSQL SELECT statement
    * @throws UnsupportedOperationException if the select statement is not supported by this strategy
    */
-  String transformSelectStatement(SelectStatement selectStatement, Everything context, String schemaContext);
+  //String transformSelectStatement(SelectStatement selectStatement, Everything context, String schemaContext);
 
   /**
    * Gets a human-readable name for this strategy.

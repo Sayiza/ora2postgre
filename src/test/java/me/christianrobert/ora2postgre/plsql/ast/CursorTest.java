@@ -3,6 +3,7 @@ package me.christianrobert.ora2postgre.plsql.ast;
 import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.global.PlsqlCode;
 import me.christianrobert.ora2postgre.oracledb.SynonymMetadata;
+import me.christianrobert.ora2postgre.oracledb.TableMetadata;
 import me.christianrobert.ora2postgre.plsql.PlSqlAstMain;
 import org.junit.jupiter.api.Test;
 
@@ -17,7 +18,7 @@ public class CursorTest {
     String oracleSql = """
 CREATE PACKAGE BODY TEST_SCHEMA.TESTPACKAGE is  
   FUNCTION process_employees RETURN NUMBER IS
-    CURSOR emp_cursor IS SELECT 1, 'test';
+    CURSOR emp_cursor IS SELECT 1, 'test' from testtable where nr = 1;
     v_emp_id NUMBER;
     v_first_name VARCHAR2(50);
     v_count NUMBER := 0;
@@ -38,6 +39,10 @@ end;
     // Create test data and setup schema information
     Everything data = new Everything();
     data.getUserNames().add("TEST_SCHEMA");
+    
+    // Add required table metadata for testtable
+    TableMetadata testTable = new TableMetadata("TEST_SCHEMA", "testtable");
+    data.getTableSql().add(testTable);
 
     PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
 
@@ -93,7 +98,7 @@ end;
 CREATE PACKAGE BODY TEST_SCHEMA.TESTPACKAGE is  
   FUNCTION get_department_count(p_dept_id IN NUMBER) RETURN NUMBER IS
     CURSOR dept_cursor(c_dept_id NUMBER) IS 
-      SELECT c_dept_id, 'Department';
+      SELECT c_dept_id, 'Department' from testtable where nr = 1;
     v_count NUMBER;
   BEGIN
     OPEN dept_cursor(p_dept_id);
@@ -108,6 +113,10 @@ end;
     // Create test data
     Everything data = new Everything();
     data.getUserNames().add("TEST_SCHEMA");
+    
+    // Add required table metadata for testtable
+    TableMetadata testTable = new TableMetadata("TEST_SCHEMA", "testtable");
+    data.getTableSql().add(testTable);
 
     PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
 
@@ -144,7 +153,7 @@ end;
     String oracleSql = """
 CREATE PACKAGE BODY TEST_SCHEMA.TESTPACKAGE is  
   PROCEDURE update_salaries IS
-    CURSOR sal_cursor IS SELECT 1 as employee_id, 50000 as salary;
+    CURSOR sal_cursor IS SELECT 1 as employee_id, 50000 as salary FROM testtable where nr = 1;
     v_emp_id NUMBER;
     v_salary NUMBER;
   BEGIN
@@ -164,6 +173,10 @@ end;
     // Create test data
     Everything data = new Everything();
     data.getUserNames().add("TEST_SCHEMA");
+    
+    // Add required table metadata for testtable
+    TableMetadata testTable = new TableMetadata("TEST_SCHEMA", "testtable");
+    data.getTableSql().add(testTable);
 
     PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
 
@@ -204,7 +217,7 @@ end;
     String oracleSql = """
 CREATE PACKAGE BODY TEST_SCHEMA.TESTPACKAGE is  
   PROCEDURE simple_cursor_test IS
-    CURSOR test_cursor IS SELECT 1;
+    CURSOR test_cursor IS SELECT 1 from testtable where nr = 1;
     v_dummy NUMBER;
   BEGIN
     OPEN test_cursor;
@@ -218,6 +231,10 @@ end;
     // Create test data
     Everything data = new Everything();
     data.getUserNames().add("TEST_SCHEMA");
+    
+    // Add required table metadata for testtable
+    TableMetadata testTable = new TableMetadata("TEST_SCHEMA", "testtable");
+    data.getTableSql().add(testTable);
 
     PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
 

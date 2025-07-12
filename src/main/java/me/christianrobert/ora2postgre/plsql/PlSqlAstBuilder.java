@@ -819,7 +819,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     if (ctx.subquery() != null) {
       subquery = (SelectSubQuery) visit(ctx.subquery());
     }
-    return new CursorExpression(subquery);
+    return new CursorExpression(subquery, schema);
   }
 
   @Override

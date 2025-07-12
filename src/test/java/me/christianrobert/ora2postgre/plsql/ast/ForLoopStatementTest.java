@@ -4,6 +4,7 @@ import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.global.PlsqlCode;
 import me.christianrobert.ora2postgre.oracledb.SynonymExtractor;
 import me.christianrobert.ora2postgre.oracledb.SynonymMetadata;
+import me.christianrobert.ora2postgre.oracledb.TableMetadata;
 import me.christianrobert.ora2postgre.plsql.PlSqlAstMain;
 import org.junit.jupiter.api.Test;
 
@@ -18,7 +19,7 @@ CREATE PACKAGE BODY TEST_SCHEMA.TESTPACKAGE is
     return varchar2
   is 
   begin 
-    for r in ( select nr , name name1 from TEST_SCHEMA.NAMETABLE )
+    for r in ( select nr , name name1 from NAMETABLE )
     loop
       return r.name1;
     end loop;
@@ -31,6 +32,10 @@ end;
     // Create test data
     Everything data = new Everything();
     data.getUserNames().add("TEST_SCHEMA");
+    
+    // Add required table metadata for NAMETABLE
+    TableMetadata nameTable = new TableMetadata("TEST_SCHEMA", "NAMETABLE");
+    data.getTableSql().add(nameTable);
 
     PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
 

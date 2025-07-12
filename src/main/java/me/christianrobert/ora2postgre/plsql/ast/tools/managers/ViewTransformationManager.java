@@ -119,39 +119,9 @@ public class ViewTransformationManager {
     }
   }
 
-  /**
-   * Transforms the given select statement into PostgreSQL SELECT statement.
-   *
-   * @param selectStatement The select statement to transform
-   * @param context The global context containing all migration data
-   * @return PostgreSQL SELECT statement
-   */
-  public String transformSelectStatement(SelectStatement selectStatement, Everything context) {
-    ViewTransformationStrategy strategy = selectStrategy(selectStatement);
-
-    if (strategy == null) {
-      throw new RuntimeException("No strategy found for select statement");
-    }
-
-    try {
-      String result = strategy.transformSelectStatement(selectStatement, context);
-      log.debug("Successfully transformed select statement using {} strategy", strategy.getStrategyName());
-      return result;
-    } catch (Exception e) {
-      log.error("Error transforming select statement with strategy {}: {}",
-              strategy.getStrategyName(), e.getMessage());
-      throw new RuntimeException("Failed to transform select statement", e);
-    }
-  }
-
-  /**
-   * Transforms the given select statement into PostgreSQL SELECT statement with schema context.
-   *
-   * @param selectStatement The select statement to transform
-   * @param context The global context containing all migration data
-   * @param schemaContext The schema context for transformation
-   * @return PostgreSQL SELECT statement
-   */
+  // The view Manager only deals with the metadata part, the
+  // query is a "simple ast" element, and does not follow the manager-strategy pattern
+  /*
   public String transformSelectStatement(SelectStatement selectStatement, Everything context, String schemaContext) {
     ViewTransformationStrategy strategy = selectStrategy(selectStatement);
 
@@ -168,7 +138,7 @@ public class ViewTransformationManager {
               strategy.getStrategyName(), e.getMessage());
       throw new RuntimeException("Failed to transform select statement with schema context", e);
     }
-  }
+  }*/
 
   /**
    * Gets all registered strategies.

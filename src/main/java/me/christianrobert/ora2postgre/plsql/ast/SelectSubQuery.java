@@ -33,10 +33,6 @@ public class SelectSubQuery extends PlSqlAst {
     return subQueryBasicElement.getFromTables();
   }
 
-  public String toPostgre(Everything data) {
-    return toPostgre(data, null);
-  }
-
   public String toPostgre(Everything data, String schemaContext) {
     return subQueryBasicElement.toPostgre(data, schemaContext);
     //TODO join the other set operators!
