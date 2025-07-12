@@ -7,7 +7,7 @@ import java.util.List;
 /**
  * AST class representing cursor declarations.
  * Oracle: CURSOR cursor_name [(parameter_list)] [RETURN type] IS select_statement;
- * PostgreSQL: Same syntax (cursors work similarly in PostgreSQL)
+ * PostgreSQL: cursor_name CURSOR [(parameter_list)] FOR select_statement;
  */
 public class CursorDeclaration extends PlSqlAst {
   private final String cursorName;
@@ -62,12 +62,13 @@ public class CursorDeclaration extends PlSqlAst {
 
   /**
    * Generate PostgreSQL cursor declaration.
-   * In PostgreSQL, cursor declarations work similarly to Oracle.
+   * PostgreSQL syntax: cursor_name CURSOR [(parameter_list)] FOR select_statement;
    */
   public String toPostgre(Everything data) {
     StringBuilder b = new StringBuilder();
     
-    b.append(data.getIntendation()).append("CURSOR ").append(cursorName);
+    // PostgreSQL: cursor_name CURSOR FOR SELECT...
+    b.append(data.getIntendation()).append(cursorName).append(" CURSOR");
     
     // Add parameters if present
     if (hasParameters()) {
@@ -83,13 +84,8 @@ public class CursorDeclaration extends PlSqlAst {
       b.append(")");
     }
     
-    // Add RETURN type if present (though less common in PostgreSQL)
-    if (hasReturnType()) {
-      b.append(" RETURN ").append(returnType);
-    }
-    
-    // Add the SELECT statement
-    b.append(" IS ");
+    // PostgreSQL uses FOR instead of IS (RETURN type is not used)
+    b.append(" FOR ");
     if (selectStatement != null) {
       b.append(selectStatement.toPostgre(data));
     } else {

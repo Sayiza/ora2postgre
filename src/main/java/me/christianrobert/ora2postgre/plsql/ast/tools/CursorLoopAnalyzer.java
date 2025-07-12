@@ -43,6 +43,14 @@ public class CursorLoopAnalyzer {
         public CloseStatement getCloseStatement() { return closeStatement; }
         public FetchStatement getFetchStatement() { return fetchStatement; }
         public ExitStatement getExitStatement() { return exitStatement; }
+        
+        /**
+         * Returns the total number of statements consumed by this cursor pattern.
+         * This includes OPEN, LOOP, and CLOSE statements (3 total).
+         */
+        public int getStatementCount() {
+            return 3; // OPEN + LOOP + CLOSE
+        }
     }
 
     /**

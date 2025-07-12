@@ -80,16 +80,17 @@ end;
     assertTrue(completePgFunction.contains("BEGIN"));
     assertTrue(completePgFunction.contains("END"));
     
-    // Test cursor declaration is included
-    assertTrue(completePgFunction.contains("CURSOR emp_cursor IS"));
+    // Test cursor declaration uses correct PostgreSQL syntax
+    assertTrue(completePgFunction.contains("emp_cursor CURSOR FOR"));
     assertTrue(completePgFunction.contains("SELECT")); // SELECT statement is transformed
     
-    // Test cursor statements are included
-    assertTrue(completePgFunction.contains("OPEN emp_cursor"));
-    assertTrue(completePgFunction.contains("CLOSE emp_cursor"));
+    // Test cursor loop transformation to FOR loop
+    assertTrue(completePgFunction.contains("FOR rec IN emp_cursor LOOP"));
+    assertTrue(completePgFunction.contains("END LOOP"));
     
-    // Note: FETCH statement is part of LOOP which isn't fully transpiled yet
-    // This is expected - cursor declarations and basic OPEN/CLOSE work
+    // Test record field assignments are generated
+    assertTrue(completePgFunction.contains("v_emp_id := rec.column1"));
+    assertTrue(completePgFunction.contains("v_first_name := rec.column2"));
   }
 
   @Test
@@ -139,13 +140,15 @@ end;
     // Test complete function transformation
     String completePgFunction = function.toPostgre(data, false);
     
+    
     assertNotNull(completePgFunction);
-    // Test parameterized cursor declaration
-    assertTrue(completePgFunction.contains("CURSOR dept_cursor"));
+    // Test parameterized cursor declaration with correct PostgreSQL syntax
+    assertTrue(completePgFunction.contains("dept_cursor CURSOR"));
     assertTrue(completePgFunction.contains("c_dept_id"));
     
-    // Test cursor opening with parameter
+    // Test simple cursor operations (no loop transformation for simple OPEN/FETCH/CLOSE)
     assertTrue(completePgFunction.contains("OPEN dept_cursor"));
+    assertTrue(completePgFunction.contains("FETCH dept_cursor"));
   }
 
   @Test
@@ -204,12 +207,12 @@ end;
     assertTrue(completePgProcedure.contains("CREATE OR REPLACE PROCEDURE"));
     assertTrue(completePgProcedure.contains("TEST_SCHEMA.TESTPACKAGE_update_salaries"));
     
-    // Test cursor functionality in procedure
-    assertTrue(completePgProcedure.contains("CURSOR sal_cursor IS"));
-    assertTrue(completePgProcedure.contains("OPEN sal_cursor"));
-    assertTrue(completePgProcedure.contains("CLOSE sal_cursor"));
+    // Test cursor functionality in procedure with correct PostgreSQL syntax
+    assertTrue(completePgProcedure.contains("sal_cursor CURSOR FOR"));
+    assertTrue(completePgProcedure.contains("FOR rec IN sal_cursor LOOP"));
+    assertTrue(completePgProcedure.contains("END LOOP"));
     
-    // Note: FETCH is part of LOOP which isn't fully transpiled yet
+    // Test cursor loop transformation works in procedures too
   }
 
   @Test
@@ -257,10 +260,12 @@ end;
     String completePgProcedure = procedure.toPostgre(data, false);
     
     assertNotNull(completePgProcedure);
-    // Test basic cursor operations
-    assertTrue(completePgProcedure.contains("CURSOR test_cursor IS"));
+    // Test basic cursor operations with correct PostgreSQL syntax
+    assertTrue(completePgProcedure.contains("test_cursor CURSOR FOR"));
     assertTrue(completePgProcedure.contains("SELECT"));
+    // Simple OPEN/FETCH/CLOSE pattern (no loop) should remain as separate statements
     assertTrue(completePgProcedure.contains("OPEN test_cursor"));
+    assertTrue(completePgProcedure.contains("FETCH test_cursor"));
     assertTrue(completePgProcedure.contains("CLOSE test_cursor"));
   }
 }
