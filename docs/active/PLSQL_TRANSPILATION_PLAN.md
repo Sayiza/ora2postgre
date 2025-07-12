@@ -2,7 +2,42 @@
 
 ## Recent Progress Update (Session 2025-07-12)
 
-### 🔄 **URGENT REFACTORING: Cursor Strategy Revision (HIGHEST PRIORITY)**
+### 🚨 **CRITICAL: Expression Architecture Cleanup (HIGHEST PRIORITY)**
+- **Problem**: Expression parsing infrastructure is in bad state, causing cursor attributes and other expressions to fail
+- **Root Cause**: Mixed parsing approaches, missing semantic AST classes, complex delegation chains not properly implemented
+- **Current Issues**:
+  - `visitUnary_logical_expression()` converts multiset expressions to raw text instead of visiting children
+  - Missing semantic AST classes for grammar hierarchy: `MultisetExpression`, `RelationalExpression`, `CompoundExpression`, `Concatenation`, `ModelExpression`
+  - Broken parsing chain: `expression` → `logical_expression` → `unary_logical_expression` → `multiset_expression` → ... → `unary_expression` → `standard_function` → `other_function`
+  - Complex grammar rules not properly mapped to AST classes
+- **Grammar Analysis**:
+  ```
+  expression: cursor_expression | logical_expression
+  logical_expression: unary_logical_expression | logical_expression (AND|OR) logical_expression
+  unary_logical_expression: NOT? multiset_expression unary_logical_operation?
+  multiset_expression: relational_expression (multiset operations)?
+  relational_expression: relational_expression relational_operator relational_expression | compound_expression
+  compound_expression: concatenation (NOT? (IN|BETWEEN|LIKE) ...)?
+  concatenation: model_expression (arithmetic operations)?
+  model_expression: unary_expression ('[' model_expression_element ']')?
+  unary_expression: ('+'/'-'/PRIOR/...) unary_expression | standard_function | atom | ...
+  standard_function: string_function | numeric_function | json_function | other_function
+  other_function: ... | cursor_name (PERCENT_FOUND|PERCENT_NOTFOUND|...) | ...
+  ```
+- **Required Implementation**:
+  1. **Create missing semantic AST classes** following grammar structure exactly:
+     - `MultisetExpression.java` - Handle multiset operations and delegate to relational_expression
+     - `RelationalExpression.java` - Handle comparison operations and delegate to compound_expression
+     - `CompoundExpression.java` - Handle IN/BETWEEN/LIKE operations and delegate to concatenation
+     - `Concatenation.java` - Handle string/arithmetic operations and delegate to model_expression
+     - `ModelExpression.java` - Handle array access and delegate to unary_expression
+  2. **Fix visitor methods** to properly delegate to child AST classes instead of converting to raw text
+  3. **Ensure proper parsing chain** so cursor attributes reach `visitOther_function()` method
+  4. **Follow naming convention** that closely matches grammar rule names for maintainability
+- **Impact**: This cleanup will enable cursor attributes, complex expressions, and many other parsing features to work correctly
+- **Priority**: Must be completed before any other expression-related work (cursor attributes, complex conditions, etc.)
+
+### 🔄 **URGENT REFACTORING: Cursor Strategy Revision (SECOND PRIORITY)**
 - **Strategic Decision**: After analysis, we need to **revert cursor loop transformation** and use **direct OPEN/CLOSE mapping** instead
 - **Rationale**: 
   - Cursor attributes (`%FOUND`, `%NOTFOUND`, `%ROWCOUNT`) create complex semantic mismatches with FOR loop transformations
