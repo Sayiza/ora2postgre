@@ -46,4 +46,13 @@ public interface PlSqlAstVisitor<T> {
   T visit(OpenStatement openStatement);
   T visit(FetchStatement fetchStatement);
   T visit(CloseStatement closeStatement);
+  
+  // New expression hierarchy AST classes
+  T visit(MultisetExpression multisetExpression);
+  T visit(RelationalExpression relationalExpression);
+  T visit(CompoundExpression compoundExpression);
+  T visit(Concatenation concatenation);
+  T visit(ModelExpression modelExpression);
+  T visit(UnaryExpression unaryExpression);
+  T visit(CursorAttributeExpression cursorAttributeExpression);
 }

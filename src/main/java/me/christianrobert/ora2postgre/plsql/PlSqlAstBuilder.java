@@ -888,10 +888,27 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     String logicalOperation = null;
     
     if (ctx.multiset_expression() != null) {
-      // For now, treat multiset_expression as a general expression
-      // This can be refined later when multiset expressions are fully implemented
-      LogicalExpression logicalExpr = new LogicalExpression(new UnaryLogicalExpression(ctx.multiset_expression().getText()));
-      multisetExpr = new Expression(logicalExpr);
+      // Visit the multiset_expression to properly handle cursor attributes and other expressions
+      PlSqlAst multisetAst = visit(ctx.multiset_expression());
+      if (multisetAst instanceof MultisetExpression) {
+        // Create expression from the multiset expression
+        LogicalExpression logicalExpr = new LogicalExpression(new UnaryLogicalExpression("MULTISET_EXPR_PLACEHOLDER"));
+        multisetExpr = new Expression(logicalExpr) {
+          @Override
+          public String toPostgre(me.christianrobert.ora2postgre.global.Everything data) {
+            return ((MultisetExpression) multisetAst).toPostgre(data);
+          }
+          
+          @Override
+          public String toString() {
+            return multisetAst.toString();
+          }
+        };
+      } else {
+        // Fallback to text if visit returns something else
+        LogicalExpression logicalExpr = new LogicalExpression(new UnaryLogicalExpression(ctx.multiset_expression().getText()));
+        multisetExpr = new Expression(logicalExpr);
+      }
     }
     
     if (ctx.unary_logical_operation() != null) {
@@ -1427,6 +1444,187 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       return new Expression(logicalExpr);
     }
     return null;
+  }
+
+  /**
+   * Visitor method for unary_expression rule.
+   * This is the key method that handles standard_function calls including cursor attributes.
+   */
+  @Override
+  public PlSqlAst visitUnary_expression(PlSqlParser.Unary_expressionContext ctx) {
+    if (ctx.standard_function() != null) {
+      PlSqlAst standardFunctionAst = visit(ctx.standard_function());
+      if (standardFunctionAst instanceof Expression) {
+        return UnaryExpression.forStandardFunction((Expression) standardFunctionAst);
+      }
+      // Fallback
+      return visitChildren(ctx);
+    }
+    
+    if (ctx.atom() != null) {
+      PlSqlAst atomAst = visit(ctx.atom());
+      if (atomAst instanceof Expression) {
+        return UnaryExpression.forAtom((Expression) atomAst);
+      }
+      // Fallback
+      return visitChildren(ctx);
+    }
+    
+    // For other types of unary expressions, fall back to default behavior
+    return visitChildren(ctx);
+  }
+
+  /**
+   * Visitor method for multiset_expression rule.
+   */
+  @Override
+  public PlSqlAst visitMultiset_expression(PlSqlParser.Multiset_expressionContext ctx) {
+    if (ctx.relational_expression() != null) {
+      // Visit the relational expression
+      PlSqlAst relationalAst = visit(ctx.relational_expression());
+      if (relationalAst instanceof RelationalExpression) {
+        return new MultisetExpression((RelationalExpression) relationalAst);
+      }
+      // Fallback
+      return visitChildren(ctx);
+    }
+    
+    // For other types of multiset expressions, fall back to default behavior
+    return visitChildren(ctx);
+  }
+
+  /**
+   * Visitor method for relational_expression rule.
+   */
+  @Override
+  public PlSqlAst visitRelational_expression(PlSqlParser.Relational_expressionContext ctx) {
+    if (ctx.compound_expression() != null) {
+      PlSqlAst compoundAst = visit(ctx.compound_expression());
+      if (compoundAst instanceof CompoundExpression) {
+        return new RelationalExpression((CompoundExpression) compoundAst);
+      }
+      // Fallback
+      return visitChildren(ctx);
+    }
+    
+    // For relational operations, fall back to default behavior
+    return visitChildren(ctx);
+  }
+
+  /**
+   * Visitor method for compound_expression rule.
+   */
+  @Override
+  public PlSqlAst visitCompound_expression(PlSqlParser.Compound_expressionContext ctx) {
+    if (ctx.concatenation() != null && !ctx.concatenation().isEmpty()) {
+      // Visit the first concatenation
+      PlSqlAst concatenationAst = visit(ctx.concatenation(0));
+      if (concatenationAst instanceof Concatenation) {
+        return new CompoundExpression((Concatenation) concatenationAst);
+      }
+      // Fallback
+      return visitChildren(ctx);
+    }
+    
+    // For other compound expressions, fall back to default behavior
+    return visitChildren(ctx);
+  }
+
+  /**
+   * Visitor method for concatenation rule.
+   */
+  @Override
+  public PlSqlAst visitConcatenation(PlSqlParser.ConcatenationContext ctx) {
+    if (ctx.model_expression() != null) {
+      PlSqlAst modelAst = visit(ctx.model_expression());
+      if (modelAst instanceof ModelExpression) {
+        return new Concatenation((ModelExpression) modelAst);
+      }
+      // Fallback
+      return visitChildren(ctx);
+    }
+    
+    // For concatenation operations, fall back to default behavior
+    return new Concatenation(new ModelExpression(UnaryExpression.forAtom(new Expression(new LogicalExpression(new UnaryLogicalExpression(ctx.getText()))))));
+  }
+
+  /**
+   * Visitor method for standard_function rule.
+   * This delegates to the appropriate sub-function visitor.
+   */
+  @Override
+  public PlSqlAst visitStandard_function(PlSqlParser.Standard_functionContext ctx) {
+    if (ctx.other_function() != null) {
+      return visit(ctx.other_function());
+    }
+    
+    // For other types of standard functions, fall back to default behavior
+    return visitChildren(ctx);
+  }
+
+  /**
+   * Visitor method for other_function rule.
+   * This handles cursor attributes and other Oracle functions.
+   */
+  @Override
+  public PlSqlAst visitOther_function(PlSqlParser.Other_functionContext ctx) {
+    // Check if this is a cursor attribute (cursor_name %FOUND, %NOTFOUND, etc.)
+    if (ctx.cursor_name() != null) {
+      String cursorName = ctx.cursor_name().getText();
+      
+      CursorAttributeExpression.CursorAttributeType attributeType = null;
+      
+      if (ctx.PERCENT_FOUND() != null) {
+        attributeType = CursorAttributeExpression.CursorAttributeType.FOUND;
+      } else if (ctx.PERCENT_NOTFOUND() != null) {
+        attributeType = CursorAttributeExpression.CursorAttributeType.NOTFOUND;
+      } else if (ctx.PERCENT_ROWCOUNT() != null) {
+        attributeType = CursorAttributeExpression.CursorAttributeType.ROWCOUNT;
+      } else if (ctx.PERCENT_ISOPEN() != null) {
+        attributeType = CursorAttributeExpression.CursorAttributeType.ISOPEN;
+      }
+      
+      if (attributeType != null) {
+        // Create a CursorAttributeExpression and wrap it in UnaryExpression
+        CursorAttributeExpression cursorAttr = new CursorAttributeExpression(cursorName, attributeType);
+        
+        // Create an Expression that delegates to our cursor attribute
+        LogicalExpression logicalExpr = new LogicalExpression(new UnaryLogicalExpression("CURSOR_ATTR_PLACEHOLDER"));
+        return new Expression(logicalExpr) {
+          @Override
+          public String toPostgre(me.christianrobert.ora2postgre.global.Everything data) {
+            return cursorAttr.toPostgre(data);
+          }
+          
+          @Override
+          public String toString() {
+            return cursorAttr.toString();
+          }
+        };
+      }
+    }
+    
+    // For other function types, fall back to default behavior
+    return visitChildren(ctx);
+  }
+
+  /**
+   * Visitor method for model_expression rule.
+   */
+  @Override
+  public PlSqlAst visitModel_expression(PlSqlParser.Model_expressionContext ctx) {
+    if (ctx.unary_expression() != null) {
+      PlSqlAst unaryAst = visit(ctx.unary_expression());
+      if (unaryAst instanceof UnaryExpression) {
+        return new ModelExpression((UnaryExpression) unaryAst);
+      }
+      // Fallback - create a simple UnaryExpression from text
+      UnaryExpression unaryExpr = UnaryExpression.forAtom(new Expression(new LogicalExpression(new UnaryLogicalExpression(ctx.unary_expression().getText()))));
+      return new ModelExpression(unaryExpr);
+    }
+    
+    // For other model expressions, fall back to default behavior
+    return visitChildren(ctx);
   }
 
 }
