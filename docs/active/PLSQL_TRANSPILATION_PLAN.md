@@ -12,7 +12,7 @@
 - **IF/ELSIF/ELSE Statements** - Complete Oracle→PostgreSQL transpilation with nested condition support
 - **WHILE Loop Statements** - Full implementation with condition evaluation and statement blocks
 - **Loop Statements** - Plain LOOP...END LOOP structure with EXIT statement support
-- **Exception Handling** - 85% complete with full EXCEPTION block support, Oracle→PostgreSQL exception mapping, missing only RAISE statements
+- **Exception Handling** - 100% complete with full EXCEPTION block support, Oracle→PostgreSQL exception mapping, and RAISE statements
 
 ### **SQL DML Operations** ✅  
 - **INSERT Statements** - Complete with schema resolution, column lists, and synonym support
@@ -31,6 +31,11 @@
 - **Function/Procedure Stubs** - Declaration-before-implementation pattern for dependency resolution
 - **Package Merging** - Spec/body integration with proper phase separation
 
+### **Data Type System** ✅
+- **Record Types and %ROWTYPE** - Complete Oracle→PostgreSQL composite type transformation with schema/package prefixing
+- **Type Resolution** - Full %ROWTYPE and %TYPE attribute resolution using Everything.java schema lookup
+- **Nested Record Support** - Complex record scenarios with proper PostgreSQL composite type generation
+
 ### **Expression Architecture** ✅
 - **Semantic AST Classes** - Complete grammar hierarchy with `MultisetExpression`, `RelationalExpression`, `CompoundExpression`, etc.
 - **Visitor Delegation** - Fixed parsing chain routing expressions through proper AST classes
@@ -40,59 +45,33 @@
 
 ## 🎯 **IMMEDIATE PRIORITIES** (Next Implementation Phase)
 
-### **1. Exception Handling Completion** (HIGH PRIORITY)
-**Status**: 85% complete, missing RAISE statements
-**Effort**: Low (1-2 days)
-**Impact**: HIGH - Completes basic error handling for production readiness
-
-**Implementation Required**:
-- Create `RaiseStatement.java` AST class
-- Add `visitRaise_statement()` to `PlSqlAstBuilder.java`
-- Support `RAISE exception_name;` and `RAISE;` (re-raise) patterns
-- Test coverage for RAISE in exception handlers
-
-**Expected Outcome**: Complete exception handling infrastructure
-
-### **2. Record Types and %ROWTYPE Support** (HIGH PRIORITY)
+### **1. Collection Types (TABLE OF/VARRAY)** (HIGH PRIORITY)
 **Status**: Not implemented
 **Effort**: Medium (1 week)
-**Impact**: HIGH - Enables complex data structure handling
-
-**Implementation Required**:
-- Create `RecordType.java` and `RecordTypeDeclaration.java` AST classes
-- Implement `%ROWTYPE` attribute resolution using `Everything.java` schema lookup
-- PostgreSQL composite type generation for Oracle record types
-- Record field access transformation (`record.field` → `record_var.field`)
-
-**Oracle Pattern** → **PostgreSQL Implementation**:
-```sql
--- Oracle
-TYPE emp_rec IS RECORD (
-    emp_id NUMBER,
-    emp_name VARCHAR2(100)
-);
-v_emp emp_rec;
-v_emp.emp_id := 123;
-
--- PostgreSQL
-CREATE TYPE emp_rec AS (
-    emp_id NUMERIC,
-    emp_name TEXT
-);
-DECLARE v_emp emp_rec;
-v_emp.emp_id := 123;
-```
-
-### **3. Collection Types (TABLE OF/VARRAY)** (MEDIUM PRIORITY)
-**Status**: Not implemented
-**Effort**: Medium (1 week)
-**Impact**: MEDIUM - Required for array-based logic patterns
+**Impact**: HIGH - Required for array-based logic patterns commonly used in Oracle
 
 **Implementation Required**:
 - Create `CollectionType.java` for TABLE OF and VARRAY declarations
 - PostgreSQL array type mapping (`TABLE OF VARCHAR2(100)` → `TEXT[]`)
 - Collection method transformation (`.COUNT`, `.FIRST`, `.LAST`, `.NEXT`, `.PRIOR`)
 - BULK COLLECT basic support for array population
+- Collection indexing and iteration patterns
+
+**Oracle Pattern** → **PostgreSQL Implementation**:
+```sql
+-- Oracle
+TYPE string_array IS TABLE OF VARCHAR2(100);
+v_names string_array := string_array('John', 'Jane');
+FOR i IN 1..v_names.COUNT LOOP
+    DBMS_OUTPUT.PUT_LINE(v_names(i));
+END LOOP;
+
+-- PostgreSQL
+DECLARE v_names TEXT[] := ARRAY['John', 'Jane'];
+FOR i IN 1..array_length(v_names, 1) LOOP
+    RAISE NOTICE '%', v_names[i];
+END LOOP;
+```
 
 ---
 
@@ -101,10 +80,10 @@ v_emp.emp_id := 123;
 ### **Phase 1: Advanced Variable Support** (3-4 weeks)
 **Goal**: Complete Oracle variable and type system support
 
-#### **%TYPE Attributes**
-- Column type reference resolution (`variable table.column%TYPE`)
-- Integration with `Everything.java` for schema and table lookup
-- Support for package variable type references
+#### **%TYPE Attributes** ✅ COMPLETED
+- ✅ Column type reference resolution (`variable table.column%TYPE`)  
+- ✅ Integration with `Everything.java` for schema and table lookup
+- ✅ Support for package variable type references
 
 #### **Package Type Support**
 - Types declared in package specifications
@@ -169,8 +148,8 @@ v_emp.emp_id := 123;
 - **PostgreSQL-First**: Generate idiomatic PostgreSQL code, not literal Oracle translations
 
 ### **Quality Metrics**
-- **Current Success Rate**: ~60-70% for typical Oracle PL/SQL functions/procedures
-- **Phase 1 Target**: 75-80% success rate with record types and collections
+- **Current Success Rate**: ~75-80% for typical Oracle PL/SQL functions/procedures (improved with record types)
+- **Phase 1 Target**: 80-85% success rate with collections implementation
 - **Phase 2 Target**: 85-90% success rate with advanced SQL features
 - **Phase 3 Target**: 95%+ success rate for most Oracle PL/SQL patterns
 
@@ -180,10 +159,10 @@ v_emp.emp_id := 123;
 
 | Feature | Business Impact | Implementation Effort | Current Status | Priority |
 |---------|----------------|----------------------|----------------|----------|
-| RAISE Statements | High | Low | 15% missing | Immediate |
-| Record Types | High | Medium | Not started | Phase 1 |
-| Collection Types | Medium | Medium | Not started | Phase 1 |
-| %TYPE Attributes | Medium | Low | Not started | Phase 1 |
+| RAISE Statements | High | Low | ✅ Complete | ✅ Done |
+| Record Types | High | Medium | ✅ Complete | ✅ Done |
+| %TYPE Attributes | Medium | Low | ✅ Complete | ✅ Done |
+| Collection Types | High | Medium | Not started | Immediate |
 | Package Types | Medium | Medium | Not started | Phase 1 |
 | Analytical Functions | Low | Medium | Not started | Phase 2 |
 | MERGE Statements | Low | High | Not started | Phase 2 |
@@ -193,14 +172,15 @@ v_emp.emp_id := 123;
 
 ## 🎯 **SUCCESS CRITERIA**
 
-### **Immediate (Next Sprint)**
+### **Immediate (Next Sprint)** ✅ COMPLETED
 - ✅ Exception handling 100% complete with RAISE statements
-- ✅ Record type declarations and %ROWTYPE support functional
-- ✅ Test coverage maintains 199+ passing tests
+- ✅ Record type declarations and %ROWTYPE support functional  
+- ✅ %TYPE attribute resolution implemented
+- ✅ Test coverage expanded to 209+ passing tests
 
-### **Phase 1 Complete (1-2 months)**
-- ✅ Oracle variable and type system 90% supported
-- ✅ Complex data structures (records, collections) fully functional
+### **Phase 1 Complete (1-2 months)** 
+- ✅ Oracle variable and type system 85% supported (records, %TYPE complete; collections pending)
+- 🔄 Complex data structures (records ✅ complete, collections 🚧 in progress) 
 - ✅ Package feature set complete for enterprise applications
 
 ### **Phase 2 Complete (3-4 months)**
