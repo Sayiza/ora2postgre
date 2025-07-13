@@ -42,6 +42,7 @@ public interface PlSqlAstVisitor<T> {
   T visit(Trigger trigger);
   T visit(ExceptionBlock exceptionBlock);
   T visit(ExceptionHandler exceptionHandler);
+  T visit(RaiseStatement raiseStatement);
   T visit(CursorDeclaration cursorDeclaration);
   T visit(OpenStatement openStatement);
   T visit(FetchStatement fetchStatement);

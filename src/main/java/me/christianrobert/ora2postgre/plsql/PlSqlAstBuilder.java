@@ -824,6 +824,18 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     
     return new DeleteStatement(schemaName, tableName, whereClause);
   }
+
+  @Override
+  public PlSqlAst visitRaise_statement(PlSqlParser.Raise_statementContext ctx) {
+    // Handle bare RAISE (re-raise current exception)
+    if (ctx.exception_name() == null) {
+      return new RaiseStatement(); // Default constructor for re-raise
+    }
+    
+    // Handle RAISE with specific exception name
+    String exceptionName = ctx.exception_name().getText();
+    return new RaiseStatement(exceptionName);
+  }
   
   // Statement END
 
