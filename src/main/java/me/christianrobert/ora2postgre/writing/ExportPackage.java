@@ -91,6 +91,8 @@ public class ExportPackage {
       mergeCursors(spec.getCursors(), body.getCursors()),
       mergePackageTypes(spec.getTypes(), body.getTypes()),
       mergeRecordTypes(spec.getRecordTypes(), body.getRecordTypes()),
+      mergeVarrayTypes(spec.getVarrayTypes(), body.getVarrayTypes()),
+      mergeNestedTableTypes(spec.getNestedTableTypes(), body.getNestedTableTypes()),
       mergeFunctions(spec.getFunctions(), body.getFunctions()),
       mergeProcedures(spec.getProcedures(), body.getProcedures()),
       body.getBodyStatements() // Body statements only exist in body
@@ -274,6 +276,56 @@ public class ExportPackage {
       for (RecordType recordType : bodyRecordTypes) {
         if (recordTypeNames.add(recordType.getName())) {
           merged.add(recordType);
+        }
+      }
+    }
+    
+    return merged;
+  }
+
+  private static List<VarrayType> mergeVarrayTypes(List<VarrayType> specVarrayTypes, List<VarrayType> bodyVarrayTypes) {
+    List<VarrayType> merged = new ArrayList<>();
+    Set<String> varrayTypeNames = new HashSet<>();
+    
+    // Add spec varray types first (they are declarations)
+    if (specVarrayTypes != null) {
+      for (VarrayType varrayType : specVarrayTypes) {
+        if (varrayTypeNames.add(varrayType.getName())) {
+          merged.add(varrayType);
+        }
+      }
+    }
+    
+    // Add body varray types (avoid duplicates)
+    if (bodyVarrayTypes != null) {
+      for (VarrayType varrayType : bodyVarrayTypes) {
+        if (varrayTypeNames.add(varrayType.getName())) {
+          merged.add(varrayType);
+        }
+      }
+    }
+    
+    return merged;
+  }
+
+  private static List<NestedTableType> mergeNestedTableTypes(List<NestedTableType> specNestedTableTypes, List<NestedTableType> bodyNestedTableTypes) {
+    List<NestedTableType> merged = new ArrayList<>();
+    Set<String> nestedTableTypeNames = new HashSet<>();
+    
+    // Add spec nested table types first (they are declarations)
+    if (specNestedTableTypes != null) {
+      for (NestedTableType nestedTableType : specNestedTableTypes) {
+        if (nestedTableTypeNames.add(nestedTableType.getName())) {
+          merged.add(nestedTableType);
+        }
+      }
+    }
+    
+    // Add body nested table types (avoid duplicates)
+    if (bodyNestedTableTypes != null) {
+      for (NestedTableType nestedTableType : bodyNestedTableTypes) {
+        if (nestedTableTypeNames.add(nestedTableType.getName())) {
+          merged.add(nestedTableType);
         }
       }
     }

@@ -38,6 +38,8 @@ public class RestControllerGeneratorTest {
             new ArrayList<>(), // cursors
             new ArrayList<>(), // types
             new ArrayList<>(), // recordTypes
+            new ArrayList<>(),
+            new ArrayList<>(),
             Arrays.asList(testFunction), // functions
             Arrays.asList(testProcedure), // procedures
             new ArrayList<>()  // body statements

@@ -68,6 +68,13 @@ public class StandardPackageStrategy implements PackageTransformationStrategy {
       b.append("\n");
     }
     
+    // Transform collection types to PostgreSQL domain types
+    // Only generate collection types in the spec phase (specOnly=true) to avoid duplication
+    if (specOnly && (!oraclePackage.getVarrayTypes().isEmpty() || !oraclePackage.getNestedTableTypes().isEmpty())) {
+      b.append(generateCollectionTypes(oraclePackage, context));
+      b.append("\n");
+    }
+    
     // Transform functions
     for (Function function : oraclePackage.getFunctions()) {
       b.append(function.toPostgre(context, specOnly));
@@ -232,6 +239,38 @@ public class StandardPackageStrategy implements PackageTransformationStrategy {
     b.append("-- Usage Pattern:\n");
     b.append("-- DECLARE variable_name schema_packagename_recordtypename;\n");
     b.append("-- Example: DECLARE emp_rec test_schema_emp_pkg_employee_record;\n\n");
+    
+    return b.toString();
+  }
+
+  private String generateCollectionTypes(OraclePackage oraclePackage, Everything context) {
+    StringBuilder b = new StringBuilder();
+    String packageName = oraclePackage.getName().toLowerCase();
+    String schemaName = oraclePackage.getSchema().toLowerCase();
+    
+    b.append("-- Collection Types for ").append(oraclePackage.getSchema()).append(".").append(packageName).append("\n");
+    b.append("-- Implemented using PostgreSQL domain types\n\n");
+    
+    // Generate VARRAY types
+    for (VarrayType varrayType : oraclePackage.getVarrayTypes()) {
+      String domainName = schemaName + "_" + packageName + "_" + varrayType.getName().toLowerCase();
+      
+      b.append("-- VARRAY type: ").append(varrayType.getName()).append("\n");
+      b.append("CREATE DOMAIN ").append(domainName).append(" AS ").append(varrayType.toPostgre(context)).append(";\n\n");
+    }
+    
+    // Generate TABLE OF types
+    for (NestedTableType nestedTableType : oraclePackage.getNestedTableTypes()) {
+      String domainName = schemaName + "_" + packageName + "_" + nestedTableType.getName().toLowerCase();
+      
+      b.append("-- TABLE OF type: ").append(nestedTableType.getName()).append("\n");
+      b.append("CREATE DOMAIN ").append(domainName).append(" AS ").append(nestedTableType.toPostgre(context)).append(";\n\n");
+    }
+    
+    b.append("-- Usage Pattern:\n");
+    b.append("-- DECLARE variable_name schema_packagename_collectiontypename;\n");
+    b.append("-- Example: DECLARE str_array test_schema_pkg_string_array;\n");
+    b.append("-- Access elements: str_array[1], array_length(str_array, 1)\n\n");
     
     return b.toString();
   }

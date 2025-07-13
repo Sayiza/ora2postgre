@@ -159,11 +159,13 @@ public class VariableDeclarationTest {
             Collections.emptyList(), // variables
             Collections.emptyList(), // subTypes  
             Collections.emptyList(), // cursors
-            Collections.emptyList(), // packageTypes
-            Collections.emptyList(), // recordTypes
-            Collections.emptyList(), // functions
-            Collections.emptyList(), // procedures
-            Collections.emptyList()  // bodyStatements
+            Collections.emptyList(),
+            Collections.emptyList(),
+            Collections.emptyList(),
+            Collections.emptyList(),
+            Collections.emptyList(),
+            Collections.emptyList(),
+            Collections.emptyList()
         );
     }
 }

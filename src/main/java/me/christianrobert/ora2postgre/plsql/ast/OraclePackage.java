@@ -14,12 +14,15 @@ public class OraclePackage extends PlSqlAst {
   private List<Cursor> cursors;
   private List<PackageType> types;
   private List<RecordType> recordTypes;
+  private List<VarrayType> varrayTypes;
+  private List<NestedTableType> nestedTableTypes;
   private List<Function> functions;
   private List<Procedure> procedures;
   private List<Statement> bodyStatements;
   
   private static final PackageTransformationManager transformationManager = new PackageTransformationManager();
 
+  // Full constructor with collection types
   public OraclePackage(String name,
                        String schema,
                        List<Variable> variables,
@@ -27,6 +30,8 @@ public class OraclePackage extends PlSqlAst {
                        List<Cursor> cursors,
                        List<PackageType> types,
                        List<RecordType> recordTypes,
+                       List<VarrayType> varrayTypes,
+                       List<NestedTableType> nestedTableTypes,
                        List<Function> functions,
                        List<Procedure> procedures,
                        List<Statement> bodyStatements) {
@@ -40,6 +45,8 @@ public class OraclePackage extends PlSqlAst {
     this.cursors = cursors != null ? cursors : new ArrayList<>();
     this.types = types != null ? types : new ArrayList<>();
     this.recordTypes = recordTypes != null ? recordTypes : new ArrayList<>();
+    this.varrayTypes = varrayTypes != null ? varrayTypes : new ArrayList<>();
+    this.nestedTableTypes = nestedTableTypes != null ? nestedTableTypes : new ArrayList<>();
     this.bodyStatements = bodyStatements != null ? bodyStatements : new ArrayList<>();
   }
 
@@ -73,6 +80,14 @@ public class OraclePackage extends PlSqlAst {
 
   public List<RecordType> getRecordTypes() {
     return recordTypes;
+  }
+
+  public List<VarrayType> getVarrayTypes() {
+    return varrayTypes;
+  }
+
+  public List<NestedTableType> getNestedTableTypes() {
+    return nestedTableTypes;
   }
 
   public List<Statement> getBodyStatements() {

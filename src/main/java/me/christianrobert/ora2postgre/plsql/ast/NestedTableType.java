@@ -4,10 +4,16 @@ import me.christianrobert.ora2postgre.global.Everything;
 
 public class NestedTableType extends PlSqlAst {
 
+  private String name;
   private DataTypeSpec dataType; // TODO replace with TypesüecsDatatype Object
   // TODO also replace all other data type occurencies :-/
 
   public NestedTableType(DataTypeSpec dataType) {
+    this("", dataType);
+  }
+
+  public NestedTableType(String name, DataTypeSpec dataType) {
+    this.name = name;
     this.dataType = dataType;
   }
 
@@ -21,6 +27,19 @@ public class NestedTableType extends PlSqlAst {
   }
 
   public String toPostgre(Everything data) {
-    return dataType.toPostgre(data); // size?
+    // Convert Oracle TABLE OF to PostgreSQL array type
+    String baseType = dataType.toPostgre(data);
+    if (baseType != null && !baseType.contains("/* data type not implemented")) {
+      return baseType + "[]";
+    }
+    return "text[]"; // fallback to text array
+  }
+
+  public String getName() {
+    return name;
+  }
+
+  public DataTypeSpec getDataType() {
+    return dataType;
   }
 }

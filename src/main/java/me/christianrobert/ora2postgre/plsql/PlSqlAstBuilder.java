@@ -2,6 +2,7 @@ package me.christianrobert.ora2postgre.plsql;
 
 import me.christianrobert.ora2postgre.antlr.PlSqlParser;
 import me.christianrobert.ora2postgre.antlr.PlSqlParserBaseVisitor;
+import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.plsql.ast.*;
 import me.christianrobert.ora2postgre.oracledb.tools.NameNormalizer;
 
@@ -1020,6 +1021,11 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     return new NestedTableType((DataTypeSpec) visit(ctx.type_spec()));
   }
 
+  @Override
+  public PlSqlAst visitTable_type_def(PlSqlParser.Table_type_defContext ctx) {
+    return new NestedTableType((DataTypeSpec) visit(ctx.type_spec()));
+  }
+
   // Start Object Types
   @Override
   public PlSqlAst visitType_definition(PlSqlParser.Type_definitionContext ctx) {
@@ -1367,6 +1373,8 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
 
     List<Variable> variables = new ArrayList<>();
     List<RecordType> recordTypes = new ArrayList<>();
+    List<VarrayType> varrayTypes = new ArrayList<>();
+    List<NestedTableType> nestedTableTypes = new ArrayList<>();
 
     if (ctx.package_obj_spec() != null) {
       for (var member : ctx.package_obj_spec()) {
@@ -1375,11 +1383,15 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
           variables.add((Variable) memberAst);
         } else if (memberAst instanceof RecordType) {
           recordTypes.add((RecordType) memberAst);
+        } else if (memberAst instanceof VarrayType) {
+          varrayTypes.add((VarrayType) memberAst);
+        } else if (memberAst instanceof NestedTableType) {
+          nestedTableTypes.add((NestedTableType) memberAst);
         }
       }
     }
     // TODO $if, subtype, packagetype, cursor, etc.
-    return new OraclePackage(packageName, schema, variables, null, null, null, recordTypes, null, null, null);
+    return new OraclePackage(packageName, schema, variables, null, null, null, recordTypes, varrayTypes, nestedTableTypes, null, null, null);
   }
 
   @Override
@@ -1394,6 +1406,8 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     List<Function> funcs = new ArrayList<>();
     List<Variable> variables = new ArrayList<>();
     List<RecordType> recordTypes = new ArrayList<>();
+    List<VarrayType> varrayTypes = new ArrayList<>();
+    List<NestedTableType> nestedTableTypes = new ArrayList<>();
     if (ctx.package_obj_body() != null) {
       for (var member : ctx.package_obj_body()) {
         PlSqlAst memberAst = visit(member);
@@ -1401,6 +1415,10 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
           variables.add((Variable) memberAst);
         } else if (memberAst instanceof RecordType) {
           recordTypes.add((RecordType) memberAst);
+        } else if (memberAst instanceof VarrayType) {
+          varrayTypes.add((VarrayType) memberAst);
+        } else if (memberAst instanceof NestedTableType) {
+          nestedTableTypes.add((NestedTableType) memberAst);
         } else if (memberAst instanceof Function) {
           funcs.add((Function) memberAst);
         } else if (memberAst instanceof Procedure) {
@@ -1408,7 +1426,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
         }
       }
     }
-    OraclePackage o = new OraclePackage(packageName, schema, variables, null, null, null, recordTypes, funcs, procedures, null);
+    OraclePackage o = new OraclePackage(packageName, schema, variables, null, null, null, recordTypes, varrayTypes, nestedTableTypes, funcs, procedures, null);
     o.getFunctions().forEach(e -> e.setParentPackage(o));
     o.getProcedures().forEach(e -> e.setParentPackage(o));
     return o;
@@ -1715,7 +1733,23 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       return new RecordType(typeName, recordType.getFields());
     }
     
-    // TODO: Handle other type declarations (table_type_def, varray_type_def, ref_cursor_type_def)
+    // Handle VARRAY type declarations: TYPE name IS VARRAY(size) OF type_spec
+    if (ctx.identifier() != null && ctx.varray_type_def() != null) {
+      String typeName = ctx.identifier().getText();
+      VarrayType varrayType = (VarrayType) visit(ctx.varray_type_def());
+      // Return a named VarrayType (similar to RecordType pattern)
+      return new VarrayType(typeName, varrayType.getSize(), varrayType.getSizeExpression(), varrayType.getDataType());
+    }
+    
+    // Handle TABLE OF type declarations: TYPE name IS TABLE OF type_spec
+    if (ctx.identifier() != null && ctx.table_type_def() != null) {
+      String typeName = ctx.identifier().getText();
+      NestedTableType nestedTableType = (NestedTableType) visit(ctx.table_type_def());
+      // Return a named NestedTableType (similar to RecordType pattern)
+      return new NestedTableType(typeName, nestedTableType.getDataType());
+    }
+    
+    // TODO: Handle ref_cursor_type_def
     return new Comment("type_declaration not fully implemented");
   }
 
