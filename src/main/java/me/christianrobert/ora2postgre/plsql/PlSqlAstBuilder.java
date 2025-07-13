@@ -1574,8 +1574,20 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       return visitChildren(ctx);
     }
     
-    // For relational operations, fall back to default behavior
-    return visitChildren(ctx);
+    // Handle relational operations: relational_expression relational_operator relational_expression
+    if (ctx.relational_expression() != null && ctx.relational_expression().size() == 2 
+        && ctx.relational_operator() != null) {
+      PlSqlAst leftAst = visit(ctx.relational_expression(0));
+      PlSqlAst rightAst = visit(ctx.relational_expression(1));
+      String operator = ctx.relational_operator().getText();
+      
+      if (leftAst instanceof RelationalExpression && rightAst instanceof RelationalExpression) {
+        return new RelationalExpression((RelationalExpression) leftAst, operator, (RelationalExpression) rightAst);
+      }
+    }
+    
+    // Fallback for other cases - should not normally happen, but use raw text
+    throw new IllegalStateException("Unhandled relational expression case: " + ctx.getText());
   }
 
   /**

@@ -36,6 +36,10 @@ public class UnaryLogicalExpression extends PlSqlAst {
         }
         if (multisetExpression != null) {
             sb.append(multisetExpression.toString());
+            // If there's also a logical operation, append it (for cases like "expr > 0" where expr is multiset and "> 0" is operation)
+            if (logicalOperation != null) {
+                sb.append(" ").append(logicalOperation);
+            }
         } else if (logicalOperation != null) {
             // If there's no multiset expression, logicalOperation might contain the raw text
             sb.append(logicalOperation);
@@ -74,6 +78,10 @@ public class UnaryLogicalExpression extends PlSqlAst {
         }
         if (multisetExpression != null) {
             sb.append(multisetExpression.toPostgre(data));
+            // If there's also a logical operation, append it (for cases like "expr > 0" where expr is multiset and "> 0" is operation)
+            if (logicalOperation != null) {
+                sb.append(" ").append(logicalOperation);
+            }
         } else if (logicalOperation != null) {
             // If there's no multiset expression, logicalOperation might contain the raw text
             sb.append(logicalOperation);
