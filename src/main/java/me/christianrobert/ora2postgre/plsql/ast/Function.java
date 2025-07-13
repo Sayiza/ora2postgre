@@ -15,6 +15,8 @@ public class Function extends PlSqlAst {
   private List<Variable> variables; // Variable declarations from DECLARE section
   private List<CursorDeclaration> cursorDeclarations; // Cursor declarations from DECLARE section
   private List<RecordType> recordTypes; // Record type declarations from DECLARE section
+  private List<VarrayType> varrayTypes; // VARRAY type declarations from DECLARE section
+  private List<NestedTableType> nestedTableTypes; // TABLE OF type declarations from DECLARE section
   private String returnType;
   private List<Statement> statements;
   private ExceptionBlock exceptionBlock; // Exception handling

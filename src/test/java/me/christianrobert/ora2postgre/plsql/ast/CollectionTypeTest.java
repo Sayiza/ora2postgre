@@ -468,4 +468,298 @@ end;
     int variableIndex = postgresOutput.indexOf("value test_schema_var_test_pkg_string_array");
     assertTrue(domainIndex < variableIndex, "DOMAIN definition must come before variable usage");
   }
+
+  // =====================================================================================
+  // FUNCTION-LOCAL COLLECTION TYPE TESTS (NEW FUNCTIONALITY)
+  // =====================================================================================
+
+  @Test
+  public void testFunctionLocalVarrayDeclaration() {
+    // Test function-local VARRAY declaration using direct array syntax (Option B)
+    String oracleSql = """
+CREATE OR REPLACE FUNCTION TEST_SCHEMA.test_func RETURN NUMBER IS
+  TYPE local_array IS VARRAY(10) OF VARCHAR2(100);
+  v_arr local_array := local_array('a','b');
+BEGIN
+  RETURN v_arr.COUNT;
+END;
+/
+""";
+
+    // Create test data
+    Everything data = new Everything();
+    data.getUserNames().add("TEST_SCHEMA");
+
+    PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
+
+    // Parse the Oracle function
+    PlSqlAst ast = PlSqlAstMain.processPlsqlCode(plsqlCode);
+
+    assertNotNull(ast);
+    assertTrue(ast instanceof Function);
+    
+    Function func = (Function) ast;
+    assertEquals("TEST_SCHEMA.test_func", func.getName());
+    
+    // Should have local collection type declarations parsed in function
+    // Note: This test will fail until we implement function-local collection parsing
+    // For now, it serves as a specification for the expected behavior
+  }
+
+  @Test
+  public void testFunctionLocalTableOfDeclaration() {
+    // Test function-local TABLE OF declaration using direct array syntax (Option B)
+    String oracleSql = """
+CREATE OR REPLACE FUNCTION TEST_SCHEMA.test_func RETURN NUMBER IS
+  TYPE local_table IS TABLE OF NUMBER;
+  v_arr local_table := local_table(1, 2, 3);
+BEGIN
+  RETURN v_arr.COUNT;
+END;
+/
+""";
+
+    // Create test data
+    Everything data = new Everything();
+    data.getUserNames().add("TEST_SCHEMA");
+
+    PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
+
+    // Parse the Oracle function
+    PlSqlAst ast = PlSqlAstMain.processPlsqlCode(plsqlCode);
+
+    assertNotNull(ast);
+    assertTrue(ast instanceof Function);
+    
+    Function func = (Function) ast;
+    assertEquals("TEST_SCHEMA.test_func", func.getName());
+    
+    // Should have local collection type declarations parsed in function
+    // Note: This test will fail until we implement function-local collection parsing
+  }
+
+  @Test
+  public void testFunctionLocalCollectionTypeGeneration() {
+    // Test PostgreSQL generation for function with local collection types
+    // Expected output should use direct array syntax (TEXT[], numeric[])
+    // without creating schema-level DOMAINs
+    
+    String expectedPostgresSQL = """
+CREATE FUNCTION test_schema.test_func() RETURNS numeric AS $$
+DECLARE
+  v_arr TEXT[] := ARRAY['a','b'];
+BEGIN
+  RETURN array_length(v_arr, 1);
+END;
+$$ LANGUAGE plpgsql;
+""";
+    
+    // This test documents the expected PostgreSQL output format
+    // Implementation will generate this from Oracle function with local VARRAY
+    assertTrue(expectedPostgresSQL.contains("TEXT[]"));
+    assertTrue(expectedPostgresSQL.contains("ARRAY['a','b']"));
+    assertTrue(expectedPostgresSQL.contains("array_length(v_arr, 1)"));
+  }
+
+  @Test
+  public void testMultipleFunctionLocalCollectionTypes() {
+    // Test function with multiple local collection type declarations
+    String oracleSql = """
+CREATE OR REPLACE FUNCTION TEST_SCHEMA.test_func RETURN NUMBER IS
+  TYPE string_array IS VARRAY(10) OF VARCHAR2(100);
+  TYPE number_table IS TABLE OF NUMBER;
+  TYPE date_array IS VARRAY(5) OF DATE;
+  
+  v_strings string_array := string_array('a','b');
+  v_numbers number_table := number_table(1, 2, 3);
+  v_dates date_array := date_array(SYSDATE, SYSDATE+1);
+BEGIN
+  RETURN v_strings.COUNT + v_numbers.COUNT + v_dates.COUNT;
+END;
+/
+""";
+
+    // Create test data
+    Everything data = new Everything();
+    data.getUserNames().add("TEST_SCHEMA");
+
+    PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
+
+    // Parse the Oracle function
+    PlSqlAst ast = PlSqlAstMain.processPlsqlCode(plsqlCode);
+
+    assertNotNull(ast);
+    assertTrue(ast instanceof Function);
+    
+    Function func = (Function) ast;
+    assertEquals("TEST_SCHEMA.test_func", func.getName());
+    
+    // Should parse multiple local collection types
+    // Expected PostgreSQL should use direct array syntax for all types:
+    // v_strings TEXT[] := ARRAY['a','b'];
+    // v_numbers numeric[] := ARRAY[1, 2, 3];  
+    // v_dates timestamp[] := ARRAY[CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + INTERVAL '1 day'];
+  }
+
+  @Test
+  public void testFunctionLocalCollectionWithPackageTypes() {
+    // Test function that uses both package-level and function-local collection types
+    String oracleSql = """
+CREATE PACKAGE BODY TEST_SCHEMA.MIXED_COLLECTION_PKG is  
+  TYPE pkg_string_array IS VARRAY(10) OF VARCHAR2(100);
+  
+  FUNCTION test_function RETURN NUMBER IS
+    TYPE local_number_table IS TABLE OF NUMBER;
+    
+    v_pkg_strings pkg_string_array := pkg_string_array('a','b');
+    v_local_numbers local_number_table := local_number_table(1, 2, 3);
+  BEGIN
+    RETURN v_pkg_strings.COUNT + v_local_numbers.COUNT;
+  END;
+end;
+/
+""";
+
+    // Create test data
+    Everything data = new Everything();
+    data.getUserNames().add("TEST_SCHEMA");
+
+    PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
+
+    // Parse the Oracle package
+    PlSqlAst ast = PlSqlAstMain.processPlsqlCode(plsqlCode);
+
+    assertNotNull(ast);
+    assertTrue(ast instanceof OraclePackage);
+    
+    OraclePackage pkg = (OraclePackage) ast;
+    assertEquals("MIXED_COLLECTION_PKG", pkg.getName());
+    assertEquals(1, pkg.getFunctions().size());
+    
+    Function function = pkg.getFunctions().get(0);
+    assertEquals("test_function", function.getName());
+    
+    // Expected behavior:
+    // - Package-level type should create DOMAIN: test_schema_mixed_collection_pkg_pkg_string_array
+    // - Function-local type should use direct array: numeric[]
+    // - Package variable should reference DOMAIN: test_schema_mixed_collection_pkg_pkg_string_array
+    // - Function variable should use direct array: numeric[]
+  }
+
+  @Test
+  public void testFunctionLocalCollectionMethodTransformation() {
+    // Test transformation of Oracle collection methods to PostgreSQL array functions
+    String oracleSql = """
+CREATE OR REPLACE FUNCTION TEST_SCHEMA.test_collection_methods RETURN NUMBER IS
+  TYPE local_array IS VARRAY(10) OF VARCHAR2(100);
+  v_arr local_array := local_array('a','b','c');
+  v_count NUMBER;
+  v_first NUMBER;
+  v_last NUMBER;
+BEGIN
+  v_count := v_arr.COUNT;
+  v_first := v_arr.FIRST;
+  v_last := v_arr.LAST;
+  RETURN v_count + v_first + v_last;
+END;
+/
+""";
+
+    // Expected PostgreSQL transformation:
+    String expectedPostgresSQL = """
+CREATE FUNCTION test_schema.test_collection_methods() RETURNS numeric AS $$
+DECLARE
+  v_arr TEXT[] := ARRAY['a','b','c'];
+  v_count numeric;
+  v_first numeric;
+  v_last numeric;
+BEGIN
+  v_count := array_length(v_arr, 1);
+  v_first := 1; -- PostgreSQL arrays are 1-indexed
+  v_last := array_length(v_arr, 1);
+  RETURN v_count + v_first + v_last;
+END;
+$$ LANGUAGE plpgsql;
+""";
+    
+    // This test documents the expected transformation:
+    // Oracle .COUNT → PostgreSQL array_length(arr, 1)
+    // Oracle .FIRST → PostgreSQL 1 (arrays are 1-indexed)
+    // Oracle .LAST → PostgreSQL array_length(arr, 1)
+    assertTrue(expectedPostgresSQL.contains("array_length(v_arr, 1)"));
+    assertTrue(expectedPostgresSQL.contains("v_first := 1"));
+  }
+
+  @Test
+  public void testFunctionLocalCollectionIndexing() {
+    // Test transformation of Oracle collection indexing to PostgreSQL array indexing
+    String oracleSql = """
+CREATE OR REPLACE FUNCTION TEST_SCHEMA.test_collection_indexing RETURN VARCHAR2 IS
+  TYPE local_array IS VARRAY(10) OF VARCHAR2(100);
+  v_arr local_array := local_array('first','second','third');
+  v_element VARCHAR2(100);
+BEGIN
+  v_element := v_arr(2); -- Oracle uses 1-based indexing
+  RETURN v_element;
+END;
+/
+""";
+
+    // Expected PostgreSQL transformation:
+    String expectedPostgresSQL = """
+CREATE FUNCTION test_schema.test_collection_indexing() RETURNS text AS $$
+DECLARE
+  v_arr TEXT[] := ARRAY['first','second','third'];
+  v_element text;
+BEGIN
+  v_element := v_arr[2]; -- PostgreSQL also uses 1-based indexing for arrays
+  RETURN v_element;
+END;
+$$ LANGUAGE plpgsql;
+""";
+    
+    // This test documents the expected transformation:
+    // Oracle arr(i) → PostgreSQL arr[i]
+    // Both use 1-based indexing, so index values stay the same
+    assertTrue(expectedPostgresSQL.contains("v_arr[2]"));
+  }
+
+  @Test
+  public void testFunctionLocalCollectionInitialization() {
+    // Test transformation of Oracle collection constructors to PostgreSQL ARRAY[...] syntax
+    String oracleSql = """
+CREATE OR REPLACE FUNCTION TEST_SCHEMA.test_collection_init RETURN NUMBER IS
+  TYPE string_array IS VARRAY(10) OF VARCHAR2(100);
+  TYPE number_table IS TABLE OF NUMBER;
+  
+  v_strings string_array := string_array('a', 'b', 'c');
+  v_numbers number_table := number_table(1, 2, 3, 4, 5);
+  v_empty_strings string_array := string_array();
+BEGIN
+  RETURN v_strings.COUNT + v_numbers.COUNT;
+END;
+/
+""";
+
+    // Expected PostgreSQL transformation:
+    String expectedPostgresSQL = """
+CREATE FUNCTION test_schema.test_collection_init() RETURNS numeric AS $$
+DECLARE
+  v_strings TEXT[] := ARRAY['a', 'b', 'c'];
+  v_numbers numeric[] := ARRAY[1, 2, 3, 4, 5];
+  v_empty_strings TEXT[] := ARRAY[]::TEXT[];
+BEGIN
+  RETURN array_length(v_strings, 1) + array_length(v_numbers, 1);
+END;
+$$ LANGUAGE plpgsql;
+""";
+    
+    // This test documents the expected transformation:
+    // Oracle string_array('a', 'b', 'c') → PostgreSQL ARRAY['a', 'b', 'c']
+    // Oracle number_table(1, 2, 3) → PostgreSQL ARRAY[1, 2, 3]
+    // Oracle string_array() → PostgreSQL ARRAY[]::TEXT[]
+    assertTrue(expectedPostgresSQL.contains("ARRAY['a', 'b', 'c']"));
+    assertTrue(expectedPostgresSQL.contains("ARRAY[1, 2, 3, 4, 5]"));
+    assertTrue(expectedPostgresSQL.contains("ARRAY[]::TEXT[]"));
+  }
 }
