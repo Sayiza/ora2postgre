@@ -398,4 +398,74 @@ end;
     
     return merged;
   }
+
+  @Test
+  public void testCustomTypeDataSpecResolution() {
+    // Test that DataTypeSpec can resolve custom collection types with package context
+    Everything data = new Everything();
+    
+    // Create a DataTypeSpec for a custom collection type
+    DataTypeSpec customTypeSpec = new DataTypeSpec(null, "varraytyp2", null, null);
+    
+    // Test without package context (should return fallback)
+    String resultWithoutContext = customTypeSpec.toPostgre(data);
+    assertTrue(resultWithoutContext.contains("data type not implemented"));
+    
+    // Test with package context (should return domain name)
+    String resultWithContext = customTypeSpec.toPostgre(data, "TEST_SCHEMA", "COLLECTION_PKG");
+    assertEquals("test_schema_collection_pkg_varraytyp2", resultWithContext);
+  }
+
+  @Test
+  public void testPackageVariableWithCustomType() {
+    String oracleSql = """
+CREATE PACKAGE BODY TEST_SCHEMA.VAR_TEST_PKG is  
+  TYPE string_array IS VARRAY(10) OF VARCHAR2(100);
+  
+  g_my_array string_array;
+  
+  FUNCTION get_count RETURN NUMBER IS
+  BEGIN
+    RETURN 1;
+  END;
+end;
+/
+""";
+
+    // Create test data
+    Everything data = new Everything();
+    data.getUserNames().add("TEST_SCHEMA");
+
+    PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
+
+    // Parse the Oracle package
+    PlSqlAst ast = PlSqlAstMain.processPlsqlCode(plsqlCode);
+
+    assertNotNull(ast);
+    assertTrue(ast instanceof OraclePackage);
+    
+    OraclePackage pkg = (OraclePackage) ast;
+    
+    // Verify collection type and variable are collected
+    assertEquals(1, pkg.getVarrayTypes().size());
+    assertEquals(1, pkg.getVariables().size());
+    
+    Variable variable = pkg.getVariables().get(0);
+    assertEquals("g_my_array", variable.getName());
+    
+    // Generate PostgreSQL using the StandardPackageStrategy
+    String postgresOutput = pkg.toPostgre(data, true); // specOnly=true for types and variables
+    
+    // Verify the custom type domain is created
+    assertTrue(postgresOutput.contains("CREATE DOMAIN test_schema_var_test_pkg_string_array AS text[]"));
+    
+    // Verify the variable uses the correct domain type  
+    assertTrue(postgresOutput.contains("test_schema_var_test_pkg_g_my_array"));
+    assertTrue(postgresOutput.contains("value test_schema_var_test_pkg_string_array"));
+    
+    // Verify correct order: DOMAIN definition must come before variable that uses it
+    int domainIndex = postgresOutput.indexOf("CREATE DOMAIN test_schema_var_test_pkg_string_array");
+    int variableIndex = postgresOutput.indexOf("value test_schema_var_test_pkg_string_array");
+    assertTrue(domainIndex < variableIndex, "DOMAIN definition must come before variable usage");
+  }
 }

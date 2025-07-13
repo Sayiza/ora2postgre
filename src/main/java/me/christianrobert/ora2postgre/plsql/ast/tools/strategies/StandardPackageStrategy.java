@@ -27,6 +27,13 @@ public class StandardPackageStrategy implements PackageTransformationStrategy {
 
     StringBuilder b = new StringBuilder();
     
+    // Transform collection types to PostgreSQL domain types FIRST (before variables that reference them)
+    // Only generate collection types in the spec phase (specOnly=true) to avoid duplication
+    if (specOnly && (!oraclePackage.getVarrayTypes().isEmpty() || !oraclePackage.getNestedTableTypes().isEmpty())) {
+      b.append(generateCollectionTypes(oraclePackage, context));
+      b.append("\n");
+    }
+    
     // Transform package variables to PostgreSQL schema-level variables
     // Only generate variables in the spec phase (specOnly=true) to avoid duplication
     if (specOnly && !oraclePackage.getVariables().isEmpty()) {
@@ -65,13 +72,6 @@ public class StandardPackageStrategy implements PackageTransformationStrategy {
     // Only generate record types in the spec phase (specOnly=true) to avoid duplication
     if (specOnly && !oraclePackage.getRecordTypes().isEmpty()) {
       b.append(generateRecordTypes(oraclePackage, context));
-      b.append("\n");
-    }
-    
-    // Transform collection types to PostgreSQL domain types
-    // Only generate collection types in the spec phase (specOnly=true) to avoid duplication
-    if (specOnly && (!oraclePackage.getVarrayTypes().isEmpty() || !oraclePackage.getNestedTableTypes().isEmpty())) {
-      b.append(generateCollectionTypes(oraclePackage, context));
       b.append("\n");
     }
     
@@ -149,8 +149,8 @@ public class StandardPackageStrategy implements PackageTransformationStrategy {
     // Create one temporary table per package variable
     for (Variable variable : oraclePackage.getVariables()) {
       String varName = variable.getName().toLowerCase();
-      String varType = variable.getDataType().toPostgre(context);
       String schemaName = oraclePackage.getSchema().toLowerCase();
+      String varType = variable.getDataType().toPostgre(context, oraclePackage.getSchema(), oraclePackage.getName());
       String tableName = schemaName + "_" + packageName + "_" + varName;
       
       b.append("-- Temporary table for variable: ").append(variable.getName()).append("\n");

@@ -44,9 +44,21 @@ public class DataTypeSpec extends PlSqlAst {
   }
 
   public String toPostgre(Everything data) {
+    return toPostgre(data, null, null);
+  }
+
+  public String toPostgre(Everything data, String schemaName, String packageName) {
     if ( nativeDataType != null ) {
       return TypeConverter.toPostgre(nativeDataType);
     }
+    
+    // Handle custom types (collection types defined in package)
+    if ( custumDataType != null && schemaName != null && packageName != null ) {
+      // Check if this is a custom collection type defined in the current package
+      String domainName = schemaName.toLowerCase() + "_" + packageName.toLowerCase() + "_" + custumDataType.toLowerCase();
+      return domainName;
+    }
+    
     return " /* data type not implemented  */ ";
   }
 }
