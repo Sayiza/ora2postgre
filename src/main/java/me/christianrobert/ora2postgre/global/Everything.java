@@ -7,11 +7,15 @@ import me.christianrobert.ora2postgre.oracledb.TableMetadata;
 import me.christianrobert.ora2postgre.oracledb.ViewMetadata;
 import me.christianrobert.ora2postgre.plsql.ast.Expression;
 import me.christianrobert.ora2postgre.plsql.ast.Function;
+import me.christianrobert.ora2postgre.plsql.ast.NestedTableType;
 import me.christianrobert.ora2postgre.plsql.ast.ObjectType;
 import me.christianrobert.ora2postgre.plsql.ast.OraclePackage;
+import me.christianrobert.ora2postgre.plsql.ast.Parameter;
 import me.christianrobert.ora2postgre.plsql.ast.Procedure;
 import me.christianrobert.ora2postgre.plsql.ast.TableReference;
 import me.christianrobert.ora2postgre.plsql.ast.Trigger;
+import me.christianrobert.ora2postgre.plsql.ast.Variable;
+import me.christianrobert.ora2postgre.plsql.ast.VarrayType;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import java.util.ArrayList;
@@ -797,6 +801,135 @@ public class Everything {
     }
     
     return null;
+  }
+
+  /**
+   * Determines if a given identifier is a known function rather than a variable.
+   * This is crucial for distinguishing Oracle array indexing (arr(i)) from function calls (func(i)).
+   * 
+   * @param identifier The identifier to check (e.g., "v_arr", "my_function")
+   * @param schema The schema context where the check is happening
+   * @param currentFunction The function context where this identifier is being used (may be null)
+   * @return true if the identifier is a known function, false if it's likely a variable
+   */
+  public boolean isKnownFunction(String identifier, String schema, Function currentFunction) {
+    if (identifier == null || identifier.trim().isEmpty()) {
+      return false;
+    }
+    
+    String cleanIdentifier = identifier.trim();
+    
+    // Priority 1: Check if it's a variable in current function context
+    if (currentFunction != null) {
+      // Check function parameters
+      if (currentFunction.getParameters() != null) {
+        for (Parameter param : currentFunction.getParameters()) {
+          if (param.getName().equalsIgnoreCase(cleanIdentifier)) {
+            return false; // It's a parameter, not a function
+          }
+        }
+      }
+      
+      // Check local variables
+      if (currentFunction.getVariables() != null) {
+        for (Variable var : currentFunction.getVariables()) {
+          if (var.getName().equalsIgnoreCase(cleanIdentifier)) {
+            return false; // It's a local variable, not a function
+          }
+        }
+      }
+      
+      // Check local collection types (VARRAY/TABLE OF variables)
+      if (currentFunction.getVarrayTypes() != null) {
+        for (VarrayType varrayType : currentFunction.getVarrayTypes()) {
+          // VarrayType represents a type declaration, but we need to check if variables use this type
+          // This is more complex - for now, we'll rely on the variable list above
+        }
+      }
+      
+      if (currentFunction.getNestedTableTypes() != null) {
+        for (NestedTableType nestedTableType : currentFunction.getNestedTableTypes()) {
+          // Similar to VarrayType - type declarations don't directly tell us variable names
+        }
+      }
+    }
+    
+    // Priority 2: Check standalone functions in the schema
+    for (Function func : standaloneFunctionAst) {
+      if (func.getSchema() != null && func.getSchema().equalsIgnoreCase(schema) &&
+          func.getName().equalsIgnoreCase(cleanIdentifier)) {
+        return true; // It's a standalone function
+      }
+    }
+    
+    // Priority 3: Check functions in packages within the schema
+    for (OraclePackage pkg : packageSpecAst) {
+      if (pkg.getSchema().equalsIgnoreCase(schema)) {
+        for (Function func : pkg.getFunctions()) {
+          if (func.getName().equalsIgnoreCase(cleanIdentifier)) {
+            return true; // It's a package function
+          }
+        }
+      }
+    }
+    
+    // Priority 4: Check functions in object types within the schema
+    for (ObjectType objType : objectTypeSpecAst) {
+      if (objType.getSchema().equalsIgnoreCase(schema)) {
+        for (Function func : objType.getFunctions()) {
+          if (func.getName().equalsIgnoreCase(cleanIdentifier)) {
+            return true; // It's an object type function
+          }
+        }
+      }
+    }
+    
+    // Priority 5: Check built-in Oracle functions (common ones that might be confused with variables)
+    if (isBuiltInOracleFunction(cleanIdentifier)) {
+      return true;
+    }
+    
+    // If we can't find it as a function and didn't find it as a variable, 
+    // assume it's a variable (safer for array indexing)
+    return false;
+  }
+  
+  /**
+   * Helper method to identify common Oracle built-in functions that might be confused with variables.
+   */
+  private boolean isBuiltInOracleFunction(String identifier) {
+    // Common Oracle functions that might appear in parentheses syntax
+    String upperIdentifier = identifier.toUpperCase();
+    switch (upperIdentifier) {
+      case "SUBSTR":
+      case "LENGTH":
+      case "UPPER":
+      case "LOWER":
+      case "TRIM":
+      case "LTRIM":
+      case "RTRIM":
+      case "DECODE":
+      case "NVL":
+      case "NVL2":
+      case "COALESCE":
+      case "TO_CHAR":
+      case "TO_NUMBER":
+      case "TO_DATE":
+      case "SYSDATE":
+      case "GREATEST":
+      case "LEAST":
+      case "ABS":
+      case "ROUND":
+      case "TRUNC":
+      case "FLOOR":
+      case "CEIL":
+      case "MOD":
+      case "POWER":
+      case "SQRT":
+        return true;
+      default:
+        return false;
+    }
   }
 
   /**

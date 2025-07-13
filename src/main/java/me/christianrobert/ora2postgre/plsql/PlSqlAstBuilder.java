@@ -1674,14 +1674,25 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
   }
 
   /**
-   * Check if an atom contains a collection method call (e.g., v_arr.COUNT, v_arr.FIRST).
-   * This handles cases where collection methods are parsed through the general_element path
+   * Check if an atom contains a collection method call (e.g., v_arr.COUNT, v_arr.FIRST)
+   * or array indexing (e.g., v_arr(i)).
+   * This handles cases where these expressions are parsed through the general_element path
    * instead of the specific unary_expression dot notation rule.
    */
   private UnaryExpression checkAtomForCollectionMethod(PlSqlParser.AtomContext atomCtx) {
-    // Check if atom contains a general_element with dot notation
+    // Check if atom contains a general_element with dot notation (collection methods)
     if (atomCtx.general_element() != null) {
-      return checkGeneralElementForCollectionMethod(atomCtx.general_element());
+      // First check for collection methods
+      UnaryExpression collectionMethod = checkGeneralElementForCollectionMethod(atomCtx.general_element());
+      if (collectionMethod != null) {
+        return collectionMethod;
+      }
+      
+      // Then check for array indexing
+      UnaryExpression arrayIndexing = checkGeneralElementForArrayIndexing(atomCtx.general_element());
+      if (arrayIndexing != null) {
+        return arrayIndexing;
+      }
     }
     return null;
   }
@@ -1777,6 +1788,47 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     // Create a UnaryLogicalExpression with the text, then wrap it in LogicalExpression
     UnaryLogicalExpression unaryLogicalExpr = new UnaryLogicalExpression(text);
     return new LogicalExpression(unaryLogicalExpr);
+  }
+
+  /**
+   * Check if a general_element represents array indexing (e.g., v_arr(i)).
+   * This uses the Everything metadata to distinguish between function calls and array indexing.
+   */
+  private UnaryExpression checkGeneralElementForArrayIndexing(PlSqlParser.General_elementContext generalElementCtx) {
+    // Check for the pattern: general_element_part with function_argument (parentheses syntax)
+    if (generalElementCtx.general_element_part() != null && 
+        !generalElementCtx.general_element_part().isEmpty()) {
+      
+      // We need a simple identifier (not dot notation) with function arguments
+      if (generalElementCtx.general_element() == null) {
+        // This is a simple identifier with parentheses: identifier(args)
+        PlSqlParser.General_element_partContext partCtx = generalElementCtx.general_element_part().get(0);
+        
+        if (partCtx.id_expression() != null && 
+            partCtx.function_argument() != null && 
+            !partCtx.function_argument().isEmpty()) {
+          
+          String identifier = partCtx.id_expression().getText();
+          
+          // Use Everything.isKnownFunction to determine if this is a function or variable
+          // For now, we'll need access to Everything and current function context
+          // This will be passed from the calling context
+          
+          // Extract the first argument as the index expression
+          List<Expression> arguments = extractMethodArguments(partCtx);
+          if (arguments != null && !arguments.isEmpty()) {
+            Expression indexExpression = arguments.get(0);
+            
+            // TODO: We need to check Everything.isKnownFunction here
+            // For now, assume it's array indexing if we can't determine otherwise
+            // This check will be enhanced when we have the full context
+            
+            return new UnaryExpression(identifier, indexExpression);
+          }
+        }
+      }
+    }
+    return null;
   }
 
   /**

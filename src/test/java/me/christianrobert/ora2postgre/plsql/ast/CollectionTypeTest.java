@@ -824,30 +824,49 @@ CREATE OR REPLACE FUNCTION TEST_SCHEMA.test_collection_indexing RETURN VARCHAR2 
   TYPE local_array IS VARRAY(10) OF VARCHAR2(100);
   v_arr local_array := local_array('first','second','third');
   v_element VARCHAR2(100);
+  v_index NUMBER := 2;
 BEGIN
-  v_element := v_arr(2); -- Oracle uses 1-based indexing
+  v_element := v_arr(2);        -- Oracle array indexing with literal
+  v_element := v_arr(v_index);  -- Oracle array indexing with variable
   RETURN v_element;
 END;
 /
 """;
 
-    // Expected PostgreSQL transformation:
-    String expectedPostgresSQL = """
-CREATE FUNCTION test_schema.test_collection_indexing() RETURNS text AS $$
-DECLARE
-  v_arr TEXT[] := ARRAY['first','second','third'];
-  v_element text;
-BEGIN
-  v_element := v_arr[2]; -- PostgreSQL also uses 1-based indexing for arrays
-  RETURN v_element;
-END;
-$$ LANGUAGE plpgsql;
-""";
+    // Create test data
+    Everything data = new Everything();
+    data.getUserNames().add("TEST_SCHEMA");
+
+    PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
+
+    // Parse the Oracle function
+    PlSqlAst ast = PlSqlAstMain.processPlsqlCode(plsqlCode);
+
+    assertNotNull(ast);
+    assertTrue(ast instanceof Function);
+
+    Function func = (Function) ast;
+
+    // Generate PostgreSQL using the transformation manager
+    String postgresCode = func.toPostgre(data, false);
+
+    // Debug: Print the actual generated PostgreSQL code
+    System.out.println("Generated PostgreSQL code with array indexing:");
+    System.out.println(postgresCode);
+    System.out.println("=== End of generated code ===");
+
+    // Verify array indexing transformations
+    assertNotNull(postgresCode);
     
-    // This test documents the expected transformation:
-    // Oracle arr(i) → PostgreSQL arr[i]
-    // Both use 1-based indexing, so index values stay the same
-    assertTrue(expectedPostgresSQL.contains("v_arr[2]"));
+    // Test Oracle arr(2) → PostgreSQL arr[2]
+    assertTrue(postgresCode.contains("v_arr[2]"), "Should transform Oracle v_arr(2) to PostgreSQL v_arr[2]");
+    
+    // Test Oracle arr(v_index) → PostgreSQL arr[v_index]
+    assertTrue(postgresCode.contains("v_arr[v_index]"), "Should transform Oracle v_arr(v_index) to PostgreSQL v_arr[v_index]");
+    
+    // Ensure no Oracle-style parentheses indexing remains
+    assertFalse(postgresCode.contains("v_arr(2)"), "Should not contain Oracle-style v_arr(2) syntax");
+    assertFalse(postgresCode.contains("v_arr(v_index)"), "Should not contain Oracle-style v_arr(v_index) syntax");
   }
 
   @Test

@@ -33,6 +33,9 @@ public class UnaryExpression extends PlSqlAst {
   private final Expression implicitCursorExpression;
   private final String collectionMethod; // COUNT, FIRST, LAST, LIMIT, EXISTS, NEXT, PRIOR
   private final List<Expression> methodArguments; // For collection methods with arguments
+  private final boolean isArrayIndexing; // True if this represents array indexing: arr(i) -> arr[i]
+  private final String arrayVariable; // Variable name for array indexing
+  private final Expression indexExpression; // Index expression for array indexing
 
   // Constructor for unary operations (-, +, PRIOR, etc.)
   public UnaryExpression(String unaryOperator, UnaryExpression childExpression) {
@@ -45,6 +48,9 @@ public class UnaryExpression extends PlSqlAst {
     this.implicitCursorExpression = null;
     this.collectionMethod = null;
     this.methodArguments = null;
+    this.isArrayIndexing = false;
+    this.arrayVariable = null;
+    this.indexExpression = null;
   }
 
   // Constructor for case expressions
@@ -58,6 +64,9 @@ public class UnaryExpression extends PlSqlAst {
     this.implicitCursorExpression = null;
     this.collectionMethod = null;
     this.methodArguments = null;
+    this.isArrayIndexing = false;
+    this.arrayVariable = null;
+    this.indexExpression = null;
   }
 
   // Private constructor for specific types
@@ -71,6 +80,9 @@ public class UnaryExpression extends PlSqlAst {
     this.implicitCursorExpression = implicitCursorExpression;
     this.collectionMethod = null;
     this.methodArguments = null;
+    this.isArrayIndexing = false;
+    this.arrayVariable = null;
+    this.indexExpression = null;
   }
 
   // Constructor for standard functions
@@ -94,6 +106,25 @@ public class UnaryExpression extends PlSqlAst {
     this.implicitCursorExpression = null;
     this.collectionMethod = collectionMethod;
     this.methodArguments = methodArguments;
+    this.isArrayIndexing = false;
+    this.arrayVariable = null;
+    this.indexExpression = null;
+  }
+
+  // Constructor for array indexing calls
+  public UnaryExpression(String arrayVariable, Expression indexExpression) {
+    this.unaryOperator = null;
+    this.childExpression = null;
+    this.caseExpression = null;
+    this.quantifiedExpression = null;
+    this.standardFunction = null;
+    this.atom = null;
+    this.implicitCursorExpression = null;
+    this.collectionMethod = null;
+    this.methodArguments = null;
+    this.isArrayIndexing = true;
+    this.arrayVariable = arrayVariable;
+    this.indexExpression = indexExpression;
   }
 
   public String getUnaryOperator() {
@@ -160,6 +191,18 @@ public class UnaryExpression extends PlSqlAst {
     return collectionMethod != null;
   }
 
+  public boolean isArrayIndexing() {
+    return isArrayIndexing;
+  }
+
+  public String getArrayVariable() {
+    return arrayVariable;
+  }
+
+  public Expression getIndexExpression() {
+    return indexExpression;
+  }
+
   @Override
   public <T> T accept(PlSqlAstVisitor<T> visitor) {
     return visitor.visit(this);
@@ -194,6 +237,8 @@ public class UnaryExpression extends PlSqlAst {
         sb.append(")");
       }
       return sb.toString();
+    } else if (isArrayIndexing()) {
+      return arrayVariable + "(" + indexExpression.toString() + ")";
     } else {
       return "/* INVALID UNARY EXPRESSION */";
     }
@@ -216,6 +261,9 @@ public class UnaryExpression extends PlSqlAst {
     } else if (isCollectionMethodCall()) {
       // Transform Oracle collection methods to PostgreSQL function calls
       return transformCollectionMethodToPostgreSQL(data);
+    } else if (isArrayIndexing()) {
+      // Transform Oracle array indexing to PostgreSQL array indexing
+      return transformArrayIndexingToPostgreSQL(data);
     } else {
       return "/* INVALID UNARY EXPRESSION */";
     }
@@ -305,5 +353,19 @@ public class UnaryExpression extends PlSqlAst {
       default:
         return "/* Unknown collection method: " + collectionMethod + " */";
     }
+  }
+
+  /**
+   * Transform Oracle array indexing to PostgreSQL array indexing.
+   * Oracle uses parentheses: arr(i), PostgreSQL uses brackets: arr[i]
+   */
+  private String transformArrayIndexingToPostgreSQL(Everything data) {
+    if (arrayVariable == null || indexExpression == null) {
+      return "/* INVALID ARRAY INDEXING */";
+    }
+    
+    // Transform Oracle arr(i) to PostgreSQL arr[i]
+    String indexString = indexExpression.toPostgre(data);
+    return arrayVariable + "[" + indexString + "]";
   }
 }
