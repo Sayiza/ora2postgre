@@ -63,7 +63,7 @@
 
 ### Technical Implementation Details
 
-#### ✅ PostgreSQL Schema-Level Variables Table Strategy
+#### ✅ PostgreSQL Session-Specific Temporary Tables Strategy
 
 **Oracle Pattern** → **PostgreSQL Implementation**:
 ```sql
@@ -74,27 +74,25 @@ CREATE OR REPLACE PACKAGE my_package AS
   g_config_value VARCHAR2(100) := 'DEFAULT';
 END;
 
--- Generated PostgreSQL Schema-Level Variables
-CREATE TABLE my_package_variables (
-  variable_name VARCHAR(100) PRIMARY KEY,
-  variable_value TEXT,
-  variable_type VARCHAR(50),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+-- Generated PostgreSQL Session-Specific Temporary Tables (One per Variable)
+CREATE TEMPORARY TABLE schema_package_g_cache_timeout (
+  value NUMERIC DEFAULT 300
+) ON COMMIT PRESERVE ROWS;
+INSERT INTO schema_package_g_cache_timeout VALUES (DEFAULT);
 
--- Initialization Function
-CREATE FUNCTION my_package_init_variables() RETURNS VOID ...
+CREATE TEMPORARY TABLE schema_package_g_last_refresh (
+  value DATE
+) ON COMMIT PRESERVE ROWS;
+INSERT INTO schema_package_g_last_refresh VALUES (NULL);
 
--- Getter Functions  
-CREATE FUNCTION my_package_get_g_cache_timeout() RETURNS numeric ...
-CREATE FUNCTION my_package_get_g_last_refresh() RETURNS date ...
-CREATE FUNCTION my_package_get_g_config_value() RETURNS text ...
+CREATE TEMPORARY TABLE schema_package_g_config_value (
+  value TEXT DEFAULT 'DEFAULT'
+) ON COMMIT PRESERVE ROWS;
+INSERT INTO schema_package_g_config_value VALUES (DEFAULT);
 
--- Setter Functions
-CREATE FUNCTION my_package_set_g_cache_timeout(new_value numeric) RETURNS VOID ...
-CREATE FUNCTION my_package_set_g_last_refresh(new_value date) RETURNS VOID ...
-CREATE FUNCTION my_package_set_g_config_value(new_value text) RETURNS VOID ...
+-- Variable Access (Direct Table Access)
+-- Read: SELECT value FROM schema_package_variablename LIMIT 1;
+-- Write: UPDATE schema_package_variablename SET value = 500;
 ```
 
 #### ✅ Implementation Architecture
@@ -104,13 +102,13 @@ CREATE FUNCTION my_package_set_g_config_value(new_value text) RETURNS VOID ...
 - ✅ `PackageVariableTest.java` - Comprehensive test suite (4 test scenarios)
 
 **Features Implemented**:
-1. ✅ **Variable Table Creation**: Schema-qualified variables table per package
-2. ✅ **Initialization Functions**: Package variable initialization with default values
-3. ✅ **Getter Functions**: Type-safe variable retrieval with auto-initialization
-4. ✅ **Setter Functions**: Variable updates with timestamp tracking  
-5. ✅ **Type Safety**: PostgreSQL type mapping (NUMBER→numeric, BOOLEAN→boolean, etc.)
-6. ✅ **Default Values**: Expression evaluation and proper escaping
-7. ✅ **Complex Expressions**: Support for concatenation and arithmetic expressions
+1. ✅ **Session-Specific Storage**: Temporary tables ensure session isolation (like Oracle)
+2. ✅ **One Table Per Variable**: Direct type mapping without conversion overhead
+3. ✅ **Type Safety**: Native PostgreSQL types (NUMBER→numeric, BOOLEAN→boolean, etc.)
+4. ✅ **Default Values**: Direct DEFAULT clause support with expression evaluation
+5. ✅ **Future-Proof Architecture**: Extensible for complex types (arrays, records, objects)
+6. ✅ **Performance**: Direct table access without getter/setter function overhead
+7. ✅ **Unique Naming**: Schema-package-variable naming prevents conflicts (schema_package_variablename)
 
 #### ✅ Test Coverage Completed
 
@@ -427,14 +425,14 @@ The transpilation system has a **strong foundation** with working implementation
 - **Status**: ✅ **IMPLEMENTED AND TESTED**
 - **Oracle**: `g_variable NUMBER := 300;` in package spec/body
 - **PostgreSQL**: Schema-level variables table with getter/setter functions
-- **Implementation**: Enhanced `StandardPackageStrategy.java` with complete variable management system
+- **Implementation**: Enhanced `StandardPackageStrategy.java` with session-specific temporary table approach
 - **Features implemented**:
-  - ✅ Variable table creation per package: `package_variables` table
-  - ✅ Initialization functions: `package_init_variables()` with default values
-  - ✅ Getter functions: `package_get_variable_name()` with type safety
-  - ✅ Setter functions: `package_set_variable_name()` with timestamp tracking
-  - ✅ Complex default expressions: Arithmetic and concatenation support
-  - ✅ Complete type mapping: Oracle→PostgreSQL data type conversion
+  - ✅ Session-specific temporary tables: One `schema_package_variablename` table per variable
+  - ✅ Direct type mapping: Native PostgreSQL types without conversion overhead
+  - ✅ Default value support: Uses PostgreSQL DEFAULT clause with expressions
+  - ✅ Future extensibility: Architecture supports complex Oracle collections and records
+  - ✅ Performance optimized: Direct table access instead of function calls
+  - ✅ Session isolation: Temporary tables solve Oracle package variable session semantics
 - **Test coverage**: `PackageVariableTest.java` with 4 comprehensive test scenarios
 - **Manual testing**: ✅ All tests passing, ready for production use
 

@@ -12,6 +12,10 @@ public class Cursor extends PlSqlAst {
     this.content = content;
   }
 
+  public String getName() {
+    return name;
+  }
+
   @Override
   public <T> T accept(PlSqlAstVisitor<T> visitor) {
     return visitor.visit(this);

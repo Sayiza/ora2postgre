@@ -90,7 +90,7 @@ public class StandardPackageStrategy implements PackageTransformationStrategy {
     
     // Add notes about implemented transformations
     if (!oraclePackage.getVariables().isEmpty()) {
-      notes.append("; Package variables implemented as schema-level variables table with getter/setter functions");
+      notes.append("; Package variables implemented as session-specific temporary tables (one per variable)");
     }
     if (!oraclePackage.getSubtypes().isEmpty()) {
       notes.append("; Package subtypes not yet implemented");  
@@ -109,104 +109,75 @@ public class StandardPackageStrategy implements PackageTransformationStrategy {
   }
 
   /**
-   * Generates PostgreSQL DDL for package variables using a schema-level variables table approach.
-   * This creates a custom table to store package-level variables and provides getter/setter functions.
+   * Generates PostgreSQL DDL for package variables using session-specific temporary tables approach.
+   * This creates one temporary table per variable for session isolation and direct type safety.
    */
   private String generatePackageVariables(OraclePackage oraclePackage, Everything context) {
     StringBuilder b = new StringBuilder();
     String packageName = oraclePackage.getName().toLowerCase();
-    String schemaName = oraclePackage.getSchema().toLowerCase();
-    String variableTableName = packageName + "_variables";
     
-    b.append("-- Package Variables for ").append(schemaName).append(".").append(packageName).append("\n");
-    b.append("-- Implemented using PostgreSQL schema-level variables table\n\n");
+    b.append("-- Package Variables for ").append(oraclePackage.getSchema()).append(".").append(packageName).append("\n");
+    b.append("-- Implemented using PostgreSQL session-specific temporary tables (one per variable)\n\n");
     
-    // Create variables table
-    b.append("CREATE TABLE IF NOT EXISTS ").append(schemaName).append(".").append(variableTableName).append(" (\n");
-    b.append("  variable_name VARCHAR(100) PRIMARY KEY,\n");
-    b.append("  variable_value TEXT,\n");
-    b.append("  variable_type VARCHAR(50),\n");
-    b.append("  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n");
-    b.append("  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP\n");
-    b.append(");\n\n");
-    
-    // Create or replace initialization function
-    b.append("CREATE OR REPLACE FUNCTION ").append(schemaName).append(".").append(packageName).append("_init_variables() \n");
-    b.append("RETURNS VOID\n");
-    b.append("LANGUAGE plpgsql AS $$\n");
-    b.append("BEGIN\n");
-    
-    // Initialize each package variable
+    // Create one temporary table per package variable
     for (Variable variable : oraclePackage.getVariables()) {
       String varName = variable.getName().toLowerCase();
       String varType = variable.getDataType().toPostgre(context);
-      String defaultValue = "NULL";
+      String schemaName = oraclePackage.getSchema().toLowerCase();
+      String tableName = schemaName + "_" + packageName + "_" + varName;
       
+      b.append("-- Temporary table for variable: ").append(variable.getName()).append("\n");
+      b.append("CREATE TEMPORARY TABLE ").append(tableName).append(" (\n");
+      b.append("  value ").append(varType);
+      
+      // Add default value if present
       if (variable.getDefaultValue() != null) {
-        defaultValue = "'" + variable.getDefaultValue().toPostgre(context).replace("'", "''") + "'";
+        String defaultValue = variable.getDefaultValue().toPostgre(context);
+        // Handle different default value types appropriately
+        if (needsQuotes(variable.getDataType(), defaultValue)) {
+          b.append(" DEFAULT '").append(defaultValue.replace("'", "''")).append("'");
+        } else {
+          b.append(" DEFAULT ").append(defaultValue);
+        }
       }
       
-      b.append("  -- Initialize ").append(variable.getName()).append(" (").append(varType).append(")\n");
-      b.append("  INSERT INTO ").append(schemaName).append(".").append(variableTableName).append(" \n");
-      b.append("    (variable_name, variable_value, variable_type) \n");
-      b.append("  VALUES ('").append(varName).append("', ").append(defaultValue).append(", '").append(varType).append("')\n");
-      b.append("  ON CONFLICT (variable_name) DO UPDATE SET \n");
-      b.append("    variable_value = EXCLUDED.variable_value,\n");
-      b.append("    updated_at = CURRENT_TIMESTAMP;\n\n");
+      b.append("\n) ON COMMIT PRESERVE ROWS;\n");
+      
+      // Insert initial value
+      b.append("INSERT INTO ").append(tableName).append(" VALUES (DEFAULT);\n\n");
     }
     
-    b.append("END;\n$$;\n\n");
-    
-    // Create getter and setter functions for each variable
-    for (Variable variable : oraclePackage.getVariables()) {
-      String varName = variable.getName().toLowerCase();
-      String varType = variable.getDataType().toPostgre(context);
-      
-      // Getter function
-      b.append("CREATE OR REPLACE FUNCTION ").append(schemaName).append(".").append(packageName).append("_get_").append(varName).append("() \n");
-      b.append("RETURNS ").append(varType).append("\n");
-      b.append("LANGUAGE plpgsql AS $$\n");
-      b.append("DECLARE\n");
-      b.append("  result ").append(varType).append(";\n");
-      b.append("BEGIN\n");
-      b.append("  SELECT variable_value::").append(varType).append(" INTO result \n");
-      b.append("  FROM ").append(schemaName).append(".").append(variableTableName).append(" \n");
-      b.append("  WHERE variable_name = '").append(varName).append("';\n");
-      b.append("  \n");
-      b.append("  IF NOT FOUND THEN\n");
-      b.append("    -- Initialize if not found\n");
-      b.append("    PERFORM ").append(schemaName).append(".").append(packageName).append("_init_variables();\n");
-      b.append("    SELECT variable_value::").append(varType).append(" INTO result \n");
-      b.append("    FROM ").append(schemaName).append(".").append(variableTableName).append(" \n");
-      b.append("    WHERE variable_name = '").append(varName).append("';\n");
-      b.append("  END IF;\n");
-      b.append("  \n");
-      b.append("  RETURN result;\n");
-      b.append("END;\n$$;\n\n");
-      
-      // Setter function
-      b.append("CREATE OR REPLACE FUNCTION ").append(schemaName).append(".").append(packageName).append("_set_").append(varName).append("(new_value ").append(varType).append(") \n");
-      b.append("RETURNS VOID\n");
-      b.append("LANGUAGE plpgsql AS $$\n");
-      b.append("BEGIN\n");
-      b.append("  UPDATE ").append(schemaName).append(".").append(variableTableName).append(" \n");
-      b.append("  SET variable_value = new_value::TEXT, updated_at = CURRENT_TIMESTAMP \n");
-      b.append("  WHERE variable_name = '").append(varName).append("';\n");
-      b.append("  \n");
-      b.append("  IF NOT FOUND THEN\n");
-      b.append("    -- Initialize if not found\n");
-      b.append("    PERFORM ").append(schemaName).append(".").append(packageName).append("_init_variables();\n");
-      b.append("    UPDATE ").append(schemaName).append(".").append(variableTableName).append(" \n");
-      b.append("    SET variable_value = new_value::TEXT, updated_at = CURRENT_TIMESTAMP \n");
-      b.append("    WHERE variable_name = '").append(varName).append("';\n");
-      b.append("  END IF;\n");
-      b.append("END;\n$$;\n\n");
-    }
-    
-    // Initialize variables on first creation
-    b.append("-- Initialize package variables\n");
-    b.append("SELECT ").append(schemaName).append(".").append(packageName).append("_init_variables();\n\n");
+    b.append("-- Variable Access Pattern:\n");
+    b.append("-- Read:  SELECT value FROM schema_packagename_variablename LIMIT 1;\n");
+    b.append("-- Write: UPDATE schema_packagename_variablename SET value = new_value;\n\n");
     
     return b.toString();
+  }
+  
+  /**
+   * Determines if a default value needs to be quoted based on the data type.
+   */
+  private boolean needsQuotes(DataTypeSpec dataType, String defaultValue) {
+    String pgType = dataType.toPostgre(null).toLowerCase();
+    
+    // Don't quote numeric types, booleans, or expressions
+    if (pgType.contains("numeric") || pgType.contains("integer") || pgType.contains("decimal") ||
+        pgType.contains("boolean") || pgType.contains("bool") ||
+        defaultValue.equalsIgnoreCase("true") || defaultValue.equalsIgnoreCase("false") ||
+        defaultValue.equalsIgnoreCase("null") ||
+        isNumericExpression(defaultValue)) {
+      return false;
+    }
+    
+    // Quote text types and dates
+    return true;
+  }
+  
+  /**
+   * Simple check for numeric expressions that shouldn't be quoted.
+   */
+  private boolean isNumericExpression(String value) {
+    // Simple patterns for numeric expressions
+    return value.matches("^[0-9+\\-*/\\s().]+$") && !value.trim().isEmpty();
   }
 }

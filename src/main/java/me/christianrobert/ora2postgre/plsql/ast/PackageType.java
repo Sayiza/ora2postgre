@@ -11,6 +11,10 @@ public class PackageType extends PlSqlAst {
     this.dataType = dataType;
   }
 
+  public String getName() {
+    return name;
+  }
+
   @Override
   public <T> T accept(PlSqlAstVisitor<T> visitor) {
     return visitor.visit(this);
