@@ -28,27 +28,37 @@ public class StandardPackageStrategy implements PackageTransformationStrategy {
     StringBuilder b = new StringBuilder();
     
     // Transform package variables to PostgreSQL schema-level variables
-    if (!oraclePackage.getVariables().isEmpty()) {
+    // Only generate variables in the spec phase (specOnly=true) to avoid duplication
+    if (specOnly && !oraclePackage.getVariables().isEmpty()) {
       b.append(generatePackageVariables(oraclePackage, context));
       b.append("\n");
     }
     
     // Transform package subtypes - currently TODO in original code
-    for (SubType subtype : oraclePackage.getSubtypes()) {
-      // TODO: Oracle subtypes might need to become PostgreSQL domains or composite types
-      // This is currently a TODO in the original OraclePackage.toPostgre() method
+    // Only generate subtypes in the spec phase (specOnly=true) to avoid duplication
+    if (specOnly) {
+      for (SubType subtype : oraclePackage.getSubtypes()) {
+        // TODO: Oracle subtypes might need to become PostgreSQL domains or composite types
+        // This is currently a TODO in the original OraclePackage.toPostgre() method
+      }
     }
     
-    // Transform package cursors - currently TODO in original code  
-    for (Cursor cursor : oraclePackage.getCursors()) {
-      // TODO: Package cursors might need special handling in PostgreSQL
-      // This is currently a TODO in the original OraclePackage.toPostgre() method
+    // Transform package cursors - currently TODO in original code
+    // Only generate cursors in the spec phase (specOnly=true) to avoid duplication
+    if (specOnly) {
+      for (Cursor cursor : oraclePackage.getCursors()) {
+        // TODO: Package cursors might need special handling in PostgreSQL
+        // This is currently a TODO in the original OraclePackage.toPostgre() method
+      }
     }
     
     // Transform package types - currently TODO in original code
-    for (PackageType type : oraclePackage.getTypes()) {
-      // TODO: Package types might need to become PostgreSQL composite types
-      // This is currently a TODO in the original OraclePackage.toPostgre() method
+    // Only generate types in the spec phase (specOnly=true) to avoid duplication
+    if (specOnly) {
+      for (PackageType type : oraclePackage.getTypes()) {
+        // TODO: Package types might need to become PostgreSQL composite types
+        // This is currently a TODO in the original OraclePackage.toPostgre() method
+      }
     }
     
     // Transform functions
