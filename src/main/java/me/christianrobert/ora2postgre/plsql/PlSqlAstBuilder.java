@@ -1603,6 +1603,48 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
    */
   @Override
   public PlSqlAst visitUnary_expression(PlSqlParser.Unary_expressionContext ctx) {
+    // Handle collection method calls: unary_expression '.' (COUNT | FIRST | LAST | etc.)
+    if (ctx.unary_expression() != null) {
+      // Check for collection methods without arguments
+      if (ctx.COUNT() != null || ctx.FIRST() != null || ctx.LAST() != null || ctx.LIMIT() != null) {
+        // Parse the base expression
+        PlSqlAst baseExpressionAst = visit(ctx.unary_expression());
+        if (baseExpressionAst instanceof UnaryExpression) {
+          String methodName = null;
+          if (ctx.COUNT() != null) methodName = "COUNT";
+          else if (ctx.FIRST() != null) methodName = "FIRST";
+          else if (ctx.LAST() != null) methodName = "LAST";
+          else if (ctx.LIMIT() != null) methodName = "LIMIT";
+          
+          return new UnaryExpression((UnaryExpression) baseExpressionAst, methodName, null);
+        }
+      }
+      
+      // Check for collection methods with arguments: EXISTS, NEXT, PRIOR
+      if (ctx.EXISTS() != null || ctx.NEXT() != null || ctx.PRIOR() != null) {
+        PlSqlAst baseExpressionAst = visit(ctx.unary_expression());
+        if (baseExpressionAst instanceof UnaryExpression) {
+          String methodName = null;
+          if (ctx.EXISTS() != null) methodName = "EXISTS";
+          else if (ctx.NEXT() != null) methodName = "NEXT";
+          else if (ctx.PRIOR() != null) methodName = "PRIOR";
+          
+          // Parse method arguments
+          List<Expression> methodArguments = new ArrayList<>();
+          if (ctx.index != null) {
+            for (var exprCtx : ctx.index) {
+              PlSqlAst argAst = visit(exprCtx);
+              if (argAst instanceof Expression) {
+                methodArguments.add((Expression) argAst);
+              }
+            }
+          }
+          
+          return new UnaryExpression((UnaryExpression) baseExpressionAst, methodName, methodArguments);
+        }
+      }
+    }
+    
     if (ctx.standard_function() != null) {
       PlSqlAst standardFunctionAst = visit(ctx.standard_function());
       if (standardFunctionAst instanceof Expression) {
@@ -1613,6 +1655,12 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     }
     
     if (ctx.atom() != null) {
+      // Check if the atom contains a collection method call before visiting
+      UnaryExpression collectionMethodCall = checkAtomForCollectionMethod(ctx.atom());
+      if (collectionMethodCall != null) {
+        return collectionMethodCall;
+      }
+      
       PlSqlAst atomAst = visit(ctx.atom());
       if (atomAst instanceof Expression) {
         return UnaryExpression.forAtom((Expression) atomAst);
@@ -1623,6 +1671,112 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     
     // For other types of unary expressions, fall back to default behavior
     return visitChildren(ctx);
+  }
+
+  /**
+   * Check if an atom contains a collection method call (e.g., v_arr.COUNT, v_arr.FIRST).
+   * This handles cases where collection methods are parsed through the general_element path
+   * instead of the specific unary_expression dot notation rule.
+   */
+  private UnaryExpression checkAtomForCollectionMethod(PlSqlParser.AtomContext atomCtx) {
+    // Check if atom contains a general_element with dot notation
+    if (atomCtx.general_element() != null) {
+      return checkGeneralElementForCollectionMethod(atomCtx.general_element());
+    }
+    return null;
+  }
+
+  /**
+   * Check if a general_element represents a collection method call.
+   * Looks for patterns like: variable.COUNT, variable.FIRST, variable.LAST, etc.
+   */
+  private UnaryExpression checkGeneralElementForCollectionMethod(PlSqlParser.General_elementContext generalElementCtx) {
+    // Check for the pattern: general_element ('.' general_element_part)+
+    if (generalElementCtx.general_element() != null && 
+        generalElementCtx.general_element_part() != null && 
+        !generalElementCtx.general_element_part().isEmpty()) {
+      
+      // Get the base expression (the variable part)
+      PlSqlParser.General_elementContext baseElement = generalElementCtx.general_element();
+      
+      // Check each dot notation part for collection methods
+      for (PlSqlParser.General_element_partContext partCtx : generalElementCtx.general_element_part()) {
+        String methodName = extractCollectionMethodName(partCtx);
+        if (methodName != null) {
+          // Create a simple text-based expression for the base element
+          String variableName = baseElement.getText();
+          
+          // Create a LogicalExpression that wraps this variable reference
+          LogicalExpression logicalExpr = createLogicalExpressionFromText(variableName);
+          Expression baseExpression = new Expression(logicalExpr);
+          UnaryExpression baseUnaryExpression = UnaryExpression.forAtom(baseExpression);
+          
+          // Check if it's a method with arguments (like EXISTS, NEXT, PRIOR)
+          List<Expression> methodArguments = extractMethodArguments(partCtx);
+          
+          return new UnaryExpression(baseUnaryExpression, methodName, methodArguments);
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Extract collection method name from a general_element_part if it's a collection method.
+   * Returns null if it's not a recognized collection method.
+   */
+  private String extractCollectionMethodName(PlSqlParser.General_element_partContext partCtx) {
+    if (partCtx.id_expression() != null) {
+      String methodName = partCtx.id_expression().getText().toUpperCase();
+      switch (methodName) {
+        case "COUNT":
+        case "FIRST":
+        case "LAST":
+        case "LIMIT":
+        case "EXISTS":
+        case "NEXT":
+        case "PRIOR":
+          return methodName;
+        default:
+          return null;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Extract method arguments from a general_element_part if it has function_argument.
+   * Used for methods like EXISTS(index), NEXT(index), PRIOR(index).
+   */
+  private List<Expression> extractMethodArguments(PlSqlParser.General_element_partContext partCtx) {
+    List<Expression> arguments = new ArrayList<>();
+    
+    if (partCtx.function_argument() != null && !partCtx.function_argument().isEmpty()) {
+      for (PlSqlParser.Function_argumentContext argCtx : partCtx.function_argument()) {
+        if (argCtx.argument() != null && !argCtx.argument().isEmpty()) {
+          for (PlSqlParser.ArgumentContext arg : argCtx.argument()) {
+            if (arg.expression() != null) {
+              PlSqlAst argAst = visit(arg.expression());
+              if (argAst instanceof Expression) {
+                arguments.add((Expression) argAst);
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    return arguments.isEmpty() ? null : arguments;
+  }
+
+  /**
+   * Create a simple LogicalExpression from text.
+   * This is a helper method to wrap variable names in the Expression hierarchy.
+   */
+  private LogicalExpression createLogicalExpressionFromText(String text) {
+    // Create a UnaryLogicalExpression with the text, then wrap it in LogicalExpression
+    UnaryLogicalExpression unaryLogicalExpr = new UnaryLogicalExpression(text);
+    return new LogicalExpression(unaryLogicalExpr);
   }
 
   /**

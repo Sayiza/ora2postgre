@@ -214,24 +214,8 @@ public class UnaryExpression extends PlSqlAst {
     } else if (isImplicitCursorExpression()) {
       return implicitCursorExpression.toPostgre(data);
     } else if (isCollectionMethodCall()) {
-      StringBuilder sb = new StringBuilder();
-      if (childExpression != null) {
-        sb.append(childExpression.toPostgre(data));
-      }
-      
-      // Transform Oracle collection methods to PostgreSQL equivalents
-      String pgMethod = transformCollectionMethod(collectionMethod);
-      sb.append(".").append(pgMethod);
-      
-      if (methodArguments != null && !methodArguments.isEmpty()) {
-        sb.append("(");
-        for (int i = 0; i < methodArguments.size(); i++) {
-          if (i > 0) sb.append(", ");
-          sb.append(methodArguments.get(i).toPostgre(data));
-        }
-        sb.append(")");
-      }
-      return sb.toString();
+      // Transform Oracle collection methods to PostgreSQL function calls
+      return transformCollectionMethodToPostgreSQL(data);
     } else {
       return "/* INVALID UNARY EXPRESSION */";
     }
@@ -264,29 +248,62 @@ public class UnaryExpression extends PlSqlAst {
   }
 
   /**
-   * Transform Oracle collection methods to PostgreSQL equivalents.
+   * Transform Oracle collection methods to PostgreSQL function calls.
+   * This completely restructures the syntax from Oracle dot notation to PostgreSQL functions.
    */
-  private String transformCollectionMethod(String oracleMethod) {
-    if (oracleMethod == null) {
-      return "";
+  private String transformCollectionMethodToPostgreSQL(Everything data) {
+    if (collectionMethod == null || childExpression == null) {
+      return "/* INVALID COLLECTION METHOD CALL */";
     }
     
-    switch (oracleMethod.toUpperCase()) {
+    String arrayExpression = childExpression.toPostgre(data);
+    
+    switch (collectionMethod.toUpperCase()) {
       case "COUNT":
-        return "array_length"; // PostgreSQL array length function
+        // Oracle: arr.COUNT → PostgreSQL: array_length(arr, 1)
+        return "array_length(" + arrayExpression + ", 1)";
+        
       case "FIRST":
-        return "/* FIRST - use array lower bound function */";
+        // Oracle: arr.FIRST → PostgreSQL: 1 (arrays are 1-indexed in PostgreSQL)
+        return "1";
+        
       case "LAST":
-        return "/* LAST - use array upper bound function */";
-      case "LIMIT":
-        return "/* LIMIT - no direct PostgreSQL equivalent */";
+        // Oracle: arr.LAST → PostgreSQL: array_length(arr, 1)
+        return "array_length(" + arrayExpression + ", 1)";
+        
       case "EXISTS":
-        return "/* EXISTS - check if array index exists */";
+        // Oracle: arr.EXISTS(i) → PostgreSQL: (i >= 1 AND i <= array_length(arr, 1))
+        if (methodArguments != null && !methodArguments.isEmpty()) {
+          String index = methodArguments.get(0).toPostgre(data);
+          return "(" + index + " >= 1 AND " + index + " <= array_length(" + arrayExpression + ", 1))";
+        } else {
+          return "/* EXISTS requires an index argument */";
+        }
+        
       case "NEXT":
+        // Oracle: arr.NEXT(i) → PostgreSQL: (CASE WHEN i < array_length(arr, 1) THEN i + 1 ELSE NULL END)
+        if (methodArguments != null && !methodArguments.isEmpty()) {
+          String index = methodArguments.get(0).toPostgre(data);
+          return "(CASE WHEN " + index + " < array_length(" + arrayExpression + ", 1) THEN " + index + " + 1 ELSE NULL END)";
+        } else {
+          return "/* NEXT requires an index argument */";
+        }
+        
       case "PRIOR":
-        return "/* " + oracleMethod + " - no direct PostgreSQL equivalent */";
+        // Oracle: arr.PRIOR(i) → PostgreSQL: (CASE WHEN i > 1 THEN i - 1 ELSE NULL END)
+        if (methodArguments != null && !methodArguments.isEmpty()) {
+          String index = methodArguments.get(0).toPostgre(data);
+          return "(CASE WHEN " + index + " > 1 THEN " + index + " - 1 ELSE NULL END)";
+        } else {
+          return "/* PRIOR requires an index argument */";
+        }
+        
+      case "LIMIT":
+        // Oracle: arr.LIMIT → PostgreSQL: No direct equivalent, return a comment
+        return "/* LIMIT - no direct PostgreSQL equivalent for dynamic array limits */";
+        
       default:
-        return oracleMethod; // Pass through unknown methods
+        return "/* Unknown collection method: " + collectionMethod + " */";
     }
   }
 }

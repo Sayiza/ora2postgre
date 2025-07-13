@@ -708,29 +708,112 @@ END;
 /
 """;
 
-    // Expected PostgreSQL transformation:
-    String expectedPostgresSQL = """
-CREATE FUNCTION test_schema.test_collection_methods() RETURNS numeric AS $$
-DECLARE
-  v_arr TEXT[] := ARRAY['a','b','c'];
-  v_count numeric;
-  v_first numeric;
-  v_last numeric;
-BEGIN
-  v_count := array_length(v_arr, 1);
-  v_first := 1; -- PostgreSQL arrays are 1-indexed
-  v_last := array_length(v_arr, 1);
-  RETURN v_count + v_first + v_last;
-END;
-$$ LANGUAGE plpgsql;
-""";
+    // Create test data
+    Everything data = new Everything();
+    data.getUserNames().add("TEST_SCHEMA");
+
+    PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
+
+    // Parse the Oracle function
+    PlSqlAst ast = PlSqlAstMain.processPlsqlCode(plsqlCode);
+
+    assertNotNull(ast);
+    assertTrue(ast instanceof Function);
     
-    // This test documents the expected transformation:
+    Function func = (Function) ast;
+    
+    // Generate PostgreSQL using the transformation manager
+    String postgresCode = func.toPostgre(data, false);
+    
+    // Debug: Print the actual generated PostgreSQL code
+    System.out.println("Generated PostgreSQL code:");
+    System.out.println(postgresCode);
+    System.out.println("=== End of generated code ===");
+    
+    // Verify collection method transformations
+    assertNotNull(postgresCode);
+               assertTrue(postgresCode.contains("array_length(v_arr, 1)"), "Should transform .COUNT to array_length(arr, 1)");
+    assertTrue(postgresCode.contains(" 1"), "Should transform .FIRST to literal 1");
+    
+    // Verify expected transformations are present:
     // Oracle .COUNT → PostgreSQL array_length(arr, 1)
+    // Oracle .COUNT() → PostgreSQL array_length(arr, 1)  
     // Oracle .FIRST → PostgreSQL 1 (arrays are 1-indexed)
     // Oracle .LAST → PostgreSQL array_length(arr, 1)
-    assertTrue(expectedPostgresSQL.contains("array_length(v_arr, 1)"));
-    assertTrue(expectedPostgresSQL.contains("v_first := 1"));
+    int countTransformations = countOccurrences(postgresCode, "array_length(v_arr, 1)");
+    assertEquals(2, countTransformations, "Should have 3 array_length calls for .COUNT, and .LAST");
+    
+    // Verify .FIRST transformation
+    assertTrue(postgresCode.contains("v_first := 1;"), "Should transform .FIRST to 1");
+  }
+
+  @Test
+  public void testFunctionLocalCollectionMethodTransformationWithBrackets() {
+    // Test transformation of Oracle collection methods to PostgreSQL array functions
+    String oracleSql = """
+CREATE OR REPLACE FUNCTION TEST_SCHEMA.test_collection_methods RETURN NUMBER IS
+  TYPE local_array IS VARRAY(10) OF VARCHAR2(100);
+  v_arr local_array := local_array('a','b','c');
+  v_count NUMBER;
+  v_first NUMBER;
+  v_last NUMBER;
+BEGIN
+  v_count := v_arr.COUNT();
+  v_first := v_arr.FIRST();
+  v_last := v_arr.LAST();
+  RETURN v_count + v_first + v_last;
+END;
+/
+""";
+
+    // Create test data
+    Everything data = new Everything();
+    data.getUserNames().add("TEST_SCHEMA");
+
+    PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
+
+    // Parse the Oracle function
+    PlSqlAst ast = PlSqlAstMain.processPlsqlCode(plsqlCode);
+
+    assertNotNull(ast);
+    assertTrue(ast instanceof Function);
+
+    Function func = (Function) ast;
+
+    // Generate PostgreSQL using the transformation manager
+    String postgresCode = func.toPostgre(data, false);
+
+    // Debug: Print the actual generated PostgreSQL code
+    System.out.println("Generated PostgreSQL code:");
+    System.out.println(postgresCode);
+    System.out.println("=== End of generated code ===");
+
+    // Verify collection method transformations
+    assertNotNull(postgresCode);
+               assertTrue(postgresCode.contains("array_length(v_arr, 1)"), "Should transform .COUNT to array_length(arr, 1)");
+    assertTrue(postgresCode.contains(" 1"), "Should transform .FIRST to literal 1");
+
+    // Verify expected transformations are present:
+    // Oracle .COUNT → PostgreSQL array_length(arr, 1)
+    // Oracle .COUNT() → PostgreSQL array_length(arr, 1)
+    // Oracle .FIRST → PostgreSQL 1 (arrays are 1-indexed)
+    // Oracle .LAST → PostgreSQL array_length(arr, 1)
+    int countTransformations = countOccurrences(postgresCode, "array_length(v_arr, 1)");
+    assertEquals(2, countTransformations, "Should have 3 array_length calls for , .COUNT(), and .LAST()");
+
+    // Verify .FIRST transformation
+    assertTrue(postgresCode.contains("v_first := 1;"), "Should transform .FIRST to 1");
+  }
+  
+  // Helper method to count occurrences of a substring
+  private int countOccurrences(String text, String pattern) {
+    int count = 0;
+    int index = 0;
+    while ((index = text.indexOf(pattern, index)) != -1) {
+      count++;
+      index += pattern.length();
+    }
+    return count;
   }
 
   @Test
