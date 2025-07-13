@@ -501,9 +501,13 @@ END;
     Function func = (Function) ast;
     assertEquals("TEST_SCHEMA.test_func", func.getName());
     
-    // Should have local collection type declarations parsed in function
-    // Note: This test will fail until we implement function-local collection parsing
-    // For now, it serves as a specification for the expected behavior
+    // Verify function-local collection types are parsed
+    assertEquals(1, func.getVarrayTypes().size());
+    assertEquals(0, func.getNestedTableTypes().size());
+    
+    VarrayType localArray = func.getVarrayTypes().get(0);
+    assertEquals("local_array", localArray.getName());
+    assertEquals("text[]", localArray.toPostgre(data));
   }
 
   @Test
@@ -534,8 +538,13 @@ END;
     Function func = (Function) ast;
     assertEquals("TEST_SCHEMA.test_func", func.getName());
     
-    // Should have local collection type declarations parsed in function
-    // Note: This test will fail until we implement function-local collection parsing
+    // Verify function-local collection types are parsed
+    assertEquals(0, func.getVarrayTypes().size());
+    assertEquals(1, func.getNestedTableTypes().size());
+    
+    NestedTableType localTable = func.getNestedTableTypes().get(0);
+    assertEquals("local_table", localTable.getName());
+    assertEquals("numeric[]", localTable.toPostgre(data));
   }
 
   @Test

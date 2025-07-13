@@ -61,4 +61,38 @@ public class DataTypeSpec extends PlSqlAst {
     
     return " /* data type not implemented  */ ";
   }
+
+  public String toPostgre(Everything data, Function function) {
+    if ( nativeDataType != null ) {
+      return TypeConverter.toPostgre(nativeDataType);
+    }
+    
+    // Handle function-local collection types using direct array syntax
+    if ( custumDataType != null && function != null ) {
+      // Look for the custom type in function's local collection types
+      
+      // Check VARRAY types
+      for (VarrayType varrayType : function.getVarrayTypes()) {
+        if (varrayType.getName().equalsIgnoreCase(custumDataType)) {
+          // Return direct PostgreSQL array syntax for function-local VARRAYs
+          return varrayType.toPostgre(data);
+        }
+      }
+      
+      // Check TABLE OF types  
+      for (NestedTableType nestedTableType : function.getNestedTableTypes()) {
+        if (nestedTableType.getName().equalsIgnoreCase(custumDataType)) {
+          // Return direct PostgreSQL array syntax for function-local TABLE OF
+          return nestedTableType.toPostgre(data);
+        }
+      }
+      
+      // If not found in function-local types, fall back to package-level resolution
+      if (function.getParentPackage() != null) {
+        return toPostgre(data, function.getParentPackage().getSchema(), function.getParentPackage().getName());
+      }
+    }
+    
+    return " /* data type not implemented  */ ";
+  }
 }

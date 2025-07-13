@@ -43,4 +43,13 @@ public class Variable extends PlSqlAst {
     ;
     return b.toString();
   }
+
+  public String toPostgre(Everything data, Function function) {
+    StringBuilder b = new StringBuilder();
+    b.append(name)
+            .append(" ")
+            .append(dataType.toPostgre(data, function))
+    ;
+    return b.toString();
+  }
 }

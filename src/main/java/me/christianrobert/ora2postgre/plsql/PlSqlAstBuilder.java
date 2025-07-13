@@ -138,6 +138,48 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     return recordTypes;
   }
 
+  /**
+   * Extracts VARRAY type declarations from seq_of_declare_specs context.
+   * Returns a list of VarrayType objects found in the DECLARE section.
+   */
+  public List<VarrayType> extractVarrayTypesFromDeclareSpecs(PlSqlParser.Seq_of_declare_specsContext ctx) {
+    List<VarrayType> varrayTypes = new ArrayList<>();
+    
+    if (ctx != null && ctx.declare_spec() != null) {
+      for (PlSqlParser.Declare_specContext declareSpec : ctx.declare_spec()) {
+        if (declareSpec.type_declaration() != null) {
+          PlSqlAst typeDeclaration = visit(declareSpec.type_declaration());
+          if (typeDeclaration instanceof VarrayType) {
+            varrayTypes.add((VarrayType) typeDeclaration);
+          }
+        }
+      }
+    }
+    
+    return varrayTypes;
+  }
+
+  /**
+   * Extracts TABLE OF type declarations from seq_of_declare_specs context.
+   * Returns a list of NestedTableType objects found in the DECLARE section.
+   */
+  public List<NestedTableType> extractNestedTableTypesFromDeclareSpecs(PlSqlParser.Seq_of_declare_specsContext ctx) {
+    List<NestedTableType> nestedTableTypes = new ArrayList<>();
+    
+    if (ctx != null && ctx.declare_spec() != null) {
+      for (PlSqlParser.Declare_specContext declareSpec : ctx.declare_spec()) {
+        if (declareSpec.type_declaration() != null) {
+          PlSqlAst typeDeclaration = visit(declareSpec.type_declaration());
+          if (typeDeclaration instanceof NestedTableType) {
+            nestedTableTypes.add((NestedTableType) typeDeclaration);
+          }
+        }
+      }
+    }
+    
+    return nestedTableTypes;
+  }
+
   @Override
   public PlSqlAst visitSeq_of_declare_specs(PlSqlParser.Seq_of_declare_specsContext ctx) {
     // This method is called when seq_of_declare_specs is visited directly
@@ -1111,12 +1153,16 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     List<Variable> variables = new ArrayList<>();
     List<CursorDeclaration> cursorDeclarations = new ArrayList<>();
     List<RecordType> recordTypes = new ArrayList<>();
+    List<VarrayType> varrayTypes = new ArrayList<>();
+    List<NestedTableType> nestedTableTypes = new ArrayList<>();
     if (ctx.seq_of_declare_specs() != null) {
       variables = extractVariablesFromDeclareSpecs(ctx.seq_of_declare_specs());
       cursorDeclarations = extractCursorDeclarationsFromDeclareSpecs(ctx.seq_of_declare_specs());
       recordTypes = extractRecordTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
+      varrayTypes = extractVarrayTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
+      nestedTableTypes = extractNestedTableTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
     }
-    return new Function(ctx.function_name().getText(), parameters, variables, cursorDeclarations, recordTypes, returnType, statements, null);
+    return new Function(ctx.function_name().getText(), parameters, variables, cursorDeclarations, recordTypes, varrayTypes, nestedTableTypes, returnType, statements, null);
   }
 
   @Override
@@ -1132,10 +1178,14 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     List<Variable> variables = new ArrayList<>();
     List<CursorDeclaration> cursorDeclarations = new ArrayList<>();
     List<RecordType> recordTypes = new ArrayList<>();
+    List<VarrayType> varrayTypes = new ArrayList<>();
+    List<NestedTableType> nestedTableTypes = new ArrayList<>();
     if (ctx.seq_of_declare_specs() != null) {
       variables = extractVariablesFromDeclareSpecs(ctx.seq_of_declare_specs());
       cursorDeclarations = extractCursorDeclarationsFromDeclareSpecs(ctx.seq_of_declare_specs());
       recordTypes = extractRecordTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
+      varrayTypes = extractVarrayTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
+      nestedTableTypes = extractNestedTableTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
     }
 
     List<Statement> statements = new ArrayList<>();
@@ -1268,10 +1318,14 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     List<Variable> variables = new ArrayList<>();
     List<CursorDeclaration> cursorDeclarations = new ArrayList<>();
     List<RecordType> recordTypes = new ArrayList<>();
+    List<VarrayType> varrayTypes = new ArrayList<>();
+    List<NestedTableType> nestedTableTypes = new ArrayList<>();
     if (ctx.seq_of_declare_specs() != null) {
       variables = extractVariablesFromDeclareSpecs(ctx.seq_of_declare_specs());
       cursorDeclarations = extractCursorDeclarationsFromDeclareSpecs(ctx.seq_of_declare_specs());
       recordTypes = extractRecordTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
+      varrayTypes = extractVarrayTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
+      nestedTableTypes = extractNestedTableTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
     }
 
     List<Statement> statements = new ArrayList<>();
@@ -1315,10 +1369,14 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     List<Variable> variables = new ArrayList<>();
     List<CursorDeclaration> cursorDeclarations = new ArrayList<>();
     List<RecordType> recordTypes = new ArrayList<>();
+    List<VarrayType> varrayTypes = new ArrayList<>();
+    List<NestedTableType> nestedTableTypes = new ArrayList<>();
     if (ctx.seq_of_declare_specs() != null) {
       variables = extractVariablesFromDeclareSpecs(ctx.seq_of_declare_specs());
       cursorDeclarations = extractCursorDeclarationsFromDeclareSpecs(ctx.seq_of_declare_specs());
       recordTypes = extractRecordTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
+      varrayTypes = extractVarrayTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
+      nestedTableTypes = extractNestedTableTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
     }
 
     // Parse exception block if present
@@ -1327,7 +1385,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       exceptionBlock = parseExceptionBlock(ctx.body().exception_handler());
     }
 
-    return new Function(procedureName, parameters, variables, cursorDeclarations, recordTypes, returnType, statements, exceptionBlock);
+    return new Function(procedureName, parameters, variables, cursorDeclarations, recordTypes, varrayTypes, nestedTableTypes, returnType, statements, exceptionBlock);
   }
 
   /**
@@ -1456,13 +1514,17 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     List<Variable> variables = new ArrayList<>();
     List<CursorDeclaration> cursorDeclarations = new ArrayList<>();
     List<RecordType> recordTypes = new ArrayList<>();
+    List<VarrayType> varrayTypes = new ArrayList<>();
+    List<NestedTableType> nestedTableTypes = new ArrayList<>();
     if (ctx.seq_of_declare_specs() != null) {
       variables = extractVariablesFromDeclareSpecs(ctx.seq_of_declare_specs());
       cursorDeclarations = extractCursorDeclarationsFromDeclareSpecs(ctx.seq_of_declare_specs());
       recordTypes = extractRecordTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
+      varrayTypes = extractVarrayTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
+      nestedTableTypes = extractNestedTableTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
     }
     
-    Function function = new Function(functionName, parameters, variables, cursorDeclarations, recordTypes, returnType, statements, null);
+    Function function = new Function(functionName, parameters, variables, cursorDeclarations, recordTypes, varrayTypes, nestedTableTypes, returnType, statements, null);
     function.setStandalone(true);
     function.setSchema(schema);
     return function;
@@ -1484,10 +1546,14 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     List<Variable> variables = new ArrayList<>();
     List<CursorDeclaration> cursorDeclarations = new ArrayList<>();
     List<RecordType> recordTypes = new ArrayList<>();
+    List<VarrayType> varrayTypes = new ArrayList<>();
+    List<NestedTableType> nestedTableTypes = new ArrayList<>();
     if (ctx.seq_of_declare_specs() != null) {
       variables = extractVariablesFromDeclareSpecs(ctx.seq_of_declare_specs());
       cursorDeclarations = extractCursorDeclarationsFromDeclareSpecs(ctx.seq_of_declare_specs());
       recordTypes = extractRecordTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
+      varrayTypes = extractVarrayTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
+      nestedTableTypes = extractNestedTableTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
     }
     
     List<Statement> statements = new ArrayList<>();

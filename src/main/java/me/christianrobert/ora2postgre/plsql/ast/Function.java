@@ -38,6 +38,8 @@ public class Function extends PlSqlAst {
     this.variables = variables;
     this.cursorDeclarations = new ArrayList<>(); // Initialize empty list
     this.recordTypes = new ArrayList<>(); // Initialize empty list
+    this.varrayTypes = new ArrayList<>(); // Initialize empty list
+    this.nestedTableTypes = new ArrayList<>(); // Initialize empty list
     this.returnType = returnType;
     this.statements = statements;
     this.exceptionBlock = null; // No exception handling by default
@@ -55,6 +57,8 @@ public class Function extends PlSqlAst {
     this.variables = variables;
     this.cursorDeclarations = new ArrayList<>(); // Initialize empty list
     this.recordTypes = new ArrayList<>(); // Initialize empty list
+    this.varrayTypes = new ArrayList<>(); // Initialize empty list
+    this.nestedTableTypes = new ArrayList<>(); // Initialize empty list
     this.returnType = returnType;
     this.statements = statements;
     this.exceptionBlock = exceptionBlock;
@@ -74,6 +78,31 @@ public class Function extends PlSqlAst {
     this.variables = variables != null ? variables : new ArrayList<>();
     this.cursorDeclarations = cursorDeclarations != null ? cursorDeclarations : new ArrayList<>();
     this.recordTypes = recordTypes != null ? recordTypes : new ArrayList<>();
+    this.varrayTypes = new ArrayList<>(); // Initialize empty list
+    this.nestedTableTypes = new ArrayList<>(); // Initialize empty list
+    this.returnType = returnType;
+    this.statements = statements;
+    this.exceptionBlock = exceptionBlock;
+  }
+
+  // Constructor with all local declaration types (including collection types)
+  public Function(String name,
+                  List<Parameter> parameters,
+                  List<Variable> variables,
+                  List<CursorDeclaration> cursorDeclarations,
+                  List<RecordType> recordTypes,
+                  List<VarrayType> varrayTypes,
+                  List<NestedTableType> nestedTableTypes,
+                  String returnType,
+                  List<Statement> statements,
+                  ExceptionBlock exceptionBlock) {
+    this.name = name;
+    this.parameters = parameters;
+    this.variables = variables != null ? variables : new ArrayList<>();
+    this.cursorDeclarations = cursorDeclarations != null ? cursorDeclarations : new ArrayList<>();
+    this.recordTypes = recordTypes != null ? recordTypes : new ArrayList<>();
+    this.varrayTypes = varrayTypes != null ? varrayTypes : new ArrayList<>();
+    this.nestedTableTypes = nestedTableTypes != null ? nestedTableTypes : new ArrayList<>();
     this.returnType = returnType;
     this.statements = statements;
     this.exceptionBlock = exceptionBlock;
@@ -157,6 +186,22 @@ public class Function extends PlSqlAst {
 
   public void setRecordTypes(List<RecordType> recordTypes) {
     this.recordTypes = recordTypes != null ? recordTypes : new ArrayList<>();
+  }
+
+  public List<VarrayType> getVarrayTypes() {
+    return varrayTypes;
+  }
+
+  public void setVarrayTypes(List<VarrayType> varrayTypes) {
+    this.varrayTypes = varrayTypes != null ? varrayTypes : new ArrayList<>();
+  }
+
+  public List<NestedTableType> getNestedTableTypes() {
+    return nestedTableTypes;
+  }
+
+  public void setNestedTableTypes(List<NestedTableType> nestedTableTypes) {
+    this.nestedTableTypes = nestedTableTypes != null ? nestedTableTypes : new ArrayList<>();
   }
 
   @Override
