@@ -507,7 +507,15 @@ END;
     
     VarrayType localArray = func.getVarrayTypes().get(0);
     assertEquals("local_array", localArray.getName());
-    assertEquals("text[]", localArray.toPostgre(data));
+    
+    // Test that variables using function-local collection types resolve correctly
+    assertEquals(1, func.getVariables().size());
+    Variable variable = func.getVariables().get(0);
+    assertEquals("v_arr", variable.getName());
+    
+    // Test PostgreSQL generation with function context
+    String postgresVarDecl = variable.toPostgre(data, func);
+    assertEquals("v_arr text[]", postgresVarDecl);
   }
 
   @Test
@@ -544,30 +552,56 @@ END;
     
     NestedTableType localTable = func.getNestedTableTypes().get(0);
     assertEquals("local_table", localTable.getName());
-    assertEquals("numeric[]", localTable.toPostgre(data));
+    
+    // Test that variables using function-local collection types resolve correctly
+    assertEquals(1, func.getVariables().size());
+    Variable variable = func.getVariables().get(0);
+    assertEquals("v_arr", variable.getName());
+    
+    // Test PostgreSQL generation with function context
+    String postgresVarDecl = variable.toPostgre(data, func);
+    assertEquals("v_arr numeric[]", postgresVarDecl);
   }
 
   @Test
   public void testFunctionLocalCollectionTypeGeneration() {
-    // Test PostgreSQL generation for function with local collection types
-    // Expected output should use direct array syntax (TEXT[], numeric[])
-    // without creating schema-level DOMAINs
-    
-    String expectedPostgresSQL = """
-CREATE FUNCTION test_schema.test_func() RETURNS numeric AS $$
-DECLARE
-  v_arr TEXT[] := ARRAY['a','b'];
+    // Test complete PostgreSQL generation for function with local collection types
+    String oracleSql = """
+CREATE OR REPLACE FUNCTION TEST_SCHEMA.test_func RETURN NUMBER IS
+  TYPE local_array IS VARRAY(10) OF VARCHAR2(100);
+  v_arr local_array := local_array('a','b');
 BEGIN
-  RETURN array_length(v_arr, 1);
+  RETURN v_arr.COUNT;
 END;
-$$ LANGUAGE plpgsql;
+/
 """;
+
+    // Create test data
+    Everything data = new Everything();
+    data.getUserNames().add("TEST_SCHEMA");
+
+    PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
+
+    // Parse the Oracle function
+    PlSqlAst ast = PlSqlAstMain.processPlsqlCode(plsqlCode);
+
+    assertNotNull(ast);
+    assertTrue(ast instanceof Function);
     
-    // This test documents the expected PostgreSQL output format
-    // Implementation will generate this from Oracle function with local VARRAY
-    assertTrue(expectedPostgresSQL.contains("TEXT[]"));
-    assertTrue(expectedPostgresSQL.contains("ARRAY['a','b']"));
-    assertTrue(expectedPostgresSQL.contains("array_length(v_arr, 1)"));
+    Function func = (Function) ast;
+    
+    // Generate PostgreSQL using the transformation manager
+    String postgresCode = func.toPostgre(data, false);
+    
+    // Verify PostgreSQL output contains correct array syntax
+    assertNotNull(postgresCode);
+    assertTrue(postgresCode.contains("text[]"), "Should contain direct array syntax");
+    assertFalse(postgresCode.contains("CREATE DOMAIN"), "Should NOT create DOMAINs for function-local types");
+    assertTrue(postgresCode.contains("v_arr text[]"), "Variable should use direct array type");
+    
+    // Expected format: no type definitions, just variable declarations with direct array syntax
+    assertTrue(postgresCode.contains("DECLARE"));
+    assertTrue(postgresCode.contains("v_arr text[]"));
   }
 
   @Test

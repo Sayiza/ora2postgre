@@ -47,6 +47,9 @@ public class DataTypeSpec extends PlSqlAst {
     return toPostgre(data, null, null);
   }
 
+  // this function is currently only called under the assumption that a package level
+  // variable is being used, and needs to be augmented to the full name
+  // by the convention schema_package_name
   public String toPostgre(Everything data, String schemaName, String packageName) {
     if ( nativeDataType != null ) {
       return TypeConverter.toPostgre(nativeDataType);
@@ -67,23 +70,31 @@ public class DataTypeSpec extends PlSqlAst {
       return TypeConverter.toPostgre(nativeDataType);
     }
     
-    // Handle function-local collection types using direct array syntax
+    // Handle function-local collection types as type aliases
     if ( custumDataType != null && function != null ) {
       // Look for the custom type in function's local collection types
       
-      // Check VARRAY types
+      // Check VARRAY types - resolve to base type + []
       for (VarrayType varrayType : function.getVarrayTypes()) {
         if (varrayType.getName().equalsIgnoreCase(custumDataType)) {
-          // Return direct PostgreSQL array syntax for function-local VARRAYs
-          return varrayType.toPostgre(data);
+          // Get the base type from the VARRAY definition and add []
+          String baseType = varrayType.getDataType().toPostgre(data);
+          if (baseType.contains("/* data type not implemented")) {
+            return "text[]"; // fallback
+          }
+          return baseType + "[]";
         }
       }
       
-      // Check TABLE OF types  
+      // Check TABLE OF types - resolve to base type + []
       for (NestedTableType nestedTableType : function.getNestedTableTypes()) {
         if (nestedTableType.getName().equalsIgnoreCase(custumDataType)) {
-          // Return direct PostgreSQL array syntax for function-local TABLE OF
-          return nestedTableType.toPostgre(data);
+          // Get the base type from the TABLE OF definition and add []
+          String baseType = nestedTableType.getDataType().toPostgre(data);
+          if (baseType.contains("/* data type not implemented")) {
+            return "text[]"; // fallback
+          }
+          return baseType + "[]";
         }
       }
       

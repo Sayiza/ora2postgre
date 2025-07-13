@@ -67,7 +67,7 @@ public class StandardFunctionStrategy implements FunctionTransformationStrategy 
       if (function.getVariables() != null && !function.getVariables().isEmpty()) {
         for (me.christianrobert.ora2postgre.plsql.ast.Variable variable : function.getVariables()) {
           b.append("  ")
-                  .append(variable.toPostgre(context))
+                  .append(variable.toPostgre(context, function))
                   .append(";")
                   .append("\n");
         }
