@@ -61,6 +61,13 @@ public class StandardPackageStrategy implements PackageTransformationStrategy {
       }
     }
     
+    // Transform record types to PostgreSQL composite types
+    // Only generate record types in the spec phase (specOnly=true) to avoid duplication
+    if (specOnly && !oraclePackage.getRecordTypes().isEmpty()) {
+      b.append(generateRecordTypes(oraclePackage, context));
+      b.append("\n");
+    }
+    
     // Transform functions
     for (Function function : oraclePackage.getFunctions()) {
       b.append(function.toPostgre(context, specOnly));
@@ -110,6 +117,9 @@ public class StandardPackageStrategy implements PackageTransformationStrategy {
     }
     if (!oraclePackage.getTypes().isEmpty()) {
       notes.append("; Package types not yet implemented");
+    }
+    if (!oraclePackage.getRecordTypes().isEmpty()) {
+      notes.append("; Package record types implemented as PostgreSQL composite types");
     }
     if (!oraclePackage.getBodyStatements().isEmpty()) {
       notes.append("; Body statements not yet passed to functions/procedures");
@@ -189,5 +199,40 @@ public class StandardPackageStrategy implements PackageTransformationStrategy {
   private boolean isNumericExpression(String value) {
     // Simple patterns for numeric expressions
     return value.matches("^[0-9+\\-*/\\s().]+$") && !value.trim().isEmpty();
+  }
+  
+  /**
+   * Generates PostgreSQL DDL for package record types using CREATE TYPE statements.
+   * This creates PostgreSQL composite types that can be used within package functions and procedures.
+   */
+  private String generateRecordTypes(OraclePackage oraclePackage, Everything context) {
+    StringBuilder b = new StringBuilder();
+    String packageName = oraclePackage.getName().toLowerCase();
+    String schemaName = oraclePackage.getSchema().toLowerCase();
+    
+    b.append("-- Record Types for ").append(oraclePackage.getSchema()).append(".").append(packageName).append("\n");
+    b.append("-- Implemented using PostgreSQL composite types\n\n");
+    
+    for (RecordType recordType : oraclePackage.getRecordTypes()) {
+      String typeName = schemaName + "_" + packageName + "_" + recordType.getName().toLowerCase();
+      
+      b.append("-- Record type: ").append(recordType.getName()).append("\n");
+      
+      // Get the PostgreSQL DDL and replace the type name to include package prefix
+      String recordTypeDDL = recordType.toPostgre(context);
+      if (recordTypeDDL.contains("CREATE TYPE " + recordType.getName().toLowerCase() + " AS")) {
+        recordTypeDDL = recordTypeDDL.replace("CREATE TYPE " + recordType.getName().toLowerCase() + " AS", 
+                                              "CREATE TYPE " + typeName + " AS");
+      }
+      
+      b.append(recordTypeDDL);
+      b.append("\n\n");
+    }
+    
+    b.append("-- Usage Pattern:\n");
+    b.append("-- DECLARE variable_name schema_packagename_recordtypename;\n");
+    b.append("-- Example: DECLARE emp_rec test_schema_emp_pkg_employee_record;\n\n");
+    
+    return b.toString();
   }
 }

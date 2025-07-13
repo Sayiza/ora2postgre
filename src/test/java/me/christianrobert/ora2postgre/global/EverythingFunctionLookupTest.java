@@ -347,7 +347,7 @@ class EverythingFunctionLookupTest {
     functions.add(function);
 
     return new OraclePackage(name, schema, new ArrayList<>(), new ArrayList<>(),
-            new ArrayList<>(), new ArrayList<>(), functions, new ArrayList<>(), new ArrayList<>());
+            new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), functions, new ArrayList<>(), new ArrayList<>());
   }
 
   private Function createTestFunction(String name, String returnType) {
@@ -361,6 +361,6 @@ class EverythingFunctionLookupTest {
     }
 
     return new OraclePackage(name, schema, new ArrayList<>(), new ArrayList<>(),
-            new ArrayList<>(), new ArrayList<>(), functionList, new ArrayList<>(), new ArrayList<>());
+            new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), functionList, new ArrayList<>(), new ArrayList<>());
   }
 }

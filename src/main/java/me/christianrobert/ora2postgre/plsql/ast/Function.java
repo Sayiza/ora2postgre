@@ -14,6 +14,7 @@ public class Function extends PlSqlAst {
   private List<Parameter> parameters;
   private List<Variable> variables; // Variable declarations from DECLARE section
   private List<CursorDeclaration> cursorDeclarations; // Cursor declarations from DECLARE section
+  private List<RecordType> recordTypes; // Record type declarations from DECLARE section
   private String returnType;
   private List<Statement> statements;
   private ExceptionBlock exceptionBlock; // Exception handling
@@ -34,6 +35,7 @@ public class Function extends PlSqlAst {
     this.parameters = parameters;
     this.variables = variables;
     this.cursorDeclarations = new ArrayList<>(); // Initialize empty list
+    this.recordTypes = new ArrayList<>(); // Initialize empty list
     this.returnType = returnType;
     this.statements = statements;
     this.exceptionBlock = null; // No exception handling by default
@@ -50,6 +52,26 @@ public class Function extends PlSqlAst {
     this.parameters = parameters;
     this.variables = variables;
     this.cursorDeclarations = new ArrayList<>(); // Initialize empty list
+    this.recordTypes = new ArrayList<>(); // Initialize empty list
+    this.returnType = returnType;
+    this.statements = statements;
+    this.exceptionBlock = exceptionBlock;
+  }
+
+  // Constructor with record types and cursor declarations
+  public Function(String name,
+                  List<Parameter> parameters,
+                  List<Variable> variables,
+                  List<CursorDeclaration> cursorDeclarations,
+                  List<RecordType> recordTypes,
+                  String returnType,
+                  List<Statement> statements,
+                  ExceptionBlock exceptionBlock) {
+    this.name = name;
+    this.parameters = parameters;
+    this.variables = variables != null ? variables : new ArrayList<>();
+    this.cursorDeclarations = cursorDeclarations != null ? cursorDeclarations : new ArrayList<>();
+    this.recordTypes = recordTypes != null ? recordTypes : new ArrayList<>();
     this.returnType = returnType;
     this.statements = statements;
     this.exceptionBlock = exceptionBlock;
@@ -125,6 +147,14 @@ public class Function extends PlSqlAst {
 
   public void setCursorDeclarations(List<CursorDeclaration> cursorDeclarations) {
     this.cursorDeclarations = cursorDeclarations != null ? cursorDeclarations : new ArrayList<>();
+  }
+
+  public List<RecordType> getRecordTypes() {
+    return recordTypes;
+  }
+
+  public void setRecordTypes(List<RecordType> recordTypes) {
+    this.recordTypes = recordTypes != null ? recordTypes : new ArrayList<>();
   }
 
   @Override

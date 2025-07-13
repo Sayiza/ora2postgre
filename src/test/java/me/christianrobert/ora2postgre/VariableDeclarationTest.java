@@ -157,12 +157,13 @@ public class VariableDeclarationTest {
             "TESTPACKAGE", 
             "TEST_SCHEMA", 
             Collections.emptyList(), // variables
-            Collections.emptyList(), // packageTypes  
-            Collections.emptyList(), // subTypes
+            Collections.emptyList(), // subTypes  
             Collections.emptyList(), // cursors
+            Collections.emptyList(), // packageTypes
+            Collections.emptyList(), // recordTypes
             Collections.emptyList(), // functions
             Collections.emptyList(), // procedures
-            Collections.emptyList()  // comments
+            Collections.emptyList()  // bodyStatements
         );
     }
 }

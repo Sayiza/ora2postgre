@@ -77,6 +77,16 @@ public class StandardProcedureStrategy implements ProcedureTransformationStrateg
         }
       }
       
+      // Add record type declarations from DECLARE section
+      if (procedure.getRecordTypes() != null && !procedure.getRecordTypes().isEmpty()) {
+        for (me.christianrobert.ora2postgre.plsql.ast.RecordType recordType : procedure.getRecordTypes()) {
+          // Record types need to be created at the schema level, not inside procedures
+          // For now, add a comment indicating the record type is needed
+          b.append("  -- Record type ").append(recordType.getName())
+                  .append(" should be created as composite type at schema level\n");
+        }
+      }
+      
       // Collect and add variable declarations from FOR loops and other nested statements
       StringBuilder declarations = StatementDeclarationCollector.collectNecessaryDeclarations(
               procedure.getStatements(), context);

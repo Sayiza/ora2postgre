@@ -90,6 +90,7 @@ public class ExportPackage {
       mergeSubTypes(spec.getSubtypes(), body.getSubtypes()),
       mergeCursors(spec.getCursors(), body.getCursors()),
       mergePackageTypes(spec.getTypes(), body.getTypes()),
+      mergeRecordTypes(spec.getRecordTypes(), body.getRecordTypes()),
       mergeFunctions(spec.getFunctions(), body.getFunctions()),
       mergeProcedures(spec.getProcedures(), body.getProcedures()),
       body.getBodyStatements() // Body statements only exist in body
@@ -249,5 +250,34 @@ public class ExportPackage {
     // Only return body procedures (they have implementations)
     // Spec procedures are just declarations without implementation  
     return bodyProcedures != null ? bodyProcedures : new ArrayList<>();
+  }
+
+  /**
+   * Merges record types from spec and body, avoiding duplicates by name.
+   * Record types can be declared in both spec and body.
+   */
+  private static List<RecordType> mergeRecordTypes(List<RecordType> specRecordTypes, List<RecordType> bodyRecordTypes) {
+    List<RecordType> merged = new ArrayList<>();
+    Set<String> recordTypeNames = new HashSet<>();
+    
+    // Add spec record types first (they are declarations)
+    if (specRecordTypes != null) {
+      for (RecordType recordType : specRecordTypes) {
+        if (recordTypeNames.add(recordType.getName())) {
+          merged.add(recordType);
+        }
+      }
+    }
+    
+    // Add body record types (avoid duplicates)
+    if (bodyRecordTypes != null) {
+      for (RecordType recordType : bodyRecordTypes) {
+        if (recordTypeNames.add(recordType.getName())) {
+          merged.add(recordType);
+        }
+      }
+    }
+    
+    return merged;
   }
 }

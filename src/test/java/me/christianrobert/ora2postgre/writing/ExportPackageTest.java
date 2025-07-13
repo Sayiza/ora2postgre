@@ -25,7 +25,7 @@ public class ExportPackageTest {
             "TEST_PKG", 
             "TEST_SCHEMA", 
             Arrays.asList(specVar1, specVar2), // spec variables
-            null, null, null, null, null, null
+            null, null, null, null, null, null, null
         );
 
         // Create package body with variables (including one with same name)
@@ -38,7 +38,7 @@ public class ExportPackageTest {
             "TEST_PKG", 
             "TEST_SCHEMA", 
             Arrays.asList(bodyVar1, bodyVar2), // body variables
-            null, null, null, 
+            null, null, null, null,
             Arrays.asList(bodyFunction), // body functions
             null, null
         );
@@ -94,7 +94,7 @@ public class ExportPackageTest {
             "SPEC_ONLY_PKG", 
             "TEST_SCHEMA", 
             Arrays.asList(specVar),
-            null, null, null, null, null, null
+            null, null, null, null, null, null, null
         );
 
         try {
@@ -127,7 +127,7 @@ public class ExportPackageTest {
             "BODY_ONLY_PKG", 
             "TEST_SCHEMA", 
             Arrays.asList(bodyVar),
-            null, null, null, null, null, null
+            null, null, null, null, null, null, null
         );
 
         try {

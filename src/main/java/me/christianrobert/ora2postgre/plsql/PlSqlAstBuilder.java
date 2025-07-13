@@ -116,6 +116,27 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     return cursors;
   }
 
+  /**
+   * Extracts record type declarations from seq_of_declare_specs context.
+   * Returns a list of RecordType objects found in the DECLARE section.
+   */
+  public List<RecordType> extractRecordTypesFromDeclareSpecs(PlSqlParser.Seq_of_declare_specsContext ctx) {
+    List<RecordType> recordTypes = new ArrayList<>();
+    
+    if (ctx != null && ctx.declare_spec() != null) {
+      for (PlSqlParser.Declare_specContext declareSpec : ctx.declare_spec()) {
+        if (declareSpec.type_declaration() != null) {
+          PlSqlAst typeDeclaration = visit(declareSpec.type_declaration());
+          if (typeDeclaration instanceof RecordType) {
+            recordTypes.add((RecordType) typeDeclaration);
+          }
+        }
+      }
+    }
+    
+    return recordTypes;
+  }
+
   @Override
   public PlSqlAst visitSeq_of_declare_specs(PlSqlParser.Seq_of_declare_specsContext ctx) {
     // This method is called when seq_of_declare_specs is visited directly
@@ -130,6 +151,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     if (ctx.datatype() != null && ctx.datatype().native_datatype_element() != null ) {
       nativeDataType = ctx.datatype().native_datatype_element().getText();
     }
+    
     StringBuilder b = new StringBuilder();
     if (ctx.type_name() != null && ctx.type_name().id_expression() != null) {
       List<PlSqlParser.Id_expressionContext> idExpression = ctx.type_name().id_expression();
@@ -142,6 +164,31 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       }
     }
 
+    // Handle %ROWTYPE attributes with enhanced support
+    if (ctx.PERCENT_ROWTYPE() != null) {
+      String[] parts = b.toString().split("\\.");
+      if (parts.length == 2) {
+        // schema.table%ROWTYPE
+        return RecordTypeSpec.forRowType(parts[0], parts[1]);
+      } else if (parts.length == 1) {
+        // table%ROWTYPE (use current schema)
+        return RecordTypeSpec.forRowType(schema, parts[0]);
+      }
+    }
+    
+    // Handle %TYPE attributes with enhanced support
+    if (ctx.PERCENT_TYPE() != null) {
+      String[] parts = b.toString().split("\\.");
+      if (parts.length == 3) {
+        // schema.table.column%TYPE
+        return RecordTypeSpec.forColumnType(parts[0], parts[1], parts[2]);
+      } else if (parts.length == 2) {
+        // table.column%TYPE (use current schema)
+        return RecordTypeSpec.forColumnType(schema, parts[0], parts[1]);
+      }
+    }
+
+    // Fall back to standard DataTypeSpec for native types and custom types
     return new DataTypeSpec(
             nativeDataType,
             ctx.PERCENT_ROWTYPE() == null && ctx.PERCENT_TYPE() == null ? b.toString() : null,
@@ -1054,12 +1101,16 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       }
     }
 
-    // Extract variable declarations from DECLARE section
+    // Extract declarations from DECLARE section
     List<Variable> variables = new ArrayList<>();
+    List<CursorDeclaration> cursorDeclarations = new ArrayList<>();
+    List<RecordType> recordTypes = new ArrayList<>();
     if (ctx.seq_of_declare_specs() != null) {
       variables = extractVariablesFromDeclareSpecs(ctx.seq_of_declare_specs());
+      cursorDeclarations = extractCursorDeclarationsFromDeclareSpecs(ctx.seq_of_declare_specs());
+      recordTypes = extractRecordTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
     }
-    return new Function(ctx.function_name().getText(), parameters, variables, returnType, statements);
+    return new Function(ctx.function_name().getText(), parameters, variables, cursorDeclarations, recordTypes, returnType, statements, null);
   }
 
   @Override
@@ -1071,10 +1122,14 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       parameters.add((Parameter) visit(e));
     }
 
-    // Extract variable declarations from DECLARE section
+    // Extract declarations from DECLARE section
     List<Variable> variables = new ArrayList<>();
+    List<CursorDeclaration> cursorDeclarations = new ArrayList<>();
+    List<RecordType> recordTypes = new ArrayList<>();
     if (ctx.seq_of_declare_specs() != null) {
       variables = extractVariablesFromDeclareSpecs(ctx.seq_of_declare_specs());
+      cursorDeclarations = extractCursorDeclarationsFromDeclareSpecs(ctx.seq_of_declare_specs());
+      recordTypes = extractRecordTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
     }
 
     List<Statement> statements = new ArrayList<>();
@@ -1092,7 +1147,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       exceptionBlock = parseExceptionBlock(ctx.body().exception_handler());
     }
 
-    return new Procedure(procedureName, parameters, variables, statements, exceptionBlock);
+    return new Procedure(procedureName, parameters, variables, cursorDeclarations, recordTypes, statements, exceptionBlock);
   }
 
   @Override
@@ -1203,16 +1258,14 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       parameters.add((Parameter) visit(e));
     }
 
-    // Extract variable declarations from DECLARE section
+    // Extract declarations from DECLARE section
     List<Variable> variables = new ArrayList<>();
+    List<CursorDeclaration> cursorDeclarations = new ArrayList<>();
+    List<RecordType> recordTypes = new ArrayList<>();
     if (ctx.seq_of_declare_specs() != null) {
       variables = extractVariablesFromDeclareSpecs(ctx.seq_of_declare_specs());
-    }
-
-    // Extract cursor declarations from DECLARE section
-    List<CursorDeclaration> cursorDeclarations = new ArrayList<>();
-    if (ctx.seq_of_declare_specs() != null) {
       cursorDeclarations = extractCursorDeclarationsFromDeclareSpecs(ctx.seq_of_declare_specs());
+      recordTypes = extractRecordTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
     }
 
     List<Statement> statements = new ArrayList<>();
@@ -1230,12 +1283,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       exceptionBlock = parseExceptionBlock(ctx.body().exception_handler());
     }
 
-    Procedure procedure = new Procedure(procedureName, parameters, variables, statements, exceptionBlock);
-    
-    // Set cursor declarations
-    procedure.setCursorDeclarations(cursorDeclarations);
-    
-    return procedure;
+    return new Procedure(procedureName, parameters, variables, cursorDeclarations, recordTypes, statements, exceptionBlock);
   }
 
   @Override
@@ -1257,16 +1305,14 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       }
     }
 
-    // Extract variable declarations from DECLARE section
+    // Extract declarations from DECLARE section
     List<Variable> variables = new ArrayList<>();
+    List<CursorDeclaration> cursorDeclarations = new ArrayList<>();
+    List<RecordType> recordTypes = new ArrayList<>();
     if (ctx.seq_of_declare_specs() != null) {
       variables = extractVariablesFromDeclareSpecs(ctx.seq_of_declare_specs());
-    }
-
-    // Extract cursor declarations from DECLARE section
-    List<CursorDeclaration> cursorDeclarations = new ArrayList<>();
-    if (ctx.seq_of_declare_specs() != null) {
       cursorDeclarations = extractCursorDeclarationsFromDeclareSpecs(ctx.seq_of_declare_specs());
+      recordTypes = extractRecordTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
     }
 
     // Parse exception block if present
@@ -1275,17 +1321,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       exceptionBlock = parseExceptionBlock(ctx.body().exception_handler());
     }
 
-    Function function;
-    if (exceptionBlock != null) {
-      function = new Function(procedureName, parameters, variables, returnType, statements, exceptionBlock);
-    } else {
-      function = new Function(procedureName, parameters, variables, returnType, statements);
-    }
-    
-    // Set cursor declarations
-    function.setCursorDeclarations(cursorDeclarations);
-    
-    return function;
+    return new Function(procedureName, parameters, variables, cursorDeclarations, recordTypes, returnType, statements, exceptionBlock);
   }
 
   /**
@@ -1330,17 +1366,20 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     }
 
     List<Variable> variables = new ArrayList<>();
+    List<RecordType> recordTypes = new ArrayList<>();
 
     if (ctx.package_obj_spec() != null) {
       for (var member : ctx.package_obj_spec()) {
         PlSqlAst memberAst = visit(member);
         if (memberAst instanceof Variable) {
           variables.add((Variable) memberAst);
+        } else if (memberAst instanceof RecordType) {
+          recordTypes.add((RecordType) memberAst);
         }
       }
     }
     // TODO $if, subtype, packagetype, cursor, etc.
-    return new OraclePackage(packageName,schema, variables, null, null , null, null, null, null);
+    return new OraclePackage(packageName, schema, variables, null, null, null, recordTypes, null, null, null);
   }
 
   @Override
@@ -1354,21 +1393,22 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     List<Procedure> procedures = new ArrayList<>();
     List<Function> funcs = new ArrayList<>();
     List<Variable> variables = new ArrayList<>();
+    List<RecordType> recordTypes = new ArrayList<>();
     if (ctx.package_obj_body() != null) {
       for (var member : ctx.package_obj_body()) {
         PlSqlAst memberAst = visit(member);
         if (memberAst instanceof Variable) {
           variables.add((Variable) memberAst);
-        }
-        if (memberAst instanceof Function) {
+        } else if (memberAst instanceof RecordType) {
+          recordTypes.add((RecordType) memberAst);
+        } else if (memberAst instanceof Function) {
           funcs.add((Function) memberAst);
-        }
-        if (memberAst instanceof Procedure) {
+        } else if (memberAst instanceof Procedure) {
           procedures.add((Procedure) memberAst);
         }
       }
     }
-    OraclePackage o = new OraclePackage(packageName, schema, variables, null, null, null, funcs, procedures, null);
+    OraclePackage o = new OraclePackage(packageName, schema, variables, null, null, null, recordTypes, funcs, procedures, null);
     o.getFunctions().forEach(e -> e.setParentPackage(o));
     o.getProcedures().forEach(e -> e.setParentPackage(o));
     return o;
@@ -1394,12 +1434,20 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       }
     }
 
-    // Extract variable declarations from DECLARE section
+    // Extract declarations from DECLARE section
     List<Variable> variables = new ArrayList<>();
+    List<CursorDeclaration> cursorDeclarations = new ArrayList<>();
+    List<RecordType> recordTypes = new ArrayList<>();
     if (ctx.seq_of_declare_specs() != null) {
       variables = extractVariablesFromDeclareSpecs(ctx.seq_of_declare_specs());
+      cursorDeclarations = extractCursorDeclarationsFromDeclareSpecs(ctx.seq_of_declare_specs());
+      recordTypes = extractRecordTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
     }
-    return new Function(functionName, parameters, variables, returnType, statements);
+    
+    Function function = new Function(functionName, parameters, variables, cursorDeclarations, recordTypes, returnType, statements, null);
+    function.setStandalone(true);
+    function.setSchema(schema);
+    return function;
   }
 
   @Override
@@ -1414,10 +1462,14 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       }
     }
     
-    // Extract variable declarations from DECLARE section
+    // Extract declarations from DECLARE section
     List<Variable> variables = new ArrayList<>();
+    List<CursorDeclaration> cursorDeclarations = new ArrayList<>();
+    List<RecordType> recordTypes = new ArrayList<>();
     if (ctx.seq_of_declare_specs() != null) {
       variables = extractVariablesFromDeclareSpecs(ctx.seq_of_declare_specs());
+      cursorDeclarations = extractCursorDeclarationsFromDeclareSpecs(ctx.seq_of_declare_specs());
+      recordTypes = extractRecordTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
     }
     
     List<Statement> statements = new ArrayList<>();
@@ -1427,7 +1479,10 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       }
     }
     
-    return new Procedure(procedureName, parameters, variables, statements);
+    Procedure procedure = new Procedure(procedureName, parameters, variables, cursorDeclarations, recordTypes, statements, null);
+    procedure.setStandalone(true);
+    procedure.setSchema(schema);
+    return procedure;
   }
 
   @Override
@@ -1637,6 +1692,63 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     
     // For other model expressions, fall back to default behavior
     return visitChildren(ctx);
+  }
+
+  @Override
+  public PlSqlAst visitType_declaration(PlSqlParser.Type_declarationContext ctx) {
+    if (ctx.identifier() != null && ctx.record_type_def() != null) {
+      String typeName = ctx.identifier().getText();
+      RecordType recordType = (RecordType) visit(ctx.record_type_def());
+      // Set the name from the declaration
+      return new RecordType(typeName, recordType.getFields());
+    }
+    
+    // TODO: Handle other type declarations (table_type_def, varray_type_def, ref_cursor_type_def)
+    return new Comment("type_declaration not fully implemented");
+  }
+
+  @Override
+  public PlSqlAst visitRecord_type_def(PlSqlParser.Record_type_defContext ctx) {
+    List<RecordType.RecordField> fields = new ArrayList<>();
+    
+    if (ctx.field_spec() != null) {
+      for (PlSqlParser.Field_specContext fieldCtx : ctx.field_spec()) {
+        RecordType.RecordField field = (RecordType.RecordField) visit(fieldCtx);
+        if (field != null) {
+          fields.add(field);
+        }
+      }
+    }
+    
+    return new RecordType("", fields); // Name will be set by type_declaration
+  }
+
+  @Override
+  public PlSqlAst visitField_spec(PlSqlParser.Field_specContext ctx) {
+    String fieldName = ctx.column_name().getText();
+    
+    // Parse data type
+    DataTypeSpec dataType = null;
+    if (ctx.type_spec() != null) {
+      dataType = (DataTypeSpec) visit(ctx.type_spec());
+    } else {
+      // Default to VARCHAR if no type specified
+      dataType = new DataTypeSpec("VARCHAR2", null, null, null);
+    }
+    
+    // Parse NULL/NOT NULL constraint
+    boolean notNull = false;
+    if (ctx.NULL_() != null && ctx.NOT() != null) {
+      notNull = true;
+    }
+    
+    // Parse default value
+    Expression defaultValue = null;
+    if (ctx.default_value_part() != null) {
+      defaultValue = (Expression) visit(ctx.default_value_part());
+    }
+    
+    return new RecordType.RecordField(fieldName, dataType, notNull, defaultValue);
   }
 
 }

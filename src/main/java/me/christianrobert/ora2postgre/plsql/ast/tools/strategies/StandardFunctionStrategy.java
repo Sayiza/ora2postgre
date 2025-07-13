@@ -82,6 +82,16 @@ public class StandardFunctionStrategy implements FunctionTransformationStrategy 
         }
       }
       
+      // Add record type declarations from DECLARE section
+      if (function.getRecordTypes() != null && !function.getRecordTypes().isEmpty()) {
+        for (me.christianrobert.ora2postgre.plsql.ast.RecordType recordType : function.getRecordTypes()) {
+          // Record types need to be created at the schema level, not inside functions
+          // For now, add a comment indicating the record type is needed
+          b.append("  -- Record type ").append(recordType.getName())
+                  .append(" should be created as composite type at schema level\n");
+        }
+      }
+      
       // Collect and add variable declarations from FOR loops
       StringBuilder stmtDeclarations = StatementDeclarationCollector.collectNecessaryDeclarations(
               function.getStatements(), context);

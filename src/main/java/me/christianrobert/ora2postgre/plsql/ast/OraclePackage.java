@@ -13,6 +13,7 @@ public class OraclePackage extends PlSqlAst {
   private List<SubType> subtypes;
   private List<Cursor> cursors;
   private List<PackageType> types;
+  private List<RecordType> recordTypes;
   private List<Function> functions;
   private List<Procedure> procedures;
   private List<Statement> bodyStatements;
@@ -25,6 +26,7 @@ public class OraclePackage extends PlSqlAst {
                        List<SubType> subtypes,
                        List<Cursor> cursors,
                        List<PackageType> types,
+                       List<RecordType> recordTypes,
                        List<Function> functions,
                        List<Procedure> procedures,
                        List<Statement> bodyStatements) {
@@ -37,6 +39,7 @@ public class OraclePackage extends PlSqlAst {
     this.subtypes = subtypes != null ? subtypes : new ArrayList<>();
     this.cursors = cursors != null ? cursors : new ArrayList<>();
     this.types = types != null ? types : new ArrayList<>();
+    this.recordTypes = recordTypes != null ? recordTypes : new ArrayList<>();
     this.bodyStatements = bodyStatements != null ? bodyStatements : new ArrayList<>();
   }
 
@@ -68,6 +71,10 @@ public class OraclePackage extends PlSqlAst {
     return types;
   }
 
+  public List<RecordType> getRecordTypes() {
+    return recordTypes;
+  }
+
   public List<Statement> getBodyStatements() {
     return bodyStatements;
   }
@@ -84,6 +91,7 @@ public class OraclePackage extends PlSqlAst {
             ", procedures=" + procedures.size() +
             ", functions=" + functions.size() +
             ", cursors=" + cursors.size() +
+            ", recordTypes=" + recordTypes.size() +
             "}";
   }
 

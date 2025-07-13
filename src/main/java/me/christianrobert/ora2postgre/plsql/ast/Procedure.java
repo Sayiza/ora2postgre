@@ -11,6 +11,7 @@ public class Procedure extends PlSqlAst {
   private List<Parameter> parameters;
   private List<Variable> variables; // Variable declarations from DECLARE section
   private List<CursorDeclaration> cursorDeclarations; // Cursor declarations from DECLARE section
+  private List<RecordType> recordTypes; // Record type declarations from DECLARE section
   private List<Statement> statements;
   private ExceptionBlock exceptionBlock; // Exception handling
 
@@ -30,6 +31,7 @@ public class Procedure extends PlSqlAst {
     this.parameters = parameters;
     this.variables = variables != null ? variables : new ArrayList<>();
     this.cursorDeclarations = new ArrayList<>(); // Initialize empty list
+    this.recordTypes = new ArrayList<>(); // Initialize empty list
     this.statements = statements;
     this.exceptionBlock = null; // No exception handling by default
   }
@@ -45,6 +47,25 @@ public class Procedure extends PlSqlAst {
     this.parameters = parameters;
     this.variables = variables != null ? variables : new ArrayList<>();
     this.cursorDeclarations = new ArrayList<>(); // Initialize empty list
+    this.recordTypes = new ArrayList<>(); // Initialize empty list
+    this.statements = statements;
+    this.exceptionBlock = exceptionBlock;
+  }
+
+  // Constructor with record types and cursor declarations
+  public Procedure(
+          String name,
+          List<Parameter> parameters,
+          List<Variable> variables,
+          List<CursorDeclaration> cursorDeclarations,
+          List<RecordType> recordTypes,
+          List<Statement> statements,
+          ExceptionBlock exceptionBlock) {
+    this.name = name;
+    this.parameters = parameters;
+    this.variables = variables != null ? variables : new ArrayList<>();
+    this.cursorDeclarations = cursorDeclarations != null ? cursorDeclarations : new ArrayList<>();
+    this.recordTypes = recordTypes != null ? recordTypes : new ArrayList<>();
     this.statements = statements;
     this.exceptionBlock = exceptionBlock;
   }
@@ -83,6 +104,14 @@ public class Procedure extends PlSqlAst {
 
   public void setCursorDeclarations(List<CursorDeclaration> cursorDeclarations) {
     this.cursorDeclarations = cursorDeclarations != null ? cursorDeclarations : new ArrayList<>();
+  }
+
+  public List<RecordType> getRecordTypes() {
+    return recordTypes;
+  }
+
+  public void setRecordTypes(List<RecordType> recordTypes) {
+    this.recordTypes = recordTypes != null ? recordTypes : new ArrayList<>();
   }
 
   public ObjectType getParentType() {
