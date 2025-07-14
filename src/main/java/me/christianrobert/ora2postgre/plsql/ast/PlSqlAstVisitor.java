@@ -59,4 +59,10 @@ public interface PlSqlAstVisitor<T> {
   T visit(ModelExpression modelExpression);
   T visit(UnaryExpression unaryExpression);
   T visit(CursorAttributeExpression cursorAttributeExpression);
+  
+  // Analytical function support
+  T visit(AnalyticalFunction analyticalFunction);
+  T visit(OverClause overClause);
+  T visit(WindowingClause windowingClause);
+  T visit(OrderByElement orderByElement);
 }

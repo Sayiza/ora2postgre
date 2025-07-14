@@ -2153,8 +2153,212 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       }
     }
     
+    // Check for analytical functions: over_clause_keyword function_argument_analytic over_clause?
+    if (ctx.over_clause_keyword() != null && ctx.over_clause() != null) {
+      return parseAnalyticalFunction(ctx);
+    }
+    
+    // Check for within_or_over functions: within_or_over_clause_keyword function_argument within_or_over_part+
+    if (ctx.within_or_over_clause_keyword() != null && !ctx.within_or_over_part().isEmpty()) {
+      // Check if any of the within_or_over_part elements contain an over_clause
+      for (PlSqlParser.Within_or_over_partContext partCtx : ctx.within_or_over_part()) {
+        if (partCtx.over_clause() != null) {
+          return parseAnalyticalFunctionFromWithinOrOver(ctx);
+        }
+      }
+    }
+    
     // For other function types, fall back to default behavior
     return visitChildren(ctx);
+  }
+
+  /**
+   * Parse analytical function from over_clause_keyword function_argument_analytic over_clause pattern.
+   */
+  private AnalyticalFunction parseAnalyticalFunction(PlSqlParser.Other_functionContext ctx) {
+    // Determine function type from over_clause_keyword
+    AnalyticalFunction.AnalyticalFunctionType functionType = 
+        parseAnalyticalFunctionType(ctx.over_clause_keyword().getText());
+    
+    // Parse arguments (if any)
+    java.util.List<Expression> arguments = new java.util.ArrayList<>();
+    if (ctx.function_argument_analytic() != null) {
+      arguments = parseAnalyticalFunctionArguments(ctx.function_argument_analytic());
+    }
+    
+    // Parse OVER clause
+    OverClause overClause = null;
+    if (ctx.over_clause() != null) {
+      overClause = (OverClause) visit(ctx.over_clause());
+    }
+    
+    return new AnalyticalFunction(functionType, arguments, overClause);
+  }
+
+  /**
+   * Parse analytical function from within_or_over_clause_keyword pattern.
+   */
+  private AnalyticalFunction parseAnalyticalFunctionFromWithinOrOver(PlSqlParser.Other_functionContext ctx) {
+    // Determine function type from within_or_over_clause_keyword
+    AnalyticalFunction.AnalyticalFunctionType functionType = 
+        parseAnalyticalFunctionTypeFromWithinOrOver(ctx.within_or_over_clause_keyword().getText());
+    
+    // Parse arguments
+    java.util.List<Expression> arguments = new java.util.ArrayList<>();
+    if (ctx.function_argument() != null) {
+      // Parse standard function arguments
+      arguments = parseStandardFunctionArguments(ctx.function_argument());
+    }
+    
+    // Find the OVER clause from within_or_over_part
+    OverClause overClause = null;
+    for (PlSqlParser.Within_or_over_partContext partCtx : ctx.within_or_over_part()) {
+      if (partCtx.over_clause() != null) {
+        overClause = (OverClause) visit(partCtx.over_clause());
+        break;
+      }
+    }
+    
+    return new AnalyticalFunction(functionType, arguments, overClause);
+  }
+
+  /**
+   * Map over_clause_keyword to AnalyticalFunctionType.
+   */
+  private AnalyticalFunction.AnalyticalFunctionType parseAnalyticalFunctionType(String keyword) {
+    switch (keyword.toUpperCase()) {
+      case "ROW_NUMBER":
+        return AnalyticalFunction.AnalyticalFunctionType.ROW_NUMBER;
+      case "AVG":
+        return AnalyticalFunction.AnalyticalFunctionType.AVG;
+      case "MAX":
+        return AnalyticalFunction.AnalyticalFunctionType.MAX;
+      case "MIN":
+        return AnalyticalFunction.AnalyticalFunctionType.MIN;
+      case "SUM":
+        return AnalyticalFunction.AnalyticalFunctionType.SUM;
+      case "COUNT":
+        return AnalyticalFunction.AnalyticalFunctionType.COUNT;
+      case "NTILE":
+        return AnalyticalFunction.AnalyticalFunctionType.NTILE;
+      default:
+        // For unknown functions, default to a safe option or throw exception
+        return AnalyticalFunction.AnalyticalFunctionType.ROW_NUMBER;
+    }
+  }
+
+  /**
+   * Map within_or_over_clause_keyword to AnalyticalFunctionType.
+   */
+  private AnalyticalFunction.AnalyticalFunctionType parseAnalyticalFunctionTypeFromWithinOrOver(String keyword) {
+    switch (keyword.toUpperCase()) {
+      case "RANK":
+        return AnalyticalFunction.AnalyticalFunctionType.RANK;
+      case "DENSE_RANK":
+        return AnalyticalFunction.AnalyticalFunctionType.DENSE_RANK;
+      case "PERCENT_RANK":
+        return AnalyticalFunction.AnalyticalFunctionType.PERCENT_RANK;
+      case "CUME_DIST":
+        return AnalyticalFunction.AnalyticalFunctionType.CUME_DIST;
+      default:
+        return AnalyticalFunction.AnalyticalFunctionType.RANK;
+    }
+  }
+
+  /**
+   * Parse analytical function arguments.
+   */
+  private java.util.List<Expression> parseAnalyticalFunctionArguments(PlSqlParser.Function_argument_analyticContext ctx) {
+    java.util.List<Expression> arguments = new java.util.ArrayList<>();
+    
+    // For most analytical functions, arguments are optional or handled differently
+    // This is a placeholder for future argument parsing if needed
+    
+    return arguments;
+  }
+
+  /**
+   * Parse standard function arguments.
+   */
+  private java.util.List<Expression> parseStandardFunctionArguments(PlSqlParser.Function_argumentContext ctx) {
+    java.util.List<Expression> arguments = new java.util.ArrayList<>();
+    
+    // This is a placeholder for standard function argument parsing
+    // The exact implementation depends on the function_argument grammar structure
+    
+    return arguments;
+  }
+
+  /**
+   * Visitor method for over_clause rule.
+   */
+  @Override
+  public PlSqlAst visitOver_clause(PlSqlParser.Over_clauseContext ctx) {
+    java.util.List<Expression> partitionByColumns = null;
+    java.util.List<OrderByElement> orderByElements = null;
+    WindowingClause windowingClause = null;
+    
+    // Parse PARTITION BY clause
+    if (ctx.query_partition_clause() != null) {
+      partitionByColumns = parsePartitionByClause(ctx.query_partition_clause());
+    }
+    
+    // Parse ORDER BY clause
+    if (ctx.order_by_clause() != null) {
+      orderByElements = parseOrderByClause(ctx.order_by_clause());
+    }
+    
+    // Parse windowing clause
+    if (ctx.windowing_clause() != null) {
+      windowingClause = (WindowingClause) visit(ctx.windowing_clause());
+    }
+    
+    return new OverClause(partitionByColumns, orderByElements, windowingClause);
+  }
+
+  /**
+   * Parse PARTITION BY clause.
+   */
+  private java.util.List<Expression> parsePartitionByClause(PlSqlParser.Query_partition_clauseContext ctx) {
+    java.util.List<Expression> partitionByColumns = new java.util.ArrayList<>();
+    
+    // Create simple text-based expressions for now
+    // A more complete implementation would parse the actual expressions
+    if (ctx != null && ctx.getText() != null) {
+      String text = ctx.getText();
+      if (text.contains("PARTITION")) {
+        // Simple text-based expression as placeholder
+        LogicalExpression logicalExpr = new LogicalExpression(new UnaryLogicalExpression(text));
+        Expression expr = new Expression(logicalExpr);
+        partitionByColumns.add(expr);
+      }
+    }
+    
+    return partitionByColumns;
+  }
+
+  /**
+   * Parse ORDER BY clause for OVER clause.
+   */
+  private java.util.List<OrderByElement> parseOrderByClause(PlSqlParser.Order_by_clauseContext ctx) {
+    java.util.List<OrderByElement> orderByElements = new java.util.ArrayList<>();
+    
+    // Create simple text-based order by elements for now
+    // A more complete implementation would parse the actual order by elements
+    if (ctx != null && ctx.getText() != null) {
+      String text = ctx.getText();
+      if (text.contains("ORDER")) {
+        // Simple text-based expression as placeholder
+        LogicalExpression logicalExpr = new LogicalExpression(new UnaryLogicalExpression(text));
+        Expression expr = new Expression(logicalExpr);
+        OrderByElement.SortDirection direction = text.contains("DESC") ? 
+            OrderByElement.SortDirection.DESC : OrderByElement.SortDirection.ASC;
+        OrderByElement orderByElement = new OrderByElement(expr, direction);
+        orderByElements.add(orderByElement);
+      }
+    }
+    
+    return orderByElements;
   }
 
   /**
