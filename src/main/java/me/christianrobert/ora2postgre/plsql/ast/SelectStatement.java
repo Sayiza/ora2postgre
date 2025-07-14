@@ -75,12 +75,23 @@ public class SelectStatement extends Statement {
   //@Deprecated
   public String toPostgre(Everything data) {
     StringBuilder b = new StringBuilder();
-    b.append(subQuery.toPostgre(data))
-            //.append("\n")
-            //.append(orderByClause.toJava()) TODO later
-            //.append("\n")
-            // TODO .append(forUpdateClause.toJava()
-            ;
+    
+    // Add WITH clause if present
+    if (withClause != null) {
+      String withClauseSQL = withClause.toPostgre(data);
+      if (withClauseSQL != null && !withClauseSQL.trim().isEmpty()) {
+        b.append(withClauseSQL);
+        b.append("\n");
+      }
+    }
+    
+    // Add main query
+    b.append(subQuery.toPostgre(data));
+    
+    // TODO: Add other clauses when implemented
+    // if (orderByClause != null) b.append("\n").append(orderByClause.toPostgre(data));
+    // if (forUpdateClause != null) b.append("\n").append(forUpdateClause.toPostgre(data));
+    
     return b.toString();
   }
 

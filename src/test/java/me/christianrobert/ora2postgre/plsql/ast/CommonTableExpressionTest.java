@@ -1,0 +1,243 @@
+package me.christianrobert.ora2postgre.plsql.ast;
+
+import me.christianrobert.ora2postgre.global.Everything;
+import me.christianrobert.ora2postgre.global.PlsqlCode;
+import me.christianrobert.ora2postgre.plsql.PlSqlAstMain;
+import org.junit.jupiter.api.Test;
+
+public class CommonTableExpressionTest {
+
+  @Test
+  public void testSimpleCommonTableExpression() {
+    // Test Oracle function with simple CTE
+    String oracleSql = """
+CREATE FUNCTION TEST_SCHEMA.GET_DEPARTMENT_EMPLOYEES 
+RETURN NUMBER IS
+  v_count NUMBER;
+BEGIN
+  WITH dept_employees AS (
+    SELECT employee_id, department_id, salary
+    FROM employees
+    WHERE department_id = 10
+  )
+  SELECT COUNT(*) INTO v_count
+  FROM dept_employees
+  WHERE salary > 5000;
+  
+  RETURN v_count;
+END;
+""";
+
+    // Create test data
+    Everything data = new Everything();
+    data.getUserNames().add("TEST_SCHEMA");
+
+    PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
+
+    // Parse the Oracle function
+    PlSqlAst ast = PlSqlAstMain.processPlsqlCode(plsqlCode);
+
+    System.out.println("Parsed AST: " + ast.getClass().getSimpleName());
+    
+    if (ast instanceof Function) {
+      Function function = (Function) ast;
+      System.out.println("Function name: " + function.getName());
+      System.out.println("Function statements count: " + function.getStatements().size());
+      
+      // Convert to PostgreSQL
+      String postgreSql = function.toPostgre(data, false);
+      System.out.println("Generated PostgreSQL:");
+      System.out.println(postgreSql);
+      
+      // Verify the CTE is transformed correctly
+      assert postgreSql.contains("WITH dept_employees AS") : "Should contain CTE definition";
+      assert postgreSql.contains("SELECT employee_id, department_id, salary") : "Should contain CTE query";
+      assert postgreSql.contains("FROM employees") : "Should contain CTE FROM clause";
+      assert postgreSql.contains("WHERE department_id = 10") : "Should contain CTE WHERE clause";
+    }
+  }
+
+  @Test
+  public void testMultipleCommonTableExpressions() {
+    // Test Oracle function with multiple CTEs
+    String oracleSql = """
+CREATE FUNCTION TEST_SCHEMA.GET_DEPARTMENT_STATS 
+RETURN NUMBER IS
+  v_result NUMBER;
+BEGIN
+  WITH dept_employees AS (
+    SELECT employee_id, department_id, salary
+    FROM employees
+    WHERE department_id = 10
+  ),
+  high_earners AS (
+    SELECT employee_id, salary
+    FROM dept_employees
+    WHERE salary > 5000
+  )
+  SELECT COUNT(*) INTO v_result
+  FROM high_earners;
+  
+  RETURN v_result;
+END;
+""";
+
+    // Create test data
+    Everything data = new Everything();
+    data.getUserNames().add("TEST_SCHEMA");
+
+    PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
+
+    // Parse the Oracle function
+    PlSqlAst ast = PlSqlAstMain.processPlsqlCode(plsqlCode);
+
+    System.out.println("Multiple CTEs test:");
+    System.out.println("Parsed AST: " + ast.getClass().getSimpleName());
+    
+    if (ast instanceof Function) {
+      Function function = (Function) ast;
+      System.out.println("Function name: " + function.getName());
+      
+      // Convert to PostgreSQL
+      String postgreSql = function.toPostgre(data, false);
+      System.out.println("Generated PostgreSQL:");
+      System.out.println(postgreSql);
+      
+      // Verify both CTEs are transformed correctly
+      assert postgreSql.contains("WITH dept_employees AS") : "Should contain first CTE";
+      assert postgreSql.contains("high_earners AS") : "Should contain second CTE";
+      assert postgreSql.contains("FROM dept_employees") : "Should reference first CTE in second CTE";
+      assert postgreSql.contains("FROM high_earners") : "Should reference second CTE in main query";
+    }
+  }
+
+  @Test
+  public void testCTEWithColumnList() {
+    // Test Oracle CTE with explicit column list
+    String oracleSql = """
+CREATE FUNCTION TEST_SCHEMA.GET_EMPLOYEE_SUMMARY
+RETURN NUMBER IS
+  v_count NUMBER;
+BEGIN
+  WITH employee_summary (emp_id, emp_name, emp_salary) AS (
+    SELECT employee_id, first_name, salary
+    FROM employees
+    WHERE department_id = 10
+  )
+  SELECT COUNT(*) INTO v_count
+  FROM employee_summary
+  WHERE emp_salary > 3000;
+  
+  RETURN v_count;
+END;
+""";
+
+    // Create test data
+    Everything data = new Everything();
+    data.getUserNames().add("TEST_SCHEMA");
+
+    PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
+
+    // Parse the Oracle function
+    PlSqlAst ast = PlSqlAstMain.processPlsqlCode(plsqlCode);
+
+    System.out.println("CTE with column list test:");
+    System.out.println("Parsed AST: " + ast.getClass().getSimpleName());
+    
+    if (ast instanceof Function) {
+      Function function = (Function) ast;
+      System.out.println("Function name: " + function.getName());
+      
+      // Convert to PostgreSQL
+      String postgreSql = function.toPostgre(data, false);
+      System.out.println("Generated PostgreSQL:");
+      System.out.println(postgreSql);
+      
+      // Verify CTE with column list is transformed correctly
+      assert postgreSql.contains("WITH employee_summary (emp_id, emp_name, emp_salary) AS") : "Should contain CTE with column list";
+      assert postgreSql.contains("SELECT employee_id, first_name, salary") : "Should contain CTE query";
+      assert postgreSql.contains("FROM employee_summary") : "Should reference CTE in main query";
+      assert postgreSql.contains("WHERE emp_salary > 3000") : "Should use CTE column names";
+    }
+  }
+
+  @Test
+  public void testRecursiveCommonTableExpression() {
+    // Test Oracle recursive CTE (using CONNECT BY equivalent)
+    String oracleSql = """
+CREATE FUNCTION TEST_SCHEMA.GET_HIERARCHY_COUNT
+RETURN NUMBER IS
+  v_count NUMBER;
+BEGIN
+  WITH RECURSIVE employee_hierarchy AS (
+    SELECT employee_id, manager_id, first_name, 1 as level
+    FROM employees
+    WHERE manager_id IS NULL
+    UNION ALL
+    SELECT e.employee_id, e.manager_id, e.first_name, eh.level + 1
+    FROM employees e
+    JOIN employee_hierarchy eh ON e.manager_id = eh.employee_id
+  )
+  SELECT COUNT(*) INTO v_count
+  FROM employee_hierarchy;
+  
+  RETURN v_count;
+END;
+""";
+
+    // Create test data
+    Everything data = new Everything();
+    data.getUserNames().add("TEST_SCHEMA");
+
+    PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
+
+    // Parse the Oracle function
+    PlSqlAst ast = PlSqlAstMain.processPlsqlCode(plsqlCode);
+
+    System.out.println("Recursive CTE test:");
+    System.out.println("Parsed AST: " + ast.getClass().getSimpleName());
+    
+    if (ast instanceof Function) {
+      Function function = (Function) ast;
+      System.out.println("Function name: " + function.getName());
+      
+      // Convert to PostgreSQL
+      String postgreSql = function.toPostgre(data, false);
+      System.out.println("Generated PostgreSQL:");
+      System.out.println(postgreSql);
+      
+      // Verify recursive CTE is transformed correctly
+      assert postgreSql.contains("WITH RECURSIVE employee_hierarchy AS") : "Should contain recursive CTE";
+      assert postgreSql.contains("UNION ALL") : "Should contain recursive union";
+      assert postgreSql.contains("JOIN employee_hierarchy") : "Should contain self-reference";
+    }
+  }
+
+  @Test
+  public void testDirectCommonTableExpressionTransformation() {
+    // Test direct CTE transformation without function wrapper
+    CommonTableExpression cte = new CommonTableExpression(
+        "test_cte", 
+        java.util.Arrays.asList("col1", "col2"), 
+        null, // subquery would normally be provided
+        false
+    );
+    
+    Everything data = new Everything();
+    String result = cte.toPostgre(data);
+    
+    System.out.println("Direct CTE transformation:");
+    System.out.println("Result: " + result);
+    
+    // Verify the basic structure
+    assert result.contains("test_cte (col1, col2) AS") : "Should contain CTE name and columns";
+    assert result.endsWith(")") : "Should end with closing parenthesis";
+    
+    // Test CTE without column list
+    CommonTableExpression cte2 = new CommonTableExpression("simple_cte", null, null, false);
+    String result2 = cte2.toPostgre(data);
+    
+    System.out.println("Simple CTE result: " + result2);
+    assert result2.equals("simple_cte AS ()") : "Should contain simple CTE structure";
+  }
+}

@@ -592,6 +592,96 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     return new SelectQueryBlock(schema, selectedFields, fromTables, whereClause);
   }
 
+  /**
+   * Visits Oracle WITH clause and creates SelectWithClause AST node.
+   * Grammar: WITH (function_body | procedure_body)* with_factoring_clause (',' with_factoring_clause)*
+   */
+  @Override
+  public PlSqlAst visitWith_clause(PlSqlParser.With_clauseContext ctx) {
+    List<CommonTableExpression> cteList = new ArrayList<>();
+    List<Function> functions = new ArrayList<>();
+    List<Procedure> procedures = new ArrayList<>();
+    
+    // Process function and procedure bodies (Oracle-specific feature)
+    if (ctx.function_body() != null) {
+      for (PlSqlParser.Function_bodyContext funcCtx : ctx.function_body()) {
+        Function function = (Function) visit(funcCtx);
+        if (function != null) {
+          functions.add(function);
+        }
+      }
+    }
+    
+    if (ctx.procedure_body() != null) {
+      for (PlSqlParser.Procedure_bodyContext procCtx : ctx.procedure_body()) {
+        Procedure procedure = (Procedure) visit(procCtx);
+        if (procedure != null) {
+          procedures.add(procedure);
+        }
+      }
+    }
+    
+    // Process WITH factoring clauses (CTE definitions)
+    if (ctx.with_factoring_clause() != null) {
+      for (PlSqlParser.With_factoring_clauseContext factoringCtx : ctx.with_factoring_clause()) {
+        CommonTableExpression cte = (CommonTableExpression) visit(factoringCtx);
+        if (cte != null) {
+          cteList.add(cte);
+        }
+      }
+    }
+    
+    return new SelectWithClause(cteList, functions, procedures);
+  }
+  
+  /**
+   * Visits Oracle WITH factoring clause and delegates to appropriate handler.
+   * Grammar: subquery_factoring_clause | subav_factoring_clause
+   */
+  @Override
+  public PlSqlAst visitWith_factoring_clause(PlSqlParser.With_factoring_clauseContext ctx) {
+    if (ctx.subquery_factoring_clause() != null) {
+      return visit(ctx.subquery_factoring_clause());
+    } else if (ctx.subav_factoring_clause() != null) {
+      // TODO: Handle subav_factoring_clause (advanced analytical feature)
+      return null;
+    }
+    return null;
+  }
+  
+  /**
+   * Visits Oracle subquery factoring clause and creates CommonTableExpression AST node.
+   * Grammar: query_name paren_column_list? AS '(' subquery order_by_clause? ')' search_clause? cycle_clause?
+   */
+  @Override
+  public PlSqlAst visitSubquery_factoring_clause(PlSqlParser.Subquery_factoring_clauseContext ctx) {
+    // Extract query name
+    String queryName = ctx.query_name().getText();
+    
+    // Extract optional column list
+    List<String> columnList = null;
+    if (ctx.paren_column_list() != null) {
+      columnList = new ArrayList<>();
+      for (PlSqlParser.Column_nameContext colCtx : ctx.paren_column_list().column_list().column_name()) {
+        columnList.add(colCtx.getText());
+      }
+    }
+    
+    // Extract subquery
+    SelectSubQuery subQuery = null;
+    if (ctx.subquery() != null) {
+      subQuery = (SelectSubQuery) visit(ctx.subquery());
+    }
+    
+    // Check for recursive CTE (Oracle uses SEARCH and CYCLE clauses to indicate recursion)
+    boolean recursive = (ctx.search_clause() != null || ctx.cycle_clause() != null);
+    
+    // TODO: Handle search_clause and cycle_clause transformation
+    // For now, we'll just detect their presence to mark as recursive
+    
+    return new CommonTableExpression(queryName, columnList, subQuery, recursive);
+  }
+
   @Override
   public PlSqlAst visitSelect_list_elements(PlSqlParser.Select_list_elementsContext ctx) {
 

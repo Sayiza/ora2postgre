@@ -22,6 +22,7 @@ public interface PlSqlAstVisitor<T> {
   T visit(SelectSubQuery subQuery);
   T visit(SelectSubQueryBasicElement subQueryBasicElement);
   T visit(SelectWithClause selectWithClause);
+  T visit(CommonTableExpression commonTableExpression);
   T visit(TableReference tableReference);
   T visit(TableReferenceAux tableReferenceAux);
   T visit(TableReferenceAuxInternal tableReferenceAuxInternal);
