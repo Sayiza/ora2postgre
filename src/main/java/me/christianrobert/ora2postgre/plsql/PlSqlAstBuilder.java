@@ -1446,6 +1446,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     List<RecordType> recordTypes = new ArrayList<>();
     List<VarrayType> varrayTypes = new ArrayList<>();
     List<NestedTableType> nestedTableTypes = new ArrayList<>();
+    List<PackageType> packageTypes = new ArrayList<>();
 
     if (ctx.package_obj_spec() != null) {
       for (var member : ctx.package_obj_spec()) {
@@ -1458,11 +1459,13 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
           varrayTypes.add((VarrayType) memberAst);
         } else if (memberAst instanceof NestedTableType) {
           nestedTableTypes.add((NestedTableType) memberAst);
+        } else if (memberAst instanceof PackageType) {
+          packageTypes.add((PackageType) memberAst);
         }
       }
     }
-    // TODO $if, subtype, packagetype, cursor, etc.
-    return new OraclePackage(packageName, schema, variables, null, null, null, recordTypes, varrayTypes, nestedTableTypes, null, null, null);
+    // TODO $if, subtype, cursor, etc.
+    return new OraclePackage(packageName, schema, variables, null, null, packageTypes, recordTypes, varrayTypes, nestedTableTypes, null, null, null);
   }
 
   @Override
@@ -2106,6 +2109,14 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       NestedTableType nestedTableType = (NestedTableType) visit(ctx.table_type_def());
       // Return a named NestedTableType (similar to RecordType pattern)
       return new NestedTableType(typeName, nestedTableType.getDataType());
+    }
+    
+    // Handle simple type alias declarations: TYPE name IS type_spec (e.g., TYPE user_id IS NUMBER(10))
+    if (ctx.identifier() != null && ctx.type_spec() != null) {
+      String typeName = ctx.identifier().getText();
+      DataTypeSpec dataTypeSpec = (DataTypeSpec) visit(ctx.type_spec());
+      // Return a PackageType for simple type aliases
+      return new PackageType(typeName, dataTypeSpec);
     }
     
     // TODO: Handle ref_cursor_type_def

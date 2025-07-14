@@ -59,13 +59,11 @@ public class StandardPackageStrategy implements PackageTransformationStrategy {
       }
     }
     
-    // Transform package types - currently TODO in original code
+    // Transform package types to PostgreSQL DOMAIN types
     // Only generate types in the spec phase (specOnly=true) to avoid duplication
-    if (specOnly) {
-      for (PackageType type : oraclePackage.getTypes()) {
-        // TODO: Package types might need to become PostgreSQL composite types
-        // This is currently a TODO in the original OraclePackage.toPostgre() method
-      }
+    if (specOnly && !oraclePackage.getTypes().isEmpty()) {
+      b.append(generatePackageTypes(oraclePackage, context));
+      b.append("\n");
     }
     
     // Transform record types to PostgreSQL composite types
@@ -123,7 +121,7 @@ public class StandardPackageStrategy implements PackageTransformationStrategy {
       notes.append("; Package cursors not yet implemented");
     }
     if (!oraclePackage.getTypes().isEmpty()) {
-      notes.append("; Package types not yet implemented");
+      notes.append("; Package types implemented as PostgreSQL domain types");
     }
     if (!oraclePackage.getRecordTypes().isEmpty()) {
       notes.append("; Package record types implemented as PostgreSQL composite types");
@@ -213,6 +211,36 @@ public class StandardPackageStrategy implements PackageTransformationStrategy {
     return value.matches("^[0-9+\\-*/\\s().]+$") && !value.trim().isEmpty();
   }
   
+  /**
+   * Generates PostgreSQL DDL for package types using CREATE DOMAIN statements.
+   * This creates PostgreSQL domain types for Oracle type aliases defined in package specifications.
+   */
+  private String generatePackageTypes(OraclePackage oraclePackage, Everything context) {
+    StringBuilder b = new StringBuilder();
+    String packageName = oraclePackage.getName().toLowerCase();
+    String schemaName = oraclePackage.getSchema().toLowerCase();
+    
+    b.append("-- Package Types for ").append(oraclePackage.getSchema()).append(".").append(packageName).append("\n");
+    b.append("-- Implemented using PostgreSQL domain types\n\n");
+    
+    for (PackageType packageType : oraclePackage.getTypes()) {
+      String typeName = packageType.getName();
+      
+      b.append("-- Type alias: ").append(typeName).append("\n");
+      
+      // Use the toDomainDDL method from PackageType to generate the DDL
+      String domainDDL = packageType.toDomainDDL(schemaName, packageName);
+      b.append(domainDDL);
+      b.append("\n\n");
+    }
+    
+    b.append("-- Usage Pattern:\n");
+    b.append("-- DECLARE variable_name schema_packagename_typename;\n");
+    b.append("-- Example: DECLARE user_id test_schema_pkg_user_id_type;\n\n");
+    
+    return b.toString();
+  }
+
   /**
    * Generates PostgreSQL DDL for package record types using CREATE TYPE statements.
    * This creates PostgreSQL composite types that can be used within package functions and procedures.

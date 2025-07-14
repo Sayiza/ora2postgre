@@ -5559,7 +5559,7 @@ ref_cursor_type_def
     ;
 
 type_declaration
-    : TYPE identifier IS (table_type_def | varray_type_def | record_type_def | ref_cursor_type_def) ';'
+    : TYPE identifier IS (table_type_def | varray_type_def | record_type_def | ref_cursor_type_def | type_spec) ';'
     ;
 
 table_type_def
