@@ -459,6 +459,14 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       }
     }
     
+    // Check if this is BULK COLLECT INTO
+    boolean isBulkCollect = false;
+    if (ctx.into_clause() != null) {
+      // Check for BULK COLLECT keywords in the into_clause
+      String intoClauseText = ctx.into_clause().getText().toUpperCase();
+      isBulkCollect = intoClauseText.contains("BULKCOLLECT");
+    }
+    
     // Parse INTO variables
     List<String> intoVariables = new ArrayList<>();
     if (ctx.into_clause() != null) {
@@ -503,7 +511,12 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       whereClause = (Expression) visit(ctx.where_clause().condition());
     }
     
-    return new SelectIntoStatement(selectedColumns, intoVariables, schemaName, tableName, whereClause);
+    // Return appropriate statement type based on BULK COLLECT detection
+    if (isBulkCollect) {
+      return new BulkCollectStatement(selectedColumns, intoVariables, schemaName, tableName, whereClause);
+    } else {
+      return new SelectIntoStatement(selectedColumns, intoVariables, schemaName, tableName, whereClause);
+    }
   }
 
   @Override
