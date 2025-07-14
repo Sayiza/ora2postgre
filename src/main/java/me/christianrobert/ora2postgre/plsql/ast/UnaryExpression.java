@@ -36,6 +36,9 @@ public class UnaryExpression extends PlSqlAst {
   private final boolean isArrayIndexing; // True if this represents array indexing: arr(i) -> arr[i]
   private final String arrayVariable; // Variable name for array indexing
   private final Expression indexExpression; // Index expression for array indexing
+  private final boolean isCollectionConstructor; // True if this represents collection constructor: type_name(args)
+  private final String collectionTypeName; // Type name for collection constructor
+  private final List<Expression> constructorArguments; // Arguments for collection constructor
 
   // Constructor for unary operations (-, +, PRIOR, etc.)
   public UnaryExpression(String unaryOperator, UnaryExpression childExpression) {
@@ -51,6 +54,9 @@ public class UnaryExpression extends PlSqlAst {
     this.isArrayIndexing = false;
     this.arrayVariable = null;
     this.indexExpression = null;
+    this.isCollectionConstructor = false;
+    this.collectionTypeName = null;
+    this.constructorArguments = null;
   }
 
   // Constructor for case expressions
@@ -67,6 +73,9 @@ public class UnaryExpression extends PlSqlAst {
     this.isArrayIndexing = false;
     this.arrayVariable = null;
     this.indexExpression = null;
+    this.isCollectionConstructor = false;
+    this.collectionTypeName = null;
+    this.constructorArguments = null;
   }
 
   // Private constructor for specific types
@@ -83,6 +92,9 @@ public class UnaryExpression extends PlSqlAst {
     this.isArrayIndexing = false;
     this.arrayVariable = null;
     this.indexExpression = null;
+    this.isCollectionConstructor = false;
+    this.collectionTypeName = null;
+    this.constructorArguments = null;
   }
 
   // Constructor for standard functions
@@ -109,6 +121,9 @@ public class UnaryExpression extends PlSqlAst {
     this.isArrayIndexing = false;
     this.arrayVariable = null;
     this.indexExpression = null;
+    this.isCollectionConstructor = false;
+    this.collectionTypeName = null;
+    this.constructorArguments = null;
   }
 
   // Constructor for array indexing calls
@@ -125,6 +140,28 @@ public class UnaryExpression extends PlSqlAst {
     this.isArrayIndexing = true;
     this.arrayVariable = arrayVariable;
     this.indexExpression = indexExpression;
+    this.isCollectionConstructor = false;
+    this.collectionTypeName = null;
+    this.constructorArguments = null;
+  }
+
+  // Constructor for collection constructor calls
+  public UnaryExpression(String collectionTypeName, List<Expression> constructorArguments) {
+    this.unaryOperator = null;
+    this.childExpression = null;
+    this.caseExpression = null;
+    this.quantifiedExpression = null;
+    this.standardFunction = null;
+    this.atom = null;
+    this.implicitCursorExpression = null;
+    this.collectionMethod = null;
+    this.methodArguments = null;
+    this.isArrayIndexing = false;
+    this.arrayVariable = null;
+    this.indexExpression = null;
+    this.isCollectionConstructor = true;
+    this.collectionTypeName = collectionTypeName;
+    this.constructorArguments = constructorArguments;
   }
 
   public String getUnaryOperator() {
@@ -189,6 +226,10 @@ public class UnaryExpression extends PlSqlAst {
 
   public boolean isCollectionMethodCall() {
     return collectionMethod != null;
+  }
+
+  public boolean isCollectionConstructor() {
+    return isCollectionConstructor;
   }
 
   public boolean isArrayIndexing() {
@@ -261,6 +302,9 @@ public class UnaryExpression extends PlSqlAst {
     } else if (isCollectionMethodCall()) {
       // Transform Oracle collection methods to PostgreSQL function calls
       return transformCollectionMethodToPostgreSQL(data);
+    } else if (isCollectionConstructor()) {
+      // Transform Oracle collection constructors to PostgreSQL ARRAY syntax
+      return transformCollectionConstructorToPostgreSQL(data);
     } else if (isArrayIndexing()) {
       // Transform Oracle array indexing to PostgreSQL array indexing
       return transformArrayIndexingToPostgreSQL(data);
@@ -367,5 +411,59 @@ public class UnaryExpression extends PlSqlAst {
     // Transform Oracle arr(i) to PostgreSQL arr[i]
     String indexString = indexExpression.toPostgre(data);
     return arrayVariable + "[" + indexString + "]";
+  }
+
+  /**
+   * Transform Oracle collection constructors to PostgreSQL ARRAY syntax.
+   * Oracle: string_array('a', 'b', 'c') → PostgreSQL: ARRAY['a', 'b', 'c']
+   * Oracle: number_table(1, 2, 3) → PostgreSQL: ARRAY[1, 2, 3]
+   * Oracle: string_array() → PostgreSQL: ARRAY[]::TEXT[]
+   */
+  private String transformCollectionConstructorToPostgreSQL(Everything data) {
+    if (collectionTypeName == null) {
+      return "/* INVALID COLLECTION CONSTRUCTOR */";
+    }
+    
+    // Handle empty constructor: type_name() → ARRAY[]::type[]
+    if (constructorArguments == null || constructorArguments.isEmpty()) {
+      String baseType = inferPostgreSQLTypeFromCollectionName(collectionTypeName);
+      return "ARRAY[]::" + baseType + "[]";
+    }
+    
+    // Handle constructor with arguments: type_name(arg1, arg2, ...) → ARRAY[arg1, arg2, ...]
+    StringBuilder sb = new StringBuilder();
+    sb.append("ARRAY[");
+    
+    for (int i = 0; i < constructorArguments.size(); i++) {
+      if (i > 0) {
+        sb.append(", ");
+      }
+      sb.append(constructorArguments.get(i).toPostgre(data));
+    }
+    
+    sb.append("]");
+    return sb.toString();
+  }
+
+  /**
+   * Infer PostgreSQL base type from Oracle collection type name.
+   * This is a heuristic approach that can be enhanced with full type context.
+   */
+  private String inferPostgreSQLTypeFromCollectionName(String typeName) {
+    if (typeName == null) return "TEXT";
+    
+    String lowerTypeName = typeName.toLowerCase();
+    
+    // Common Oracle collection type name patterns
+    if (lowerTypeName.contains("string") || lowerTypeName.contains("varchar") || lowerTypeName.contains("char")) {
+      return "TEXT";
+    } else if (lowerTypeName.contains("number") || lowerTypeName.contains("numeric") || lowerTypeName.contains("int")) {
+      return "NUMERIC";
+    } else if (lowerTypeName.contains("date") || lowerTypeName.contains("timestamp")) {
+      return "TIMESTAMP";
+    } else {
+      // Default to TEXT for unknown types
+      return "TEXT";
+    }
   }
 }

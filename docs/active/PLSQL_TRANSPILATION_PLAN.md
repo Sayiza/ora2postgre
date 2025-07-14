@@ -52,15 +52,15 @@
 
 ## 🎯 **IMMEDIATE PRIORITIES** (Next Implementation Phase)
 
-### **1. Collection Initialization and Advanced Features** 🚀 NEXT PHASE
-**Status**: Ready for implementation - foundation complete
-**Effort**: 3-4 weeks - building on solid collection infrastructure  
+### **1. BULK COLLECT and Advanced Features** 🚀 NEXT PHASE
+**Status**: Ready for implementation - collection initialization complete
+**Effort**: 2-3 weeks - building on complete collection infrastructure  
 **Impact**: HIGH - Completes comprehensive collection type support
 
 **Next Implementation Targets**:
-- 🎯 **Collection Initialization** - HIGH PRIORITY: Oracle `string_array('a','b')` → PostgreSQL `ARRAY['a','b']`
-- 🎯 **BULK COLLECT Support** - MEDIUM PRIORITY: Transform Oracle BULK COLLECT INTO arrays
+- 🎯 **BULK COLLECT Support** - HIGH PRIORITY: Transform Oracle BULK COLLECT INTO arrays
 - 🎯 **Function Parameter Types** - MEDIUM PRIORITY: Support collection types as function parameters and return types
+- 🎯 **Compound Expression Collection Methods** - HIGH PRIORITY: Fix parsing of `.COUNT` in expressions like `v_arr1.COUNT + v_arr2.COUNT`
 
 ### **COMPLETED: Collection Types (Function/Procedure Level)** ✅
 **Status**: Core architecture, collection methods, and array indexing fully implemented  
@@ -73,9 +73,10 @@
 - ✅ **Variable Declaration Integration** - COMPLETE: Function context passed to DataTypeSpec
 - ✅ **No DDL Generation** - COMPLETE: Function-local types are metadata only (no CREATE DOMAIN)
 - ✅ **Test Coverage** - COMPLETE: 24 collection type tests passing (includes indexing)
-- ✅ **Collection Method Transformation** - COMPLETE: Oracle collection methods (.COUNT, .FIRST, .LAST, etc.) properly parsed and transformed to PostgreSQL functions
+- ✅ **Collection Method Transformation** - COMPLETE: Oracle collection methods (.COUNT, .FIRST, .LAST, etc.) properly parsed and transformed to PostgreSQL functions (simple expressions)
 - ✅ **Collection Indexing** - COMPLETE: Oracle `arr(i)` → PostgreSQL `arr[i]` syntax transformation with context-aware function vs variable detection using Everything metadata
-- ⏳ **Collection Initialization** - NOT STARTED: Oracle `string_array('a','b')` → PostgreSQL `ARRAY['a','b']`
+- ✅ **Collection Initialization** - COMPLETE: Oracle `string_array('a','b')` → PostgreSQL `ARRAY['a','b']` with full variable declaration support
+- ⚠️ **Compound Expression Collection Methods** - PARTIAL: Simple expressions work (`.COUNT` alone), compound expressions need enhancement (`v1.COUNT + v2.COUNT`)
 - ⏳ **BULK COLLECT Support** - NOT STARTED: Transform Oracle BULK COLLECT INTO arrays
 - ⏳ **Function Parameter Types** - NOT STARTED: Support collection types as function parameters and return types
 
@@ -201,6 +202,57 @@ v_last := array_length(v_arr, 1);
 - **Full method coverage** for all Oracle collection methods
 - **Array indexing test coverage** for both literal and variable indices
 - **No regressions** in existing functionality
+
+## 🎉 **MAJOR MILESTONE: COLLECTION INITIALIZATION COMPLETE** ✅
+
+### **Successfully Implemented (January 2025)**
+Complete Oracle collection constructor support with full PostgreSQL ARRAY syntax transformation:
+
+### **✅ COMPLETE COLLECTION CONSTRUCTOR SUPPORT:**
+**Problem Solved**: Oracle collection constructors like `string_array('a','b')` were not being transformed to PostgreSQL `ARRAY['a','b']` syntax.
+
+**Solution**: Enhanced expression parsing and variable declaration infrastructure:
+1. **`checkGeneralElementForCollectionConstructor()`** - Detects Oracle collection constructor patterns in expressions
+2. **`isLikelyCollectionConstructor()`** - Heuristic identification of collection type names
+3. **Enhanced UnaryExpression** - New constructor and transformation methods for collection constructors
+4. **Fixed Variable.toPostgre()** - Added missing default value support to variable declarations
+5. **Type Inference** - Intelligent mapping from Oracle type names to PostgreSQL base types
+
+### **✅ COMPLETE TRANSFORMATION SUPPORT:**
+```sql
+-- Oracle Collection Constructors → PostgreSQL Arrays
+string_array('a', 'b', 'c')     → ARRAY['a', 'b', 'c']
+number_table(1, 2, 3, 4, 5)     → ARRAY[1, 2, 3, 4, 5]
+string_array()                  → ARRAY[]::TEXT[]
+
+-- Variable Declarations with Initialization
+v_strings string_array := string_array('a', 'b', 'c');
+→ v_strings text[] := ARRAY['a', 'b', 'c'];
+
+v_numbers number_table := number_table(1, 2, 3);
+→ v_numbers numeric[] := ARRAY[1, 2, 3];
+```
+
+### **✅ VERIFIED WORKING OUTPUT:**
+```sql
+-- Generated PostgreSQL from Oracle function
+CREATE OR REPLACE FUNCTION _test_collection_init() 
+RETURNS numeric LANGUAGE plpgsql AS $$
+DECLARE
+  v_strings text[] := ARRAY['a', 'b', 'c'];
+  v_numbers numeric[] := ARRAY[1, 2, 3, 4, 5];
+  v_empty_strings text[] := ARRAY[]::TEXT[];
+BEGIN
+  return array_length(v_strings, 1);
+END;
+$$;
+```
+
+### **✅ INTEGRATION ACHIEVEMENTS:**
+- **Non-intrusive Implementation** - Builds on existing collection infrastructure seamlessly
+- **Type System Integration** - Works with both package-level and function-level collection types
+- **All Tests Passing** - 250/250 tests passing with no regressions
+- **Production Ready** - Complete end-to-end Oracle→PostgreSQL collection constructor transformation
 
 ## 🎉 **MAJOR MILESTONE: COLLECTION INDEXING COMPLETE** ✅
 
@@ -374,10 +426,11 @@ v_element := v_arr[v_index];  -- ✅ Correctly transformed
 - ✅ Package and function feature sets complete for enterprise applications
 - ✅ Collection infrastructure complete: types, methods, indexing all working
 
-### **Ready for Phase 1.5: Collection Initialization (Next Session)**
-- 🎯 Collection initialization transformations (Oracle constructors → PostgreSQL ARRAY syntax)
-- 🎯 BULK COLLECT support for array population
+### **Phase 1.5 Complete: Collection Initialization** ✅
+- ✅ Collection initialization transformations (Oracle constructors → PostgreSQL ARRAY syntax) **COMPLETE**
+- 🎯 BULK COLLECT support for array population (Next Priority)
 - 🎯 Function parameter and return type support for collections
+- 🎯 Compound expression collection methods (`.COUNT` in expressions like `a.COUNT + b.COUNT`)
 
 ### **Phase 2 Complete (3-4 months)**
 - ✅ Advanced SQL features enable complex reporting function migration

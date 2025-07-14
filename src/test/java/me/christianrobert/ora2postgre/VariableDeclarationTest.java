@@ -121,8 +121,8 @@ public class VariableDeclarationTest {
         String result = strategy.transform(procedure, data, false);
         
         assertNotNull(result);
-        assertTrue(result.contains("vStatus text;"), "Should contain variable declaration");
-        // Note: Default values in PostgreSQL are handled differently, so we check for the variable declaration
+        assertTrue(result.contains("vStatus text := 'ACTIVE';"), "Should contain variable declaration with default value");
+        // Default values are now properly included in PostgreSQL variable declarations
     }
 
     @Test

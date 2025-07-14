@@ -1682,13 +1682,19 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
   private UnaryExpression checkAtomForCollectionMethod(PlSqlParser.AtomContext atomCtx) {
     // Check if atom contains a general_element with dot notation (collection methods)
     if (atomCtx.general_element() != null) {
-      // First check for collection methods
+      // First check for collection constructors (e.g., string_array('a', 'b'))
+      UnaryExpression collectionConstructor = checkGeneralElementForCollectionConstructor(atomCtx.general_element());
+      if (collectionConstructor != null) {
+        return collectionConstructor;
+      }
+      
+      // Then check for collection methods
       UnaryExpression collectionMethod = checkGeneralElementForCollectionMethod(atomCtx.general_element());
       if (collectionMethod != null) {
         return collectionMethod;
       }
       
-      // Then check for array indexing
+      // Finally check for array indexing
       UnaryExpression arrayIndexing = checkGeneralElementForArrayIndexing(atomCtx.general_element());
       if (arrayIndexing != null) {
         return arrayIndexing;
@@ -1832,6 +1838,61 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
   }
 
   /**
+   * Check if a general_element represents a collection constructor call.
+   * Looks for patterns like: string_array('a', 'b'), number_table(1, 2, 3), etc.
+   * This needs to distinguish between function calls and collection constructors by checking
+   * if the identifier matches a known collection type name.
+   */
+  private UnaryExpression checkGeneralElementForCollectionConstructor(PlSqlParser.General_elementContext generalElementCtx) {
+    // Check for the pattern: general_element_part with function_argument (parentheses syntax)
+    if (generalElementCtx.general_element_part() != null && 
+        !generalElementCtx.general_element_part().isEmpty()) {
+      
+      // We need a simple identifier (not dot notation) with function arguments
+      if (generalElementCtx.general_element() == null) {
+        // This is a simple identifier with parentheses: identifier(args)
+        PlSqlParser.General_element_partContext partCtx = generalElementCtx.general_element_part().get(0);
+        
+        if (partCtx.id_expression() != null && 
+            partCtx.function_argument() != null) {
+          
+          String identifier = partCtx.id_expression().getText();
+          
+          // Check if this identifier is a collection type name
+          // We'll do this by checking if it ends with known collection type patterns
+          // and later enhance with Everything context for precise type checking
+          if (isLikelyCollectionConstructor(identifier)) {
+            // Extract constructor arguments
+            List<Expression> arguments = extractMethodArguments(partCtx);
+            
+            // Create a collection constructor expression
+            return new UnaryExpression(identifier, arguments);
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Check if an identifier is likely a collection constructor based on naming patterns.
+   * This is a heuristic check that can be enhanced with full type context later.
+   */
+  private boolean isLikelyCollectionConstructor(String identifier) {
+    if (identifier == null) return false;
+    
+    String lowerIdentifier = identifier.toLowerCase();
+    
+    // Common Oracle collection type naming patterns
+    return lowerIdentifier.endsWith("_array") || 
+           lowerIdentifier.endsWith("_table") ||
+           lowerIdentifier.endsWith("_list") ||
+           lowerIdentifier.endsWith("_varray") ||
+           lowerIdentifier.contains("array") ||
+           lowerIdentifier.contains("table");
+  }
+
+  /**
    * Visitor method for multiset_expression rule.
    */
   @Override
@@ -1904,6 +1965,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
    */
   @Override
   public PlSqlAst visitConcatenation(PlSqlParser.ConcatenationContext ctx) {
+    // Handle simple model expression (most common case)
     if (ctx.model_expression() != null) {
       PlSqlAst modelAst = visit(ctx.model_expression());
       if (modelAst instanceof ModelExpression) {
@@ -1913,7 +1975,19 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
       return visitChildren(ctx);
     }
     
-    // For concatenation operations, fall back to default behavior
+    // Handle binary operations (arithmetic/concatenation operations)
+    if (ctx.concatenation() != null && ctx.concatenation().size() == 2 && ctx.op != null) {
+      // Parse left and right operands recursively
+      PlSqlAst leftAst = visit(ctx.concatenation(0));
+      PlSqlAst rightAst = visit(ctx.concatenation(1));
+      
+      if (leftAst instanceof Concatenation && rightAst instanceof Concatenation) {
+        String operator = ctx.op.getText();
+        return new Concatenation((Concatenation) leftAst, operator, (Concatenation) rightAst);
+      }
+    }
+    
+    // For other concatenation patterns, fall back to default behavior
     return new Concatenation(new ModelExpression(UnaryExpression.forAtom(new Expression(new LogicalExpression(new UnaryLogicalExpression(ctx.getText()))))));
   }
 

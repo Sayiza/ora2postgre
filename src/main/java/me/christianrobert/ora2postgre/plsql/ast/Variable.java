@@ -39,8 +39,13 @@ public class Variable extends PlSqlAst {
     StringBuilder b = new StringBuilder();
     b.append(name)
             .append(" ")
-            .append(dataType.toPostgre(data))
-    ;
+            .append(dataType.toPostgre(data));
+    
+    // Add default value if present
+    if (defaultValue != null) {
+      b.append(" := ").append(defaultValue.toPostgre(data));
+    }
+    
     return b.toString();
   }
 
@@ -48,8 +53,13 @@ public class Variable extends PlSqlAst {
     StringBuilder b = new StringBuilder();
     b.append(name)
             .append(" ")
-            .append(dataType.toPostgre(data, function))
-    ;
+            .append(dataType.toPostgre(data, function));
+    
+    // Add default value if present
+    if (defaultValue != null) {
+      b.append(" := ").append(defaultValue.toPostgre(data));
+    }
+    
     return b.toString();
   }
 }

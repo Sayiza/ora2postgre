@@ -513,9 +513,9 @@ END;
     Variable variable = func.getVariables().get(0);
     assertEquals("v_arr", variable.getName());
     
-    // Test PostgreSQL generation with function context
+    // Test PostgreSQL generation with function context (should include initialization)
     String postgresVarDecl = variable.toPostgre(data, func);
-    assertEquals("v_arr text[]", postgresVarDecl);
+    assertEquals("v_arr text[] := ARRAY['a', 'b']", postgresVarDecl);
   }
 
   @Test
@@ -558,9 +558,9 @@ END;
     Variable variable = func.getVariables().get(0);
     assertEquals("v_arr", variable.getName());
     
-    // Test PostgreSQL generation with function context
+    // Test PostgreSQL generation with function context (should include initialization)
     String postgresVarDecl = variable.toPostgre(data, func);
-    assertEquals("v_arr numeric[]", postgresVarDecl);
+    assertEquals("v_arr numeric[] := ARRAY[1, 2, 3]", postgresVarDecl);
   }
 
   @Test
@@ -873,7 +873,7 @@ END;
   public void testFunctionLocalCollectionInitialization() {
     // Test transformation of Oracle collection constructors to PostgreSQL ARRAY[...] syntax
     String oracleSql = """
-CREATE OR REPLACE FUNCTION TEST_SCHEMA.test_collection_init RETURN NUMBER IS
+CREATE OR REPLACE FUNCTION test_collection_init RETURN NUMBER IS
   TYPE string_array IS VARRAY(10) OF VARCHAR2(100);
   TYPE number_table IS TABLE OF NUMBER;
   
@@ -886,25 +886,37 @@ END;
 /
 """;
 
-    // Expected PostgreSQL transformation:
-    String expectedPostgresSQL = """
-CREATE FUNCTION test_schema.test_collection_init() RETURNS numeric AS $$
-DECLARE
-  v_strings TEXT[] := ARRAY['a', 'b', 'c'];
-  v_numbers numeric[] := ARRAY[1, 2, 3, 4, 5];
-  v_empty_strings TEXT[] := ARRAY[]::TEXT[];
-BEGIN
-  RETURN array_length(v_strings, 1) + array_length(v_numbers, 1);
-END;
-$$ LANGUAGE plpgsql;
-""";
+    // Parse and transform the Oracle function
+    Everything data = new Everything();
+    data.getUserNames().add("TEST_SCHEMA");
     
-    // This test documents the expected transformation:
+    PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
+    PlSqlAst ast = PlSqlAstMain.processPlsqlCode(plsqlCode);
+    
+    assertNotNull(ast);
+    assertTrue(ast instanceof Function);
+    Function function = (Function) ast;
+    
+    // Generate PostgreSQL code
+    String postgreSQL = function.toPostgre(data, false);
+    
+    System.out.println("Generated PostgreSQL code:");
+    System.out.println(postgreSQL);
+    System.out.println("=== End of generated code ===");
+    
+    // Verify that collection constructors are transformed correctly:
     // Oracle string_array('a', 'b', 'c') → PostgreSQL ARRAY['a', 'b', 'c']
-    // Oracle number_table(1, 2, 3) → PostgreSQL ARRAY[1, 2, 3]
+    // Oracle number_table(1, 2, 3, 4, 5) → PostgreSQL ARRAY[1, 2, 3, 4, 5]
     // Oracle string_array() → PostgreSQL ARRAY[]::TEXT[]
-    assertTrue(expectedPostgresSQL.contains("ARRAY['a', 'b', 'c']"));
-    assertTrue(expectedPostgresSQL.contains("ARRAY[1, 2, 3, 4, 5]"));
-    assertTrue(expectedPostgresSQL.contains("ARRAY[]::TEXT[]"));
+    assertTrue(postgreSQL.contains("ARRAY['a', 'b', 'c']"), 
+               "Should contain ARRAY['a', 'b', 'c'] transformation");
+    assertTrue(postgreSQL.contains("ARRAY[1, 2, 3, 4, 5]"), 
+               "Should contain ARRAY[1, 2, 3, 4, 5] transformation");
+    assertTrue(postgreSQL.contains("ARRAY[]::TEXT[]"), 
+               "Should contain ARRAY[]::TEXT[] for empty constructor");
+    
+    // Verify collection methods work in compound expressions
+    assertTrue(postgreSQL.contains("array_length(v_strings, 1) + array_length(v_numbers, 1)"), 
+               "Should contain array_length transformations for both .COUNT methods in compound expression");
   }
 }
