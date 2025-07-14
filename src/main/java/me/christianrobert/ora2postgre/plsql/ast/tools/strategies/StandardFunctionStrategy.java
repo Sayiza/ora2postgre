@@ -53,13 +53,13 @@ public class StandardFunctionStrategy implements FunctionTransformationStrategy 
             .append(function.getName().toLowerCase())
             .append("(");
     
-    // Add parameters
-    ToExportPostgre.doParametersPostgre(b, function.getParameters(), context);
+    // Add parameters with function context for collection type resolution
+    ToExportPostgre.doParametersPostgre(b, function.getParameters(), context, function);
     
-    // Add return type and function header
+    // Add return type and function header with function context for collection type resolution
     b.append(") \n")
             .append("RETURNS ")
-            .append(TypeConverter.toPostgre(function.getReturnType()))
+            .append(TypeConverter.toPostgre(function.getReturnType(), context, function))
             .append("\nLANGUAGE plpgsql AS $$\n")
             .append("DECLARE\n");
 

@@ -1,5 +1,10 @@
 package me.christianrobert.ora2postgre.plsql.ast.tools.transformers;
 
+import me.christianrobert.ora2postgre.global.Everything;
+import me.christianrobert.ora2postgre.plsql.ast.Function;
+import me.christianrobert.ora2postgre.plsql.ast.VarrayType;
+import me.christianrobert.ora2postgre.plsql.ast.NestedTableType;
+
 public class TypeConverter {
 
   public static String toJava(String returnType) {
@@ -193,5 +198,62 @@ public class TypeConverter {
       default:
         return returnType;
     }
+  }
+
+  /**
+   * Enhanced return type conversion with function context for collection type resolution.
+   * This enables function return types to use function-local collection types.
+   */
+  public static String toPostgre(String returnType, Everything data, Function function) {
+    if (returnType == null) {
+      return null;
+    }
+
+    // First check if this is a function-local collection type
+    if (function != null) {
+      // Check function-local VARRAY types
+      for (VarrayType varrayType : function.getVarrayTypes()) {
+        if (varrayType.getName().equalsIgnoreCase(returnType)) {
+          // Get base type and add [] - TYPE local_array IS VARRAY(10) OF VARCHAR2(100) → text[]
+          String baseType = varrayType.getDataType().toPostgre(data);
+          return baseType + "[]";
+        }
+      }
+      
+      // Check function-local TABLE OF types
+      for (NestedTableType nestedTableType : function.getNestedTableTypes()) {
+        if (nestedTableType.getName().equalsIgnoreCase(returnType)) {
+          // Get base type and add [] - TYPE local_table IS TABLE OF NUMBER → numeric[]
+          String baseType = nestedTableType.getDataType().toPostgre(data);
+          return baseType + "[]";
+        }
+      }
+      
+      // Check if it's a package-level collection type
+      if (function.getParentPackage() != null) {
+        // Check package VARRAY types
+        for (VarrayType varrayType : function.getParentPackage().getVarrayTypes()) {
+          if (varrayType.getName().equalsIgnoreCase(returnType)) {
+            // Package-level types use DOMAIN references
+            String schema = function.getParentPackage().getSchema().toLowerCase();
+            String packageName = function.getParentPackage().getName().toLowerCase();
+            return schema + "_" + packageName + "_" + returnType.toLowerCase();
+          }
+        }
+        
+        // Check package TABLE OF types
+        for (NestedTableType nestedTableType : function.getParentPackage().getNestedTableTypes()) {
+          if (nestedTableType.getName().equalsIgnoreCase(returnType)) {
+            // Package-level types use DOMAIN references
+            String schema = function.getParentPackage().getSchema().toLowerCase();
+            String packageName = function.getParentPackage().getName().toLowerCase();
+            return schema + "_" + packageName + "_" + returnType.toLowerCase();
+          }
+        }
+      }
+    }
+
+    // Fall back to the standard type conversion
+    return toPostgre(returnType);
   }
 }

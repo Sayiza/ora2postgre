@@ -60,4 +60,21 @@ public class Parameter extends PlSqlAst {
     ;
     return b.toString();
   }
+
+  /**
+   * Enhanced toPostgre method with function context for collection type resolution.
+   * This enables function parameters to use function-local collection types.
+   */
+  public String toPostgre(Everything data, Function function) {
+    StringBuilder b = new StringBuilder();
+    b.append(name.toLowerCase())
+            .append(" ")
+            .append((in && !out) ? "IN " : " ")
+            .append((in && out) ? "INOUT " : " ")
+            .append((!in && out) ? "OUT " : " ")
+            .append((!in && !out) ? "IN " : " ")
+            .append(dataType.toPostgre(data, function))
+    ;
+    return b.toString();
+  }
 }
