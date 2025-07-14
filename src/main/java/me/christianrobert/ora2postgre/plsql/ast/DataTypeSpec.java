@@ -34,6 +34,10 @@ public class DataTypeSpec extends PlSqlAst {
     return fieldTypeFullName;
   }
 
+  public String getCustumDataType() {
+    return custumDataType;
+  }
+
   public String toJava(Everything data) {
     // TypeConverter.toJava( convert here
     if ( nativeDataType != null ) {

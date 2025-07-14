@@ -919,4 +919,70 @@ END;
     assertTrue(postgreSQL.contains("array_length(v_strings, 1) + array_length(v_numbers, 1)"), 
                "Should contain array_length transformations for both .COUNT methods in compound expression");
   }
+
+  @Test
+  public void testPackageCollectionVariableInitializationQuoteIssue() {
+    // Test that package collection variables with initialization generate correct PostgreSQL
+    // This test specifically checks for the quote issue where:
+    // DEFAULT 'ARRAY[1, 2, 3, 4, 5]' (incorrect - quoted)
+    // should become:
+    // DEFAULT ARRAY[1, 2, 3, 4, 5] (correct - unquoted)
+    
+    String oraclePackageSql = """
+CREATE OR REPLACE PACKAGE TEST_SCHEMA.testpackage IS
+  TYPE varraytyp1 IS VARRAY(6) OF VARCHAR2(256);
+  gArray1 varraytyp1 := varraytyp1(1, 2, 3, 4, 5, 6);
+END testpackage;
+/
+""";
+
+    // Create test data
+    Everything data = new Everything();
+    data.getUserNames().add("TEST_SCHEMA");
+
+    PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oraclePackageSql);
+
+    // Parse the Oracle package
+    PlSqlAst ast = PlSqlAstMain.processPlsqlCode(plsqlCode);
+
+    assertNotNull(ast);
+    assertTrue(ast instanceof OraclePackage);
+    
+    OraclePackage pkg = (OraclePackage) ast;
+    assertEquals("testpackage", pkg.getName());
+    
+    // Check that the package has the collection type and variable
+    assertEquals(1, pkg.getVarrayTypes().size());
+    assertEquals(1, pkg.getVariables().size());
+    
+    VarrayType varrayType = pkg.getVarrayTypes().get(0);
+    assertEquals("varraytyp1", varrayType.getName());
+    
+    Variable variable = pkg.getVariables().get(0);
+    assertEquals("gArray1", variable.getName());
+    assertNotNull(variable.getDefaultValue());
+    
+    // Generate PostgreSQL using the transformation manager
+    String postgresCode = pkg.toPostgre(data, true);
+    
+    System.out.println("Generated PostgreSQL package code:");
+    System.out.println(postgresCode);
+    System.out.println("=== End of generated code ===");
+    
+    // Verify the generated code
+    assertNotNull(postgresCode);
+    
+    // The key test: verify that the temporary table DEFAULT clause does NOT have quotes around the ARRAY
+    // This is the bug we're trying to fix
+    assertTrue(postgresCode.contains("CREATE TEMPORARY TABLE test_schema_testpackage_garray1"), 
+               "Should contain temporary table creation");
+    
+    // Check for the CORRECT format (without quotes)
+    assertTrue(postgresCode.contains("DEFAULT ARRAY[1, 2, 3, 4, 5, 6]"), 
+               "Should contain DEFAULT ARRAY[1, 2, 3, 4, 5, 6] without quotes");
+    
+    // Check that the INCORRECT format (with quotes) is NOT present
+    assertFalse(postgresCode.contains("DEFAULT 'ARRAY[1, 2, 3, 4, 5, 6]'"), 
+                "Should NOT contain DEFAULT 'ARRAY[1, 2, 3, 4, 5, 6]' with quotes");
+  }
 }

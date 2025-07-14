@@ -5,6 +5,7 @@ import me.christianrobert.ora2postgre.plsql.ast.Procedure;
 import me.christianrobert.ora2postgre.plsql.ast.Statement;
 import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.StatementDeclarationCollector;
 import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.ToExportPostgre;
+import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.PackageCollectionHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,6 +59,15 @@ public class StandardProcedureStrategy implements ProcedureTransformationStrateg
             .append("DECLARE\n");
 
     if (!specOnly) {
+      // Analyze package collection variables that need materialization
+      var packageCollections = PackageCollectionHelper.analyzePackageCollections(
+          procedure, procedure.getParentPackage(), context);
+      
+      // Add declarations for package collection variables
+      if (!packageCollections.isEmpty()) {
+        b.append(PackageCollectionHelper.generateVariableDeclarations(packageCollections));
+      }
+      
       // Add explicit variable declarations from procedure's DECLARE section
       if (procedure.getVariables() != null && !procedure.getVariables().isEmpty()) {
         for (me.christianrobert.ora2postgre.plsql.ast.Variable variable : procedure.getVariables()) {
@@ -98,10 +108,24 @@ public class StandardProcedureStrategy implements ProcedureTransformationStrateg
     if (specOnly) {
       b.append("null;\n");
     } else {
+      // Re-use the package collections analysis for prologue/epilogue
+      var packageCollections = PackageCollectionHelper.analyzePackageCollections(
+          procedure, procedure.getParentPackage(), context);
+      
+      // Add prologue to materialize package collections
+      if (!packageCollections.isEmpty()) {
+        b.append(PackageCollectionHelper.generatePrologue(packageCollections));
+      }
+      
       // Add procedure body statements
       for (Statement statement : procedure.getStatements()) {
         b.append(statement.toPostgre(context))
                 .append("\n");
+      }
+      
+      // Add epilogue to persist package collections
+      if (!packageCollections.isEmpty()) {
+        b.append(PackageCollectionHelper.generateEpilogue(packageCollections));
       }
     }
     

@@ -6,6 +6,7 @@ import me.christianrobert.ora2postgre.plsql.ast.Parameter;
 import me.christianrobert.ora2postgre.plsql.ast.Statement;
 import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.StatementDeclarationCollector;
 import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.ToExportPostgre;
+import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.PackageCollectionHelper;
 import me.christianrobert.ora2postgre.plsql.ast.tools.transformers.TypeConverter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,6 +64,15 @@ public class StandardFunctionStrategy implements FunctionTransformationStrategy 
             .append("DECLARE\n");
 
     if (!specOnly) {
+      // Analyze package collection variables that need materialization
+      var packageCollections = PackageCollectionHelper.analyzePackageCollections(
+          function, function.getParentPackage(), context);
+      
+      // Add declarations for package collection variables
+      if (!packageCollections.isEmpty()) {
+        b.append(PackageCollectionHelper.generateVariableDeclarations(packageCollections));
+      }
+      
       // Add explicit variable declarations from procedure's DECLARE section
       if (function.getVariables() != null && !function.getVariables().isEmpty()) {
         for (me.christianrobert.ora2postgre.plsql.ast.Variable variable : function.getVariables()) {
@@ -81,7 +91,8 @@ public class StandardFunctionStrategy implements FunctionTransformationStrategy 
                   .append("\n");
         }
       }
-      
+
+      // TODO:
       // Add record type declarations from DECLARE section
       if (function.getRecordTypes() != null && !function.getRecordTypes().isEmpty()) {
         for (me.christianrobert.ora2postgre.plsql.ast.RecordType recordType : function.getRecordTypes()) {
@@ -104,10 +115,24 @@ public class StandardFunctionStrategy implements FunctionTransformationStrategy 
     if (specOnly) {
       b.append("return null;\n");
     } else {
+      // Re-use the package collections analysis for prologue/epilogue
+      var packageCollections = PackageCollectionHelper.analyzePackageCollections(
+          function, function.getParentPackage(), context);
+      
+      // Add prologue to materialize package collections
+      if (!packageCollections.isEmpty()) {
+        b.append(PackageCollectionHelper.generatePrologue(packageCollections));
+      }
+      
       // Add function body statements
       for (Statement statement : function.getStatements()) {
         b.append(statement.toPostgre(context))
                 .append("\n");
+      }
+      
+      // Add epilogue to persist package collections
+      if (!packageCollections.isEmpty()) {
+        b.append(PackageCollectionHelper.generateEpilogue(packageCollections));
       }
     }
     

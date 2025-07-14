@@ -187,6 +187,11 @@ public class StandardPackageStrategy implements PackageTransformationStrategy {
   private boolean needsQuotes(DataTypeSpec dataType, String defaultValue) {
     String pgType = dataType.toPostgre(null).toLowerCase();
     
+    // Don't quote PostgreSQL array expressions (ARRAY[...])
+    if (defaultValue.trim().startsWith("ARRAY[")) {
+      return false;
+    }
+    
     // Don't quote numeric types, booleans, or expressions
     if (pgType.contains("numeric") || pgType.contains("integer") || pgType.contains("decimal") ||
         pgType.contains("boolean") || pgType.contains("bool") ||
