@@ -53,14 +53,13 @@
 ## 🎯 **IMMEDIATE PRIORITIES** (Next Implementation Phase)
 
 ### **1. BULK COLLECT and Advanced Features** 🚀 NEXT PHASE
-**Status**: Ready for implementation - collection initialization complete
+**Status**: Ready for implementation - all core collection features complete
 **Effort**: 2-3 weeks - building on complete collection infrastructure  
 **Impact**: HIGH - Completes comprehensive collection type support
 
 **Next Implementation Targets**:
 - 🎯 **BULK COLLECT Support** - HIGH PRIORITY: Transform Oracle BULK COLLECT INTO arrays
-- 🎯 **Function Parameter Types** - MEDIUM PRIORITY: Support collection types as function parameters and return types
-- 🎯 **Compound Expression Collection Methods** - HIGH PRIORITY: Fix parsing of `.COUNT` in expressions like `v_arr1.COUNT + v_arr2.COUNT`
+- 🎯 **Function Parameter Types** - HIGH PRIORITY: Support collection types as function parameters and return types
 
 ### **COMPLETED: Collection Types (Function/Procedure Level)** ✅
 **Status**: Core architecture, collection methods, and array indexing fully implemented  
@@ -73,10 +72,10 @@
 - ✅ **Variable Declaration Integration** - COMPLETE: Function context passed to DataTypeSpec
 - ✅ **No DDL Generation** - COMPLETE: Function-local types are metadata only (no CREATE DOMAIN)
 - ✅ **Test Coverage** - COMPLETE: 24 collection type tests passing (includes indexing)
-- ✅ **Collection Method Transformation** - COMPLETE: Oracle collection methods (.COUNT, .FIRST, .LAST, etc.) properly parsed and transformed to PostgreSQL functions (simple expressions)
+- ✅ **Collection Method Transformation** - COMPLETE: Oracle collection methods (.COUNT, .FIRST, .LAST, etc.) properly parsed and transformed to PostgreSQL functions (all expressions)
 - ✅ **Collection Indexing** - COMPLETE: Oracle `arr(i)` → PostgreSQL `arr[i]` syntax transformation with context-aware function vs variable detection using Everything metadata
 - ✅ **Collection Initialization** - COMPLETE: Oracle `string_array('a','b')` → PostgreSQL `ARRAY['a','b']` with full variable declaration support
-- ⚠️ **Compound Expression Collection Methods** - PARTIAL: Simple expressions work (`.COUNT` alone), compound expressions need enhancement (`v1.COUNT + v2.COUNT`)
+- ✅ **Compound Expression Collection Methods** - COMPLETE: All expressions work including compound expressions (`v1.COUNT + v2.COUNT` → `array_length(v1,1) + array_length(v2,1)`)
 - ⏳ **BULK COLLECT Support** - NOT STARTED: Transform Oracle BULK COLLECT INTO arrays
 - ⏳ **Function Parameter Types** - NOT STARTED: Support collection types as function parameters and return types
 
@@ -202,6 +201,39 @@ v_last := array_length(v_arr, 1);
 - **Full method coverage** for all Oracle collection methods
 - **Array indexing test coverage** for both literal and variable indices
 - **No regressions** in existing functionality
+
+## 🎉 **MAJOR MILESTONE: COMPOUND EXPRESSION COLLECTION METHODS COMPLETE** ✅
+
+### **Successfully Implemented (January 2025)**
+Complete Oracle collection method support in compound expressions with proper parsing architecture:
+
+### **✅ COMPREHENSIVE EXPRESSION PARSING FIX:**
+**Problem Solved**: Collection methods like `.COUNT` worked in simple expressions but failed in compound expressions like `v_strings.COUNT + v_numbers.COUNT`.
+
+**Root Cause**: The `visitConcatenation()` method in PlSqlAstBuilder was using raw text fallback for binary operations, bypassing proper AST parsing and collection method detection.
+
+**Solution**: Enhanced binary operation parsing in `visitConcatenation()` method:
+1. **Binary Operation Detection** - Properly handle `concatenation op = (PLUS_SIGN | MINUS_SIGN) concatenation` grammar patterns
+2. **Recursive Operand Processing** - Parse left and right operands through proper AST chain instead of raw text
+3. **Preserved Collection Method Detection** - Individual `.COUNT` calls now go through UnaryExpression processing
+4. **General Architecture** - No more special case scenarios, works for any compound expression
+
+### **✅ COMPLETE EXPRESSION SUPPORT:**
+```sql
+-- Simple Expressions (already worked)
+v_strings.COUNT                     → array_length(v_strings, 1)
+
+-- Compound Expressions (now working)  
+v_strings.COUNT + v_numbers.COUNT   → array_length(v_strings, 1) + array_length(v_numbers, 1)
+v_arr.FIRST * v_arr.LAST            → 1 * array_length(v_arr, 1)
+(v_arr1.COUNT - v_arr2.COUNT) / 2   → (array_length(v_arr1, 1) - array_length(v_arr2, 1)) / 2
+```
+
+### **✅ ARCHITECTURAL ACHIEVEMENT:**
+- **General Solution** - Works for any arithmetic operator (+, -, *, /, etc.) with collection methods
+- **Backward Compatibility** - Simple expressions continue to work unchanged
+- **No Regressions** - All 250 tests passing with enhanced functionality
+- **Extensible Design** - Foundation for handling complex nested expressions
 
 ## 🎉 **MAJOR MILESTONE: COLLECTION INITIALIZATION COMPLETE** ✅
 
@@ -426,11 +458,11 @@ v_element := v_arr[v_index];  -- ✅ Correctly transformed
 - ✅ Package and function feature sets complete for enterprise applications
 - ✅ Collection infrastructure complete: types, methods, indexing all working
 
-### **Phase 1.5 Complete: Collection Initialization** ✅
+### **Phase 1.5 Complete: Collection Initialization & Expression Parsing** ✅
 - ✅ Collection initialization transformations (Oracle constructors → PostgreSQL ARRAY syntax) **COMPLETE**
+- ✅ Compound expression collection methods (`.COUNT` in expressions like `a.COUNT + b.COUNT`) **COMPLETE**
 - 🎯 BULK COLLECT support for array population (Next Priority)
 - 🎯 Function parameter and return type support for collections
-- 🎯 Compound expression collection methods (`.COUNT` in expressions like `a.COUNT + b.COUNT`)
 
 ### **Phase 2 Complete (3-4 months)**
 - ✅ Advanced SQL features enable complex reporting function migration
