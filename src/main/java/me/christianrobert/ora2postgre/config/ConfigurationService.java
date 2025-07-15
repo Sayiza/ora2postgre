@@ -34,11 +34,10 @@ public class ConfigurationService {
     runtimeConfig.setDoTriggers(getValue("do.triggers", config.isDoTriggers()));
     runtimeConfig.setDoConstraints(getValue("do.constraints", config.isDoConstraints()));
     runtimeConfig.setDoIndexes(getValue("do.indexes", config.isDoIndexes()));
-    runtimeConfig.setDoWriteRestControllers(getValue("do.write-rest-controllers", config.isDoWriteRestControllers()));
+    runtimeConfig.setDoModPlsqlSimulator(getValue("do.mod-plsql-simulator", config.isDoModPlsqlSimulator()));
     runtimeConfig.setDoWritePostgreFiles(getValue("do.write-postgre-files", config.isDoWritePostgreFiles()));
     runtimeConfig.setDoExecutePostgreFiles(getValue("do.execute-postgre-files", config.isDoExecutePostgreFiles()));
-    runtimeConfig.setDoRestControllerFunctions(getValue("do.rest-controller-functions", config.isDoRestControllerFunctions()));
-    runtimeConfig.setDoRestControllerProcedures(getValue("do.rest-controller-procedures", config.isDoRestControllerProcedures()));
+    runtimeConfig.setDoModPlsqlProcedures(getValue("do.mod-plsql-procedures", config.isDoModPlsqlProcedures()));
 
     // Connection settings
     runtimeConfig.setOracleUrl(getValue("oracle.url", config.getOracleUrl()));
@@ -109,8 +108,8 @@ public class ConfigurationService {
     if (updates.getDoIndexes() != null) {
       runtimeSettings.put("do.indexes", updates.getDoIndexes());
     }
-    if (updates.getDoWriteRestControllers() != null) {
-      runtimeSettings.put("do.write-rest-controllers", updates.getDoWriteRestControllers());
+    if (updates.getDoModPlsqlSimulator() != null) {
+      runtimeSettings.put("do.mod-plsql-simulator", updates.getDoModPlsqlSimulator());
     }
     if (updates.getDoWritePostgreFiles() != null) {
       runtimeSettings.put("do.write-postgre-files", updates.getDoWritePostgreFiles());
@@ -118,11 +117,8 @@ public class ConfigurationService {
     if (updates.getDoExecutePostgreFiles() != null) {
       runtimeSettings.put("do.execute-postgre-files", updates.getDoExecutePostgreFiles());
     }
-    if (updates.getDoRestControllerFunctions() != null) {
-      runtimeSettings.put("do.rest-controller-functions", updates.getDoRestControllerFunctions());
-    }
-    if (updates.getDoRestControllerProcedures() != null) {
-      runtimeSettings.put("do.rest-controller-procedures", updates.getDoRestControllerProcedures());
+    if (updates.getDoModPlsqlProcedures() != null) {
+      runtimeSettings.put("do.mod-plsql-procedures", updates.getDoModPlsqlProcedures());
     }
 
     // Connection settings
@@ -233,9 +229,6 @@ public class ConfigurationService {
     return getValue("do.indexes", config.isDoIndexes());
   }
 
-  public boolean isDoWriteRestControllers() {
-    return getValue("do.write-rest-controllers", config.isDoWriteRestControllers());
-  }
 
   public boolean isDoWritePostgreFiles() {
     return getValue("do.write-postgre-files", config.isDoWritePostgreFiles());
@@ -245,12 +238,12 @@ public class ConfigurationService {
     return getValue("do.execute-postgre-files", config.isDoExecutePostgreFiles());
   }
 
-  public boolean isDoRestControllerFunctions() {
-    return getValue("do.rest-controller-functions", config.isDoRestControllerFunctions());
+  public boolean isDoModPlsqlSimulator() {
+    return getValue("do.mod-plsql-simulator", config.isDoModPlsqlSimulator());
   }
 
-  public boolean isDoRestControllerProcedures() {
-    return getValue("do.rest-controller-procedures", config.isDoRestControllerProcedures());
+  public boolean isDoModPlsqlProcedures() {
+    return getValue("do.mod-plsql-procedures", config.isDoModPlsqlProcedures());
   }
 
   public String getOracleUrl() {

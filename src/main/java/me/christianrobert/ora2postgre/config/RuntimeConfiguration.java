@@ -19,11 +19,10 @@ public class RuntimeConfiguration {
   private Boolean doTriggers;
   private Boolean doConstraints;
   private Boolean doIndexes;
-  private Boolean doWriteRestControllers;
+  private Boolean doModPlsqlSimulator;
   private Boolean doWritePostgreFiles;
   private Boolean doExecutePostgreFiles;
-  private Boolean doRestControllerFunctions;
-  private Boolean doRestControllerProcedures;
+  private Boolean doModPlsqlProcedures;
 
   // Connection settings
   private String oracleUrl;
@@ -168,12 +167,12 @@ public class RuntimeConfiguration {
     this.doIndexes = doIndexes;
   }
 
-  public Boolean getDoWriteRestControllers() {
-    return doWriteRestControllers;
+  public Boolean getDoModPlsqlSimulator() {
+    return doModPlsqlSimulator;
   }
 
-  public void setDoWriteRestControllers(Boolean doWriteRestControllers) {
-    this.doWriteRestControllers = doWriteRestControllers;
+  public void setDoModPlsqlSimulator(Boolean doModPlsqlSimulator) {
+    this.doModPlsqlSimulator = doModPlsqlSimulator;
   }
 
   public Boolean getDoWritePostgreFiles() {
@@ -192,20 +191,12 @@ public class RuntimeConfiguration {
     this.doExecutePostgreFiles = doExecutePostgreFiles;
   }
 
-  public Boolean getDoRestControllerFunctions() {
-    return doRestControllerFunctions;
+  public Boolean getDoModPlsqlProcedures() {
+    return doModPlsqlProcedures;
   }
 
-  public void setDoRestControllerFunctions(Boolean doRestControllerFunctions) {
-    this.doRestControllerFunctions = doRestControllerFunctions;
-  }
-
-  public Boolean getDoRestControllerProcedures() {
-    return doRestControllerProcedures;
-  }
-
-  public void setDoRestControllerProcedures(Boolean doRestControllerProcedures) {
-    this.doRestControllerProcedures = doRestControllerProcedures;
+  public void setDoModPlsqlProcedures(Boolean doModPlsqlProcedures) {
+    this.doModPlsqlProcedures = doModPlsqlProcedures;
   }
 
   public String getOracleUrl() {

@@ -155,17 +155,11 @@ public class Config {
   @ConfigProperty(name = "do.write-java-files", defaultValue = "false")
   boolean doWriteJavaFiles;
   
-  @ConfigProperty(name = "do.write-rest-controllers", defaultValue = "true")
-  boolean doWriteRestControllers;
+  @ConfigProperty(name = "do.mod-plsql-simulator", defaultValue = "true")
+  boolean doModPlsqlSimulator;
   
-  @ConfigProperty(name = "do.rest-controller-functions", defaultValue = "true") 
-  boolean doRestControllerFunctions;
-  
-  @ConfigProperty(name = "do.rest-controller-procedures", defaultValue = "true")
-  boolean doRestControllerProcedures;
-  
-  @ConfigProperty(name = "do.rest-simple-dtos", defaultValue = "false")
-  boolean doRestSimpleDtos;
+  @ConfigProperty(name = "do.mod-plsql-procedures", defaultValue = "true")
+  boolean doModPlsqlProcedures;
   
   @ConfigProperty(name = "do.write-postgre-files", defaultValue = "true")
   boolean doWritePostgreFiles;
@@ -245,20 +239,12 @@ public class Config {
     return doWriteJavaFiles;
   }
 
-  public boolean isDoWriteRestControllers() {
-    return doWriteRestControllers;
+  public boolean isDoModPlsqlSimulator() {
+    return doModPlsqlSimulator;
   }
 
-  public boolean isDoRestControllerFunctions() {
-    return doRestControllerFunctions;
-  }
-
-  public boolean isDoRestControllerProcedures() {
-    return doRestControllerProcedures;
-  }
-
-  public boolean isDoRestSimpleDtos() {
-    return doRestSimpleDtos;
+  public boolean isDoModPlsqlProcedures() {
+    return doModPlsqlProcedures;
   }
 
   public boolean isDoWritePostgreFiles() {

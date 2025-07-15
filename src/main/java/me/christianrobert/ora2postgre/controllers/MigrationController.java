@@ -780,7 +780,7 @@ public class MigrationController {
   }
 
   private void performExport() throws Exception {
-    boolean doWriteRestControllers = configurationService.isDoWriteRestControllers();
+    boolean doModPlsqlSimulator = configurationService.isDoModPlsqlSimulator();
 
     boolean doWritePostgreFiles = configurationService.isDoWritePostgreFiles();
     boolean doTable = configurationService.isDoTable();
@@ -796,7 +796,7 @@ public class MigrationController {
     boolean doConstraints = configurationService.isDoConstraints();
     boolean doIndexes = configurationService.isDoIndexes();
 
-    if (doWriteRestControllers) {
+    if (doModPlsqlSimulator) {
       String pathJava = configurationService.getPathTargetProjectRoot() + configurationService.getPathTargetProjectJava();
       String pathResources = configurationService.getPathTargetProjectRoot() + configurationService.getPathTargetProjectResources();
       String javaPackageName = configurationService.getJavaGeneratedPackageName();

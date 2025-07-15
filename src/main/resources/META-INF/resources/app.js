@@ -604,11 +604,9 @@ function populateConfigurationForm(config) {
   document.getElementById('doTriggers').checked = config.doTriggers || false;
   document.getElementById('doConstraints').checked = config.doConstraints || false;
   document.getElementById('doIndexes').checked = config.doIndexes || false;
-  document.getElementById('doWriteRestControllers').checked = config.doWriteRestControllers || false;
+  document.getElementById('doModPlsqlSimulator').checked = config.doModPlsqlSimulator || false;
   document.getElementById('doWritePostgreFiles').checked = config.doWritePostgreFiles || false;
   document.getElementById('doExecutePostgreFiles').checked = config.doExecutePostgreFiles || false;
-  document.getElementById('doRestControllerFunctions').checked = config.doRestControllerFunctions || false;
-  document.getElementById('doRestControllerProcedures').checked = config.doRestControllerProcedures || false;
 
   // Connection settings
   document.getElementById('oracleUrl').value = config.oracleUrl || '';
@@ -643,11 +641,9 @@ function getConfigurationFromForm() {
     doTriggers: document.getElementById('doTriggers').checked,
     doConstraints: document.getElementById('doConstraints').checked,
     doIndexes: document.getElementById('doIndexes').checked,
-    doWriteRestControllers: document.getElementById('doWriteRestControllers').checked,
+    doModPlsqlSimulator: document.getElementById('doModPlsqlSimulator').checked,
     doWritePostgreFiles: document.getElementById('doWritePostgreFiles').checked,
     doExecutePostgreFiles: document.getElementById('doExecutePostgreFiles').checked,
-    doRestControllerFunctions: document.getElementById('doRestControllerFunctions').checked,
-    doRestControllerProcedures: document.getElementById('doRestControllerProcedures').checked,
 
     // Connection settings - only include if not empty to avoid overriding with blank values
     ...(document.getElementById('oracleUrl').value.trim() && { oracleUrl: document.getElementById('oracleUrl').value.trim() }),
