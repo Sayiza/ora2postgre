@@ -21,9 +21,9 @@ public class ConfigTest {
     // but we can test that the methods exist
     try {
 
-      // Test new REST controller methods
-      config.isDoWriteRestControllers();
-      config.isDoRestSimpleDtos();
+      // Test new mod-plsql simulator methods
+      config.isDoModPlsqlSimulator();
+      config.isDoModPlsqlProcedures();
 
       // Test PostgreSQL methods still work
       config.isDoWritePostgreFiles();
@@ -42,7 +42,7 @@ public class ConfigTest {
     Config config = new Config();
 
     // Verify new methods exist by checking they don't throw exceptions
-    assertDoesNotThrow(() -> config.isDoWriteRestControllers());
-    assertDoesNotThrow(() -> config.isDoRestSimpleDtos());
+    assertDoesNotThrow(() -> config.isDoModPlsqlSimulator());
+    assertDoesNotThrow(() -> config.isDoModPlsqlProcedures());
   }
 }
