@@ -30,7 +30,7 @@ import me.christianrobert.ora2postgre.writing.ExportPackage;
 import me.christianrobert.ora2postgre.writing.ExportProjectPostgre;
 import me.christianrobert.ora2postgre.writing.ExportStandaloneFunction;
 import me.christianrobert.ora2postgre.writing.ExportStandaloneProcedure;
-import me.christianrobert.ora2postgre.writing.ExportRestControllers;
+import me.christianrobert.ora2postgre.writing.ExportModPlsqlSimulator;
 import me.christianrobert.ora2postgre.writing.ExportSchema;
 import me.christianrobert.ora2postgre.writing.ExportTable;
 import me.christianrobert.ora2postgre.writing.ExportTrigger;
@@ -801,7 +801,7 @@ public class MigrationController {
       String pathResources = configurationService.getPathTargetProjectRoot() + configurationService.getPathTargetProjectResources();
       String javaPackageName = configurationService.getJavaGeneratedPackageName();
 
-      ExportRestControllers.setupTargetProject(
+      ExportModPlsqlSimulator.setupTargetProject(
               configurationService.getPathTargetProjectRoot(),
               pathJava,
               pathResources,
@@ -812,7 +812,7 @@ public class MigrationController {
       );
 
       if (doPackageSpec && doPackageBody) {
-        ExportRestControllers.generateControllers(
+        ExportModPlsqlSimulator.generateSimulators(
                 pathJava,
                 javaPackageName,
                 data.getPackageSpecAst(),

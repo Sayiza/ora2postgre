@@ -153,20 +153,19 @@ The project uses feature flags in `application.properties` to control processing
 - `do.execute-postgre-files=true` - Execute generated PostgreSQL scripts
 - `do.data=true` - Enable data transfer (uses new DataTransferService)
 
-### REST Controller Generation (NEW)
-- `do.write-rest-controllers=true` - Generate REST controllers
-- `do.rest-controller-functions=true` - Include function endpoints
-- `do.rest-controller-procedures=true` - Include procedure endpoints  
-- `do.rest-simple-dtos=false` - Generate simple DTOs for complex types
+### Mod-PLSQL Simulator Generation (NEW)
+- `do.mod-plsql-simulator=true` - Generate mod-plsql simulator controllers
+- `do.mod-plsql-procedures=true` - Include procedure endpoints (functions not supported in mod_plsql)
 
 ### Legacy Configuration (DEPRECATED)
 - `do.write-java-files=false` - Complex Java generation (now deprecated)
+- `do.write-rest-controllers=false` - Generic REST controllers (replaced by mod-plsql simulator)
 
 ### Component Flags
 - Individual flags for tables, views, packages, object types
 - Target paths are configurable for generated code output to separate projects
 
-**Migration Note**: The project has completed migration from complex Java business logic generation (`do.write-java-files`, deprecated) to PostgreSQL-first REST controllers (`do.write-rest-controllers=true`).
+**Migration Note**: The project has completed migration from generic REST controllers to a true mod-plsql simulator that replicates Oracle's mod_plsql web functionality using PostgreSQL procedures and HTP calls.
 
 ## Quarkus Web Application Status
 
@@ -232,27 +231,37 @@ mvn exec:java -Dexec.mainClass="me.christianrobert.ora2postgre.Main"
 
 ## Generated Code Architecture
 
-### REST Controllers (NEW)
-Generated REST controllers follow this pattern:
+### Mod-PLSQL Simulator Controllers (NEW)
+Generated mod-plsql simulator controllers follow this pattern:
 ```java
 @ApplicationScoped
-@Path("/schema/package")
-@Produces(MediaType.APPLICATION_JSON)
-public class PackageController {
-    @Inject DataSource dataSource;
+@Path("/modplsql/schema/package")
+@Produces(MediaType.TEXT_HTML)
+public class PackageModPlsqlController {
+    @Inject AgroalDataSource dataSource;
     
-    @GET @Path("/functionName")
-    public Response functionName(@QueryParam("param") String param) {
+    @GET @Path("/procedureName")
+    public Response procedureName(@Context UriInfo uriInfo) {
         try (Connection conn = dataSource.getConnection()) {
-            String sql = "SELECT * FROM SCHEMA.PACKAGE_functionname(?)";
-            try (CallableStatement stmt = conn.prepareCall(sql)) {
-                stmt.setString(1, param);
-                var resultSet = stmt.executeQuery();
-                return Response.ok("Function result").build();
-            }
+            // Initialize HTP buffer
+            ModPlsqlExecutor.initializeHtpBuffer(conn);
+            
+            // Extract query parameters
+            Map<String, String> params = uriInfo.getQueryParameters().entrySet().stream()
+                .collect(Collectors.toMap(
+                    Map.Entry::getKey,
+                    entry -> entry.getValue().isEmpty() ? "" : entry.getValue().get(0)
+                ));
+            
+            // Execute procedure and get HTML
+            String html = ModPlsqlExecutor.executeProcedureWithHtp(
+                conn, "SCHEMA.PACKAGE_procedure", params);
+            
+            return Response.ok(html).type(MediaType.TEXT_HTML).build();
         } catch (SQLException e) {
-            return Response.serverError()
-                .entity("Database error: " + e.getMessage()).build();
+            String errorHtml = "<html><head><title>Error</title></head><body>" +
+                "<h1>Database Error</h1><p>" + e.getMessage() + "</p></body></html>";
+            return Response.serverError().entity(errorHtml).type(MediaType.TEXT_HTML).build();
         }
     }
 }
@@ -265,10 +274,14 @@ Oracle functions become PostgreSQL functions with this naming pattern:
 
 ### Key Files and Classes
 
-**REST Generation**:
-- `RestControllerGenerator.java` - Core REST endpoint generation
-- `ExportRestControllers.java` - REST controller file management  
-- `SimpleDtoGenerator.java` - Basic DTO generation for complex types
+**Mod-PLSQL Simulator Generation**:
+- `ModPlsqlSimulatorGenerator.java` - Core mod-plsql controller generation
+- `ExportModPlsqlSimulator.java` - Mod-plsql simulator file management and project setup
+- `ModPlsqlExecutor.java` - HTP buffer management and procedure execution utilities
+
+**Legacy REST Generation (DEPRECATED)**:
+- `RestControllerGenerator.java` - Generic REST endpoint generation (deprecated)
+- `ExportRestControllers.java` - REST controller file management (deprecated)
 
 **Trigger Infrastructure**:
 - `TriggerExtractor.java` - Oracle trigger metadata and PL/SQL extraction

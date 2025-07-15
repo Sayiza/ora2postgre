@@ -13,7 +13,12 @@ import java.util.stream.Collectors;
 /**
  * Generates minimal REST controllers that call PostgreSQL functions directly.
  * This replaces the complex Java code generation with simple database-calling endpoints.
+ * 
+ * @deprecated This class has been replaced by ModPlsqlSimulatorGenerator which provides
+ *             true mod_plsql compatibility instead of generic REST endpoints.
+ *             Use ModPlsqlSimulatorGenerator for new implementations.
  */
+@Deprecated
 public class RestControllerGenerator {
 
   /**
