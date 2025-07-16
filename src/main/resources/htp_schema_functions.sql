@@ -8,8 +8,8 @@ CREATE SCHEMA IF NOT EXISTS SYS
 CREATE OR REPLACE PROCEDURE SYS.HTP_init()
 AS $$
 BEGIN
-    DROP TABLE IF EXISTS SYS.temp_htp_buffer;
-    CREATE TEMP TABLE SYS.temp_htp_buffer (
+    DROP TABLE IF EXISTS temp_htp_buffer;
+    CREATE TEMP TABLE temp_htp_buffer (
         line_no SERIAL,
         content TEXT
     );
@@ -21,7 +21,7 @@ $$ LANGUAGE plpgsql
 CREATE OR REPLACE PROCEDURE SYS.HTP_p(content TEXT)
 AS $$
 BEGIN
-    INSERT INTO SYS.temp_htp_buffer (content) VALUES (content);
+    INSERT INTO temp_htp_buffer (content) VALUES (content);
 END;
 $$ LANGUAGE plpgsql
 ;
@@ -34,7 +34,7 @@ DECLARE
 BEGIN
     SELECT string_agg(content, chr(10) ORDER BY line_no)
     INTO html_output
-    FROM SYS.temp_htp_buffer;
+    FROM temp_htp_buffer;
    
     RETURN COALESCE(html_output, '');
 END;
@@ -46,7 +46,7 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE PROCEDURE SYS.HTP_prn(content TEXT)
 AS $$
 BEGIN
-    INSERT INTO SYS.temp_htp_buffer (content) VALUES (content || chr(10));
+    INSERT INTO temp_htp_buffer (content) VALUES (content || chr(10));
 END;
 $$ LANGUAGE plpgsql
 ;
@@ -64,7 +64,7 @@ $$ LANGUAGE plpgsql
 CREATE OR REPLACE PROCEDURE SYS.HTP_flush()
 AS $$
 BEGIN
-    DELETE FROM SYS.temp_htp_buffer;
+    DELETE FROM temp_htp_buffer;
 END;
 $$ LANGUAGE plpgsql
 ;
@@ -73,7 +73,7 @@ $$ LANGUAGE plpgsql
 CREATE OR REPLACE FUNCTION SYS.HTP_buffer_size()
 RETURNS INTEGER AS $$
 BEGIN
-    RETURN (SELECT COUNT(*) FROM SYS.temp_htp_buffer);
+    RETURN (SELECT COUNT(*) FROM temp_htp_buffer);
 END;
 $$ LANGUAGE plpgsql
 ;

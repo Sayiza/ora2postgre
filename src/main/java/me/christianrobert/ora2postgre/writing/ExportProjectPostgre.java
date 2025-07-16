@@ -58,8 +58,8 @@ CREATE SCHEMA IF NOT EXISTS SYS
 CREATE OR REPLACE PROCEDURE SYS.HTP_init()
 AS $$
 BEGIN
-    DROP TABLE IF EXISTS SYS.temp_htp_buffer;
-    CREATE TEMP TABLE SYS.temp_htp_buffer (
+    DROP TABLE IF EXISTS temp_htp_buffer;
+    CREATE TEMP TABLE temp_htp_buffer (
         line_no SERIAL,
         content TEXT
     );
@@ -70,7 +70,7 @@ $$ LANGUAGE plpgsql
 CREATE OR REPLACE PROCEDURE SYS.HTP_p(content TEXT)
 AS $$
 BEGIN
-    INSERT INTO SYS.temp_htp_buffer (content) VALUES (content);
+    INSERT INTO temp_htp_buffer (content) VALUES (content);
 END;
 $$ LANGUAGE plpgsql
 ;
@@ -82,7 +82,7 @@ DECLARE
 BEGIN
     SELECT string_agg(content, chr(10) ORDER BY line_no)
     INTO html_output
-    FROM SYS.temp_htp_buffer;
+    FROM temp_htp_buffer;
    
     RETURN COALESCE(html_output, '');
 END;
