@@ -151,10 +151,6 @@ public class Config {
   @ConfigProperty(name = "do.parse", defaultValue = "true")
   boolean doParse;
   
-  // DEPRECATED - Complex Java code generation removed in favor of PostgreSQL-first approach
-  @ConfigProperty(name = "do.write-java-files", defaultValue = "false")
-  boolean doWriteJavaFiles;
-  
   @ConfigProperty(name = "do.mod-plsql-simulator", defaultValue = "true")
   boolean doModPlsqlSimulator;
   
@@ -233,10 +229,6 @@ public class Config {
 
   public boolean isDoParse() {
     return doParse;
-  }
-
-  public boolean isDoWriteJavaFiles() {
-    return doWriteJavaFiles;
   }
 
   public boolean isDoModPlsqlSimulator() {

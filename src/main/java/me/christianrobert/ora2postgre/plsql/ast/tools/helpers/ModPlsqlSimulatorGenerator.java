@@ -40,7 +40,9 @@ public class ModPlsqlSimulatorGenerator {
     sb.append("import java.sql.Connection;\n");
     sb.append("import java.sql.SQLException;\n");
     sb.append("import java.util.Map;\n");
-    sb.append("import io.agroal.api.AgroalDataSource;\n\n");
+    sb.append("import java.util.stream.Collectors;\n");
+    sb.append("import io.agroal.api.AgroalDataSource;\n");
+    sb.append("import ").append(javaPackageName).append(".utils.ModPlsqlExecutor;\n\n");
 
     // Class declaration
     String className = StringAux.capitalizeFirst(pkg.getName()) + "ModPlsqlController";

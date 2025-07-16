@@ -41,6 +41,9 @@ public class ExportModPlsqlSimulator {
   public static void generateSimulators(String path, String javaPackageName,
                                         List<OraclePackage> specs, List<OraclePackage> bodies,
                                         Everything data) {
+    // Generate the ModPlsqlExecutor utility class first
+    generateModPlsqlExecutor(path, javaPackageName);
+    
     for (OraclePackage pkg : mergeSpecAndBody(specs, bodies)) {
       // Skip packages with no procedures (mod-plsql only supports procedures)
       if (pkg.getProcedures().isEmpty()) {
@@ -274,5 +277,157 @@ public class ExportModPlsqlSimulator {
             """;
 
     FileWriter.write(Paths.get(rootPath), "README.md", readmeContent);
+  }
+
+  /**
+   * Generates the ModPlsqlExecutor utility class in the target project.
+   * This class provides the core functionality for executing PostgreSQL procedures with HTP support.
+   */
+  private static void generateModPlsqlExecutor(String path, String javaPackageName) {
+    String utilsPath = path +
+            File.separator +
+            javaPackageName.replace('.', File.separatorChar) +
+            File.separator +
+            "utils";
+
+    String content = generateModPlsqlExecutorContent(javaPackageName);
+    FileWriter.write(Paths.get(utilsPath), "ModPlsqlExecutor.java", content);
+  }
+
+  /**
+   * Generates the content for the ModPlsqlExecutor utility class.
+   * This is a self-contained utility class that handles HTP buffer management and procedure execution.
+   */
+  private static String generateModPlsqlExecutorContent(String javaPackageName) {
+    StringBuilder sb = new StringBuilder();
+    
+    sb.append("package ").append(javaPackageName).append(".utils;\n\n");
+    
+    sb.append("import java.sql.CallableStatement;\n");
+    sb.append("import java.sql.Connection;\n");
+    sb.append("import java.sql.PreparedStatement;\n");
+    sb.append("import java.sql.ResultSet;\n");
+    sb.append("import java.sql.SQLException;\n");
+    sb.append("import java.util.Map;\n");
+    sb.append("import java.util.StringJoiner;\n\n");
+    
+    sb.append("/**\n");
+    sb.append(" * Utility class for executing PostgreSQL procedures with HTP buffer management.\n");
+    sb.append(" * \n");
+    sb.append(" * This class provides the core functionality for the mod-plsql simulator by:\n");
+    sb.append(" * 1. Initializing the HTP buffer before procedure execution\n");
+    sb.append(" * 2. Executing the target procedure with parameters\n");
+    sb.append(" * 3. Retrieving the generated HTML content from the HTP buffer\n");
+    sb.append(" */\n");
+    sb.append("public class ModPlsqlExecutor {\n\n");
+    
+    sb.append("  /**\n");
+    sb.append("   * Initializes the HTP buffer by calling SYS.HTP_init().\n");
+    sb.append("   * This creates a fresh temporary table for HTML content generation.\n");
+    sb.append("   */\n");
+    sb.append("  public static void initializeHtpBuffer(Connection conn) throws SQLException {\n");
+    sb.append("    try (CallableStatement stmt = conn.prepareCall(\"CALL SYS.HTP_init()\")) {\n");
+    sb.append("      stmt.execute();\n");
+    sb.append("    }\n");
+    sb.append("  }\n\n");
+    
+    sb.append("  /**\n");
+    sb.append("   * Executes a PostgreSQL procedure with HTP support and returns the generated HTML.\n");
+    sb.append("   * \n");
+    sb.append("   * @param conn Database connection\n");
+    sb.append("   * @param procedureName Fully qualified PostgreSQL procedure name (e.g., \"SCHEMA.PACKAGE_procedure\")\n");
+    sb.append("   * @param parameters Map of parameter names to values\n");
+    sb.append("   * @return Generated HTML content from HTP buffer\n");
+    sb.append("   * @throws SQLException If database operation fails\n");
+    sb.append("   */\n");
+    sb.append("  public static String executeProcedureWithHtp(Connection conn, String procedureName, \n");
+    sb.append("                                               Map<String, String> parameters) throws SQLException {\n");
+    sb.append("    // Execute the procedure with parameters\n");
+    sb.append("    executeProcedure(conn, procedureName, parameters);\n");
+    sb.append("    \n");
+    sb.append("    // Retrieve and return the generated HTML\n");
+    sb.append("    return getHtmlFromBuffer(conn);\n");
+    sb.append("  }\n\n");
+    
+    sb.append("  /**\n");
+    sb.append("   * Executes a PostgreSQL procedure with the provided parameters.\n");
+    sb.append("   * Parameters are passed as strings and the database handles type conversion.\n");
+    sb.append("   */\n");
+    sb.append("  private static void executeProcedure(Connection conn, String procedureName, \n");
+    sb.append("                                       Map<String, String> parameters) throws SQLException {\n");
+    sb.append("    if (parameters.isEmpty()) {\n");
+    sb.append("      // Simple case: no parameters\n");
+    sb.append("      try (CallableStatement stmt = conn.prepareCall(\"CALL \" + procedureName + \"()\")) {\n");
+    sb.append("        stmt.execute();\n");
+    sb.append("      }\n");
+    sb.append("    } else {\n");
+    sb.append("      // Build parameterized call\n");
+    sb.append("      StringJoiner placeholders = new StringJoiner(\", \");\n");
+    sb.append("      for (int i = 0; i < parameters.size(); i++) {\n");
+    sb.append("        placeholders.add(\"?\");\n");
+    sb.append("      }\n");
+    sb.append("      \n");
+    sb.append("      String sql = \"CALL \" + procedureName + \"(\" + placeholders.toString() + \")\";\n");
+    sb.append("      \n");
+    sb.append("      try (CallableStatement stmt = conn.prepareCall(sql)) {\n");
+    sb.append("        // Set parameters in order (note: parameter order matters!)\n");
+    sb.append("        int paramIndex = 1;\n");
+    sb.append("        for (String value : parameters.values()) {\n");
+    sb.append("          if (value == null || value.trim().isEmpty()) {\n");
+    sb.append("            stmt.setNull(paramIndex, java.sql.Types.VARCHAR);\n");
+    sb.append("          } else {\n");
+    sb.append("            stmt.setString(paramIndex, value);\n");
+    sb.append("          }\n");
+    sb.append("          paramIndex++;\n");
+    sb.append("        }\n");
+    sb.append("        \n");
+    sb.append("        stmt.execute();\n");
+    sb.append("      }\n");
+    sb.append("    }\n");
+    sb.append("  }\n\n");
+    
+    sb.append("  /**\n");
+    sb.append("   * Retrieves the complete HTML content from the HTP buffer.\n");
+    sb.append("   * Calls SYS.HTP_page() to get the concatenated HTML output.\n");
+    sb.append("   */\n");
+    sb.append("  private static String getHtmlFromBuffer(Connection conn) throws SQLException {\n");
+    sb.append("    try (PreparedStatement stmt = conn.prepareStatement(\"SELECT SYS.HTP_page()\")) {\n");
+    sb.append("      try (ResultSet rs = stmt.executeQuery()) {\n");
+    sb.append("        if (rs.next()) {\n");
+    sb.append("          String html = rs.getString(1);\n");
+    sb.append("          return html != null ? html : \"\";\n");
+    sb.append("        }\n");
+    sb.append("        return \"\";\n");
+    sb.append("      }\n");
+    sb.append("    }\n");
+    sb.append("  }\n\n");
+    
+    sb.append("  /**\n");
+    sb.append("   * Utility method to flush the HTP buffer (clear contents).\n");
+    sb.append("   * Useful for testing or error recovery scenarios.\n");
+    sb.append("   */\n");
+    sb.append("  public static void flushHtpBuffer(Connection conn) throws SQLException {\n");
+    sb.append("    try (CallableStatement stmt = conn.prepareCall(\"CALL SYS.HTP_flush()\")) {\n");
+    sb.append("      stmt.execute();\n");
+    sb.append("    }\n");
+    sb.append("  }\n\n");
+    
+    sb.append("  /**\n");
+    sb.append("   * Gets the current size of the HTP buffer.\n");
+    sb.append("   * Useful for debugging or monitoring HTML generation.\n");
+    sb.append("   */\n");
+    sb.append("  public static int getHtpBufferSize(Connection conn) throws SQLException {\n");
+    sb.append("    try (PreparedStatement stmt = conn.prepareStatement(\"SELECT SYS.HTP_buffer_size()\")) {\n");
+    sb.append("      try (ResultSet rs = stmt.executeQuery()) {\n");
+    sb.append("        if (rs.next()) {\n");
+    sb.append("          return rs.getInt(1);\n");
+    sb.append("        }\n");
+    sb.append("        return 0;\n");
+    sb.append("      }\n");
+    sb.append("    }\n");
+    sb.append("  }\n");
+    sb.append("}\n");
+    
+    return sb.toString();
   }
 }
