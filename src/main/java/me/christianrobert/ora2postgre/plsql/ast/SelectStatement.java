@@ -76,8 +76,13 @@ public class SelectStatement extends Statement {
   public String toPostgre(Everything data) {
     StringBuilder b = new StringBuilder();
     
-    // Add WITH clause if present
+    // Add WITH clause if present and register CTE names
     if (withClause != null) {
+      // Register CTE names in the scope before processing main query
+      for (CommonTableExpression cte : withClause.getCteList()) {
+        data.addActiveCTE(cte.getQueryName());
+      }
+      
       String withClauseSQL = withClause.toPostgre(data);
       if (withClauseSQL != null && !withClauseSQL.trim().isEmpty()) {
         b.append(withClauseSQL);
@@ -85,8 +90,15 @@ public class SelectStatement extends Statement {
       }
     }
     
-    // Add main query
+    // Add main query (CTE names are now registered and available)
     b.append(subQuery.toPostgre(data));
+    
+    // Clean up CTE names from scope after processing
+    if (withClause != null) {
+      for (CommonTableExpression cte : withClause.getCteList()) {
+        data.removeActiveCTE(cte.getQueryName());
+      }
+    }
     
     // TODO: Add other clauses when implemented
     // if (orderByClause != null) b.append("\n").append(orderByClause.toPostgre(data));

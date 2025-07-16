@@ -28,9 +28,8 @@ BEGIN
 END;
 """;
 
-    // Create test data
-    Everything data = new Everything();
-    data.getUserNames().add("TEST_SCHEMA");
+    // Create test data with proper table metadata
+    Everything data = CTETestHelper.createTestEverything();
 
     PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
 
@@ -82,9 +81,8 @@ BEGIN
 END;
 """;
 
-    // Create test data
-    Everything data = new Everything();
-    data.getUserNames().add("TEST_SCHEMA");
+    // Create test data with proper table metadata
+    Everything data = CTETestHelper.createTestEverything();
 
     PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
 
@@ -132,9 +130,8 @@ BEGIN
 END;
 """;
 
-    // Create test data
-    Everything data = new Everything();
-    data.getUserNames().add("TEST_SCHEMA");
+    // Create test data with proper table metadata
+    Everything data = CTETestHelper.createTestEverything();
 
     PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
 
@@ -185,9 +182,8 @@ BEGIN
 END;
 """;
 
-    // Create test data
-    Everything data = new Everything();
-    data.getUserNames().add("TEST_SCHEMA");
+    // Create test data with proper table metadata
+    Everything data = CTETestHelper.createTestEverything();
 
     PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
 

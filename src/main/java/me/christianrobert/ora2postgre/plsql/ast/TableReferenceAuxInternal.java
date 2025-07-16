@@ -45,14 +45,20 @@ public class TableReferenceAuxInternal extends PlSqlAst {
   public String toPostgre(Everything data) {
     StringBuilder b = new StringBuilder();
     if (tableExpressionClause != null) {
-      if (tableExpressionClause.getSchemaName() != null) {
-        b.append(tableExpressionClause.getSchemaName());
+      String tableName = tableExpressionClause.getTableName();
+      
+      // Check if this is a CTE name - if so, return it as-is without schema resolution
+      if (data.isActiveCTE(tableName)) {
+        b.append(tableName);
       } else {
-        b.append(data.lookupSchema4Field(
-                tableExpressionClause.getTableName(), schema));
+        // Regular table - perform schema resolution
+        if (tableExpressionClause.getSchemaName() != null) {
+          b.append(tableExpressionClause.getSchemaName());
+        } else {
+          b.append(data.lookupSchema4Field(tableName, schema));
+        }
+        b.append(".").append(tableName);
       }
-      b.append(".")
-              .append(tableExpressionClause.getTableName());
     }
     //
     //TODO other types of subqueries

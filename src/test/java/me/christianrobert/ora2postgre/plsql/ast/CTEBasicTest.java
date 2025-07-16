@@ -21,9 +21,8 @@ FROM dept_employees
 WHERE salary > 5000;
 """;
 
-    // Create test data
-    Everything data = new Everything();
-    data.getUserNames().add("TEST_SCHEMA");
+    // Create test data with proper table metadata
+    Everything data = CTETestHelper.createTestEverything();
 
     PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
 
@@ -44,8 +43,8 @@ WHERE salary > 5000;
         System.out.println(postgreSql);
         
         // Verify the CTE is present
-        assert postgreSql.contains("WITH dept_employees AS") : "Should contain CTE definition";
-        assert postgreSql.contains("SELECT employee_id, department_id, salary") : "Should contain CTE query";
+        assert postgreSql.toUpperCase().contains("WITH DEPT_EMPLOYEES AS") : "Should contain CTE definition";
+        assert postgreSql.toUpperCase().contains("SELECT EMPLOYEE_ID, DEPARTMENT_ID, SALARY") : "Should contain CTE query";
       } else {
         System.out.println("AST was not a SelectStatement, but: " + (ast != null ? ast.getClass().getSimpleName() : "null"));
         if (ast != null) {
@@ -97,9 +96,8 @@ WITH simple_cte AS (SELECT 1 as col1)
 SELECT * FROM simple_cte;
 """;
 
-    // Create test data
-    Everything data = new Everything();
-    data.getUserNames().add("TEST_SCHEMA");
+    // Create test data with proper table metadata
+    Everything data = CTETestHelper.createTestEverything();
 
     PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
 
