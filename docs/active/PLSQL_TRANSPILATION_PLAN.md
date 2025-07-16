@@ -50,7 +50,7 @@
 - **Dependency Ordering** - DOMAIN definitions generated before variables that reference them
 
 ### **Advanced SQL Features** ✅
-- **Common Table Expressions (WITH Clause)** - Complete Oracle→PostgreSQL CTE transformation with recursive support, multiple CTEs, and column lists
+- **Common Table Expressions (WITH Clause)** - Complete Oracle→PostgreSQL CTE transformation with multiple CTEs and column lists ⚠️ *See Known Limitations*
 
 ---
 
@@ -621,11 +621,17 @@ WITH RECURSIVE recursive_cte AS ()
 - **Parser Enhancement** - Implemented missing visitor methods in `PlSqlAstBuilder`
 - **SelectStatement Integration** - Enhanced `toPostgre()` method to include WITH clause processing
 - **Direct Compatibility** - Oracle WITH clause syntax works unchanged in PostgreSQL
-- **Recursive Support** - Full WITH RECURSIVE transformation with Oracle search/cycle clause detection
 - **Column List Support** - Optional column lists in CTE definitions fully supported
 - **Multiple CTE Support** - Comma-separated CTE definitions with proper ordering
-- **Test Coverage** - 4 comprehensive infrastructure tests passing with no regressions
-- **Production Ready** - Complete end-to-end Oracle→PostgreSQL CTE transformation
+- **Test Coverage** - 3 comprehensive infrastructure tests passing with no regressions
+- **Production Ready** - Complete end-to-end Oracle→PostgreSQL CTE transformation for non-recursive CTEs
+
+### **⚠️ KNOWN LIMITATIONS:**
+- **Recursive CTE Support** - Oracle does not use `WITH RECURSIVE` syntax. Instead, Oracle automatically detects self-referencing CTEs through SQL analysis. PostgreSQL requires explicit `WITH RECURSIVE` keyword. Current implementation would need enhancement to:
+  1. Analyze CTE subqueries to detect self-references to the CTE name
+  2. Automatically add `RECURSIVE` keyword to PostgreSQL output when self-references are detected
+  3. Handle Oracle-specific hierarchical constructs within recursive CTEs
+- **Impact**: Non-recursive CTEs work perfectly. Recursive CTEs require manual PostgreSQL syntax adjustment or future enhancement to automatic detection logic.
 
 ## 🎉 **MAJOR MILESTONE: ANALYTICAL FUNCTIONS INFRASTRUCTURE COMPLETE** ✅
 
@@ -706,9 +712,9 @@ OVER (ORDER BY column1 ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
 **Goal**: Support complex Oracle SQL constructs
 
 #### **Common Table Expressions (WITH Clause)** ✅ COMPLETED
-- ✅ **Recursive CTE support for Oracle hierarchical patterns** - Complete WITH RECURSIVE transformation
 - ✅ **Multiple CTE definitions in single query** - Full support for comma-separated CTEs
 - ✅ **Integration with existing SELECT statement infrastructure** - Enhanced SelectStatement with WITH clause processing
+- ⚠️ **Recursive CTE support** - Known limitation: Oracle doesn't use `WITH RECURSIVE` syntax, requires SQL analysis to detect self-references
 
 #### **Analytical Functions**
 - Window function support (`ROW_NUMBER()`, `RANK()`, `DENSE_RANK()`)

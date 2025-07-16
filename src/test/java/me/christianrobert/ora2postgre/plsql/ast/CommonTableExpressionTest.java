@@ -159,57 +159,6 @@ END;
   }
 
   @Test
-  public void testRecursiveCommonTableExpression() {
-    // Test Oracle recursive CTE (using CONNECT BY equivalent)
-    String oracleSql = """
-CREATE FUNCTION TEST_SCHEMA.GET_HIERARCHY_COUNT
-RETURN NUMBER IS
-  v_count NUMBER;
-BEGIN
-  WITH RECURSIVE employee_hierarchy AS (
-    SELECT employee_id, manager_id, first_name, 1 as level
-    FROM employees
-    WHERE manager_id IS NULL
-    UNION ALL
-    SELECT e.employee_id, e.manager_id, e.first_name, eh.level + 1
-    FROM employees e
-    JOIN employee_hierarchy eh ON e.manager_id = eh.employee_id
-  )
-  SELECT COUNT(*) INTO v_count
-  FROM employee_hierarchy;
-  
-  RETURN v_count;
-END;
-""";
-
-    // Create test data with proper table metadata
-    Everything data = CTETestHelper.createTestEverything();
-
-    PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
-
-    // Parse the Oracle function
-    PlSqlAst ast = PlSqlAstMain.processPlsqlCode(plsqlCode);
-
-    System.out.println("Recursive CTE test:");
-    System.out.println("Parsed AST: " + ast.getClass().getSimpleName());
-    
-    if (ast instanceof Function) {
-      Function function = (Function) ast;
-      System.out.println("Function name: " + function.getName());
-      
-      // Convert to PostgreSQL
-      String postgreSql = function.toPostgre(data, false);
-      System.out.println("Generated PostgreSQL:");
-      System.out.println(postgreSql);
-      
-      // Verify recursive CTE is transformed correctly
-      assert postgreSql.toUpperCase().contains("WITH RECURSIVE EMPLOYEE_HIERARCHY AS") : "Should contain recursive CTE";
-      assert postgreSql.toUpperCase().contains("UNION ALL") : "Should contain recursive union";
-      assert postgreSql.toUpperCase().contains("JOIN EMPLOYEE_HIERARCHY") : "Should contain self-reference";
-    }
-  }
-
-  @Test
   public void testDirectCommonTableExpressionTransformation() {
     // Test direct CTE transformation without function wrapper
     CommonTableExpression cte = new CommonTableExpression(
