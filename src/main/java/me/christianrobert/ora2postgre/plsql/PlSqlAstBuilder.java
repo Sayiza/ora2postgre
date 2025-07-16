@@ -418,7 +418,11 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
         ctx.select_only_statement().subquery().subquery_basic_elements().query_block().into_clause() != null) {
       
       // This is a SELECT INTO statement - route to SelectIntoStatement
-      return visitSelectIntoFromQueryBlock(ctx.select_only_statement().subquery().subquery_basic_elements().query_block());
+      // Extract WITH clause if present
+      SelectWithClause withClause = ctx.select_only_statement().with_clause() != null ?
+              (SelectWithClause) visit(ctx.select_only_statement().with_clause()) : null;
+      
+      return visitSelectIntoFromQueryBlock(ctx.select_only_statement().subquery().subquery_basic_elements().query_block(), withClause);
     }
     
     // Regular SELECT statement - use existing logic
@@ -446,7 +450,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
   /**
    * Helper method to parse SELECT INTO statements from query_block context
    */
-  private PlSqlAst visitSelectIntoFromQueryBlock(PlSqlParser.Query_blockContext ctx) {
+  private PlSqlAst visitSelectIntoFromQueryBlock(PlSqlParser.Query_blockContext ctx, SelectWithClause withClause) {
     // Parse selected columns
     List<String> selectedColumns = new ArrayList<>();
     if (ctx.selected_list().ASTERISK() != null) {
@@ -515,7 +519,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     if (isBulkCollect) {
       return new BulkCollectStatement(selectedColumns, intoVariables, schemaName, tableName, whereClause);
     } else {
-      return new SelectIntoStatement(selectedColumns, intoVariables, schemaName, tableName, whereClause);
+      return new SelectIntoStatement(selectedColumns, intoVariables, schemaName, tableName, whereClause, withClause);
     }
   }
 

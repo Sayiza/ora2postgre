@@ -10,20 +10,28 @@ public class SelectIntoStatement extends Statement {
   private final String tableName;
   private final String schemaName;
   private final Expression whereClause; // Optional WHERE condition
+  private final SelectWithClause withClause; // Optional WITH clause (CTEs)
 
   public SelectIntoStatement(List<String> selectedColumns, List<String> intoVariables, 
-                            String schemaName, String tableName, Expression whereClause) {
+                            String schemaName, String tableName, Expression whereClause, SelectWithClause withClause) {
     this.selectedColumns = selectedColumns;
     this.intoVariables = intoVariables;
     this.schemaName = schemaName;
     this.tableName = tableName;
     this.whereClause = whereClause;
+    this.withClause = withClause;
   }
 
   // Constructor without WHERE clause
   public SelectIntoStatement(List<String> selectedColumns, List<String> intoVariables,
                             String schemaName, String tableName) {
-    this(selectedColumns, intoVariables, schemaName, tableName, null);
+    this(selectedColumns, intoVariables, schemaName, tableName, null, null);
+  }
+
+  // Constructor with WHERE clause but no WITH clause (for backward compatibility)
+  public SelectIntoStatement(List<String> selectedColumns, List<String> intoVariables,
+                            String schemaName, String tableName, Expression whereClause) {
+    this(selectedColumns, intoVariables, schemaName, tableName, whereClause, null);
   }
 
   public List<String> getSelectedColumns() {
@@ -50,6 +58,14 @@ public class SelectIntoStatement extends Statement {
     return whereClause != null;
   }
 
+  public SelectWithClause getWithClause() {
+    return withClause;
+  }
+
+  public boolean hasWithClause() {
+    return withClause != null;
+  }
+
   @Override
   public <T> T accept(PlSqlAstVisitor<T> visitor) {
     return visitor.visit(this);
@@ -61,12 +77,26 @@ public class SelectIntoStatement extends Statement {
             "table=" + (schemaName != null ? schemaName + "." : "") + tableName +
             ", columns=" + (selectedColumns != null ? selectedColumns.size() : 0) +
             ", variables=" + (intoVariables != null ? intoVariables.size() : 0) +
-            ", hasWhere=" + (whereClause != null) + "}";
+            ", hasWhere=" + (whereClause != null) +
+            ", hasWithClause=" + (withClause != null) + "}";
   }
 
   @Override
   public String toPostgre(Everything data) {
     StringBuilder b = new StringBuilder();
+
+    // Add WITH clause if present and register CTE names
+    if (hasWithClause()) {
+      // Register CTE names in the scope before processing main query
+      for (CommonTableExpression cte : withClause.getCteList()) {
+        data.addActiveCTE(cte.getQueryName());
+      }
+      
+      String withClauseSQL = withClause.toPostgre(data);
+      if (withClauseSQL != null && !withClauseSQL.trim().isEmpty()) {
+        b.append(data.getIntendation()).append(withClauseSQL).append("\n");
+      }
+    }
 
     b.append(data.getIntendation()).append("SELECT ");
 
@@ -93,38 +123,44 @@ public class SelectIntoStatement extends Statement {
       }
     }
 
-    // Handle FROM clause with schema resolution (same pattern as DML statements)
+    // Handle FROM clause with CTE-aware table resolution
     b.append(" FROM ");
     
-    String resolvedSchema = null;
-
-    if (schemaName != null && !schemaName.isEmpty()) {
-      // Schema was explicitly provided in Oracle code (e.g., SCHEMA.TABLE)
-      try {
-        resolvedSchema = data.lookupSchema4Field(tableName, schemaName);
-      } catch (Exception e) {
-        // If schema resolution fails, use the provided schema as-is
-        resolvedSchema = schemaName;
-      }
+    // Check if this is a CTE name - if so, use it as-is without schema resolution
+    if (data.isActiveCTE(tableName)) {
+      b.append(tableName.toUpperCase());
     } else {
-      // No schema prefix in Oracle code - table is in current schema or is a synonym
-      // Use the current schema context from the function/procedure
-      String currentSchema = getCurrentSchema(data);
-      if (currentSchema != null) {
+      // Regular table - perform schema resolution
+      String resolvedSchema = null;
+
+      if (schemaName != null && !schemaName.isEmpty()) {
+        // Schema was explicitly provided in Oracle code (e.g., SCHEMA.TABLE)
         try {
-          resolvedSchema = data.lookupSchema4Field(tableName, currentSchema);
+          resolvedSchema = data.lookupSchema4Field(tableName, schemaName);
         } catch (Exception e) {
-          // If synonym/table lookup fails, assume it's in the current schema
-          resolvedSchema = currentSchema;
+          // If schema resolution fails, use the provided schema as-is
+          resolvedSchema = schemaName;
+        }
+      } else {
+        // No schema prefix in Oracle code - table is in current schema or is a synonym
+        // Use the current schema context from the function/procedure
+        String currentSchema = getCurrentSchema(data);
+        if (currentSchema != null) {
+          try {
+            resolvedSchema = data.lookupSchema4Field(tableName, currentSchema);
+          } catch (Exception e) {
+            // If synonym/table lookup fails, assume it's in the current schema
+            resolvedSchema = currentSchema;
+          }
         }
       }
-    }
 
-    // Always emit schema prefix for PostgreSQL reliability
-    if (resolvedSchema != null && !resolvedSchema.isEmpty()) {
-      b.append(resolvedSchema.toUpperCase()).append(".");
+      // Always emit schema prefix for PostgreSQL reliability
+      if (resolvedSchema != null && !resolvedSchema.isEmpty()) {
+        b.append(resolvedSchema.toUpperCase()).append(".");
+      }
+      b.append(tableName.toUpperCase());
     }
-    b.append(tableName.toUpperCase());
 
     // Handle WHERE clause
     if (hasWhereClause()) {
@@ -133,6 +169,13 @@ public class SelectIntoStatement extends Statement {
     }
 
     b.append(";");
+
+    // Clean up CTE names from scope after processing
+    if (hasWithClause()) {
+      for (CommonTableExpression cte : withClause.getCteList()) {
+        data.removeActiveCTE(cte.getQueryName());
+      }
+    }
 
     return b.toString();
   }

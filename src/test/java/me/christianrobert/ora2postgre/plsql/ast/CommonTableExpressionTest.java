@@ -49,10 +49,10 @@ END;
       System.out.println(postgreSql);
       
       // Verify the CTE is transformed correctly
-      assert postgreSql.contains("WITH dept_employees AS") : "Should contain CTE definition";
-      assert postgreSql.contains("SELECT employee_id, department_id, salary") : "Should contain CTE query";
-      assert postgreSql.contains("FROM employees") : "Should contain CTE FROM clause";
-      assert postgreSql.contains("WHERE department_id = 10") : "Should contain CTE WHERE clause";
+      assert postgreSql.toUpperCase().contains("WITH DEPT_EMPLOYEES AS") : "Should contain CTE definition";
+      assert postgreSql.toUpperCase().contains("SELECT EMPLOYEE_ID, DEPARTMENT_ID, SALARY") : "Should contain CTE query";
+      assert postgreSql.toUpperCase().contains("FROM TEST_SCHEMA.EMPLOYEES") : "Should contain CTE FROM clause";
+      assert postgreSql.toUpperCase().contains("WHERE DEPARTMENT_ID = 10") : "Should contain CTE WHERE clause";
     }
   }
 
@@ -102,10 +102,10 @@ END;
       System.out.println(postgreSql);
       
       // Verify both CTEs are transformed correctly
-      assert postgreSql.contains("WITH dept_employees AS") : "Should contain first CTE";
-      assert postgreSql.contains("high_earners AS") : "Should contain second CTE";
-      assert postgreSql.contains("FROM dept_employees") : "Should reference first CTE in second CTE";
-      assert postgreSql.contains("FROM high_earners") : "Should reference second CTE in main query";
+      assert postgreSql.toUpperCase().contains("WITH DEPT_EMPLOYEES AS") : "Should contain first CTE";
+      assert postgreSql.toUpperCase().contains("HIGH_EARNERS AS") : "Should contain second CTE";
+      assert postgreSql.toUpperCase().contains("FROM DEPT_EMPLOYEES") : "Should reference first CTE in second CTE";
+      assert postgreSql.toUpperCase().contains("FROM HIGH_EARNERS") : "Should reference second CTE in main query";
     }
   }
 
@@ -151,10 +151,10 @@ END;
       System.out.println(postgreSql);
       
       // Verify CTE with column list is transformed correctly
-      assert postgreSql.contains("WITH employee_summary (emp_id, emp_name, emp_salary) AS") : "Should contain CTE with column list";
-      assert postgreSql.contains("SELECT employee_id, first_name, salary") : "Should contain CTE query";
-      assert postgreSql.contains("FROM employee_summary") : "Should reference CTE in main query";
-      assert postgreSql.contains("WHERE emp_salary > 3000") : "Should use CTE column names";
+      assert postgreSql.toUpperCase().contains("WITH EMPLOYEE_SUMMARY (EMP_ID, EMP_NAME, EMP_SALARY) AS") : "Should contain CTE with column list";
+      assert postgreSql.toUpperCase().contains("SELECT EMPLOYEE_ID, FIRST_NAME, SALARY") : "Should contain CTE query";
+      assert postgreSql.toUpperCase().contains("FROM EMPLOYEE_SUMMARY") : "Should reference CTE in main query";
+      assert postgreSql.toUpperCase().contains("WHERE EMP_SALARY > 3000") : "Should use CTE column names";
     }
   }
 
@@ -203,9 +203,9 @@ END;
       System.out.println(postgreSql);
       
       // Verify recursive CTE is transformed correctly
-      assert postgreSql.contains("WITH RECURSIVE employee_hierarchy AS") : "Should contain recursive CTE";
-      assert postgreSql.contains("UNION ALL") : "Should contain recursive union";
-      assert postgreSql.contains("JOIN employee_hierarchy") : "Should contain self-reference";
+      assert postgreSql.toUpperCase().contains("WITH RECURSIVE EMPLOYEE_HIERARCHY AS") : "Should contain recursive CTE";
+      assert postgreSql.toUpperCase().contains("UNION ALL") : "Should contain recursive union";
+      assert postgreSql.toUpperCase().contains("JOIN EMPLOYEE_HIERARCHY") : "Should contain self-reference";
     }
   }
 
