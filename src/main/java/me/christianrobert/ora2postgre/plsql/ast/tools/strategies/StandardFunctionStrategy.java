@@ -7,6 +7,7 @@ import me.christianrobert.ora2postgre.plsql.ast.Statement;
 import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.StatementDeclarationCollector;
 import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.ToExportPostgre;
 import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.PackageCollectionHelper;
+import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.PackageVariableHelper;
 import me.christianrobert.ora2postgre.plsql.ast.tools.transformers.TypeConverter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,9 +69,18 @@ public class StandardFunctionStrategy implements FunctionTransformationStrategy 
       var packageCollections = PackageCollectionHelper.analyzePackageCollections(
           function, function.getParentPackage(), context);
       
+      // Analyze regular package variables that need materialization
+      var packageVariables = PackageVariableHelper.analyzePackageVariables(
+          function, function.getParentPackage(), context);
+      
       // Add declarations for package collection variables
       if (!packageCollections.isEmpty()) {
         b.append(PackageCollectionHelper.generateVariableDeclarations(packageCollections));
+      }
+      
+      // Add declarations for regular package variables
+      if (!packageVariables.isEmpty()) {
+        b.append(PackageVariableHelper.generateVariableDeclarations(packageVariables));
       }
       
       // Add explicit variable declarations from procedure's DECLARE section
@@ -119,9 +129,18 @@ public class StandardFunctionStrategy implements FunctionTransformationStrategy 
       var packageCollections = PackageCollectionHelper.analyzePackageCollections(
           function, function.getParentPackage(), context);
       
+      // Re-use the package variables analysis for prologue/epilogue
+      var packageVariables = PackageVariableHelper.analyzePackageVariables(
+          function, function.getParentPackage(), context);
+      
       // Add prologue to materialize package collections
       if (!packageCollections.isEmpty()) {
         b.append(PackageCollectionHelper.generatePrologue(packageCollections));
+      }
+      
+      // Add prologue to materialize regular package variables
+      if (!packageVariables.isEmpty()) {
+        b.append(PackageVariableHelper.generatePrologue(packageVariables));
       }
       
       // Add function body statements
@@ -133,6 +152,11 @@ public class StandardFunctionStrategy implements FunctionTransformationStrategy 
       // Add epilogue to persist package collections
       if (!packageCollections.isEmpty()) {
         b.append(PackageCollectionHelper.generateEpilogue(packageCollections));
+      }
+      
+      // Add epilogue to persist regular package variables
+      if (!packageVariables.isEmpty()) {
+        b.append(PackageVariableHelper.generateEpilogue(packageVariables));
       }
     }
     
