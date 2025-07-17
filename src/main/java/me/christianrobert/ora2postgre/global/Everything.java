@@ -766,6 +766,136 @@ public class Everything {
   }
 
   /**
+   * Helper to find a procedure within a package.
+   */
+  private boolean findProcedureInPackage(OraclePackage pkg, String procedureName) {
+    for (Procedure proc : pkg.getProcedures()) {
+      if (proc.getName().equalsIgnoreCase(procedureName)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Lookup procedure with schema resolution and synonym support.
+   * 
+   * @param procedureName The name of the procedure to find
+   * @param packageName The package name (optional)
+   * @param currentSchema The current schema context
+   * @return The resolved schema name, or null if not found
+   */
+  public String lookupProcedureSchema(String procedureName, String packageName, String currentSchema) {
+    if (packageName != null) {
+      // Look for package.procedure
+      for (OraclePackage pkg : packageSpecAst) {
+        if (pkg.getName().equalsIgnoreCase(packageName) && 
+            pkg.getSchema().equalsIgnoreCase(currentSchema)) {
+          if (findProcedureInPackage(pkg, procedureName)) {
+            return pkg.getSchema();
+          }
+        }
+      }
+      for (OraclePackage pkg : packageBodyAst) {
+        if (pkg.getName().equalsIgnoreCase(packageName) && 
+            pkg.getSchema().equalsIgnoreCase(currentSchema)) {
+          if (findProcedureInPackage(pkg, procedureName)) {
+            return pkg.getSchema();
+          }
+        }
+      }
+      
+      // Try synonym resolution for package
+      try {
+        SynonymResolutionResult synonymResult = lookupSchemaAndName(packageName, currentSchema, DatabaseObjectType.PACKAGE);
+        if (synonymResult != null) {
+          return lookupProcedureSchema(procedureName, synonymResult.objectTypeName, synonymResult.schema);
+        }
+      } catch (IllegalStateException e) {
+        // Package synonym not found, continue
+      }
+    } else {
+      // Look for standalone procedure
+      for (Procedure proc : standaloneProcedureAst) {
+        if (proc.getName().equalsIgnoreCase(procedureName) && 
+            proc.getSchema().equalsIgnoreCase(currentSchema)) {
+          return proc.getSchema();
+        }
+      }
+    }
+    
+    return null; // Not found
+  }
+
+  /**
+   * Determine if a routine is a function or procedure.
+   * 
+   * @param routineName The name of the routine
+   * @param packageName The package name (optional)
+   * @param schema The schema name
+   * @return true if it's a function, false if it's a procedure
+   */
+  public boolean isFunction(String routineName, String packageName, String schema) {
+    if (packageName != null) {
+      // Check in packages
+      for (OraclePackage pkg : packageSpecAst) {
+        if (pkg.getName().equalsIgnoreCase(packageName) && 
+            pkg.getSchema().equalsIgnoreCase(schema)) {
+          // Check if it's a function
+          for (Function func : pkg.getFunctions()) {
+            if (func.getName().equalsIgnoreCase(routineName)) {
+              return true;
+            }
+          }
+          // Check if it's a procedure
+          for (Procedure proc : pkg.getProcedures()) {
+            if (proc.getName().equalsIgnoreCase(routineName)) {
+              return false;
+            }
+          }
+        }
+      }
+      
+      for (OraclePackage pkg : packageBodyAst) {
+        if (pkg.getName().equalsIgnoreCase(packageName) && 
+            pkg.getSchema().equalsIgnoreCase(schema)) {
+          // Check if it's a function
+          for (Function func : pkg.getFunctions()) {
+            if (func.getName().equalsIgnoreCase(routineName)) {
+              return true;
+            }
+          }
+          // Check if it's a procedure
+          for (Procedure proc : pkg.getProcedures()) {
+            if (proc.getName().equalsIgnoreCase(routineName)) {
+              return false;
+            }
+          }
+        }
+      }
+    } else {
+      // Check standalone functions
+      for (Function func : standaloneFunctionAst) {
+        if (func.getName().equalsIgnoreCase(routineName) && 
+            func.getSchema().equalsIgnoreCase(schema)) {
+          return true;
+        }
+      }
+      
+      // Check standalone procedures
+      for (Procedure proc : standaloneProcedureAst) {
+        if (proc.getName().equalsIgnoreCase(routineName) && 
+            proc.getSchema().equalsIgnoreCase(schema)) {
+          return false;
+        }
+      }
+    }
+    
+    // Default to procedure if not found (safer assumption)
+    return false;
+  }
+
+  /**
    * Determines the schema prefix needed for an expression in PostgreSQL output.
    * Handles function calls to packages/object types with synonym resolution.
    * Returns null for simple column references or non-function expressions.

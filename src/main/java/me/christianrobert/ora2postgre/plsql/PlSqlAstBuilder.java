@@ -311,14 +311,93 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
 
   @Override
   public PlSqlAst visitCall_statement(PlSqlParser.Call_statementContext ctx) {
-    if (ctx.routine_name(0) != null
-            && ctx.routine_name(0).getText().contains("htp.p")
-            && ctx.function_argument(0) != null
-            && ctx.function_argument(0).getChild(1) != null) {
-      return new HtpStatement(ctx.function_argument(0).getChild(1).getText());
-      // TODO make this more clean
+    // Parse the primary routine name
+    if (ctx.routine_name() == null || ctx.routine_name().isEmpty()) {
+      return new Comment("/* Empty call statement */");
     }
-    return new Comment("a callstatement ...");
+    
+    String routineNameText = ctx.routine_name(0).getText();
+    
+    // Handle HTP calls specifically - now parse arguments through expression hierarchy
+    if (routineNameText.contains("htp.p")) {
+      if (ctx.function_argument(0) != null) {
+        // Parse the HTP argument through the expression hierarchy to enable package variable transformation
+        List<Expression> htpArgs = parseCallArguments(ctx.function_argument(0));
+        if (!htpArgs.isEmpty()) {
+          return new HtpStatement(htpArgs.get(0));
+        }
+      }
+      // Empty HTP call - create expression with empty string
+      return new HtpStatement(new Expression(new LogicalExpression(new UnaryLogicalExpression("''"))));
+    }
+    
+    // Parse routine name components
+    String packageName = null;
+    String routineName = null;
+    
+    if (routineNameText.contains(".")) {
+      // Package.routine format
+      String[] parts = routineNameText.split("\\.", 2);
+      packageName = parts[0];
+      routineName = parts[1];
+    } else {
+      // Simple routine name
+      routineName = routineNameText;
+    }
+    
+    // Parse arguments if present
+    List<Expression> arguments = new ArrayList<>();
+    if (ctx.function_argument(0) != null) {
+      arguments = parseCallArguments(ctx.function_argument(0));
+    }
+    
+    // Check if this is a function call with return target (INTO clause)
+    Expression returnTarget = null;
+    boolean isFunction = false;
+    if (ctx.bind_variable() != null) {
+      // Function call with INTO clause
+      isFunction = true;
+      String targetVar = ctx.bind_variable().getText();
+      // Create a simple expression for the target variable
+      UnaryLogicalExpression targetExpr = new UnaryLogicalExpression(targetVar);
+      returnTarget = new Expression(new LogicalExpression(targetExpr));
+    }
+    
+    // Handle chained calls (routine_name ('.' routine_name function_argument?)*)
+    if (ctx.routine_name().size() > 1) {
+      // For now, handle simple case of package.routine
+      // TODO: Implement full chained call support
+      return new Comment("/* Chained call not yet implemented: " + routineNameText + " */");
+    }
+    
+    // Create appropriate CallStatement
+    if (isFunction && returnTarget != null) {
+      return new CallStatement(routineName, packageName, arguments, returnTarget);
+    } else {
+      // Determine if this is a function or procedure (will be resolved later)
+      return new CallStatement(routineName, packageName, arguments, false);
+    }
+  }
+  
+  /**
+   * Parse function arguments from ANTLR context.
+   * 
+   * @param funcArgCtx The function_argument context
+   * @return List of parsed Expression objects
+   */
+  private List<Expression> parseCallArguments(PlSqlParser.Function_argumentContext funcArgCtx) {
+    List<Expression> arguments = new ArrayList<>();
+    
+    if (funcArgCtx.argument() != null) {
+      for (PlSqlParser.ArgumentContext argCtx : funcArgCtx.argument()) {
+        Expression expr = (Expression) visit(argCtx.expression());
+        if (expr != null) {
+          arguments.add(expr);
+        }
+      }
+    }
+    
+    return arguments;
   }
 
   @Override
