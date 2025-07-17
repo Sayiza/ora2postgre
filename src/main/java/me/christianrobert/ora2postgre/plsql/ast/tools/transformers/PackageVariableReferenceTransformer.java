@@ -1,8 +1,9 @@
 package me.christianrobert.ora2postgre.plsql.ast.tools.transformers;
 
 import me.christianrobert.ora2postgre.plsql.ast.OraclePackage;
-import me.christianrobert.ora2postgre.plsql.ast.PackageVariable;
-import me.christianrobert.ora2postgre.plsql.ast.Everything;
+import me.christianrobert.ora2postgre.plsql.ast.Variable;
+import me.christianrobert.ora2postgre.plsql.ast.DataTypeSpec;
+import me.christianrobert.ora2postgre.global.Everything;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -247,8 +248,14 @@ public class PackageVariableReferenceTransformer {
     }
     
     // Check if variable name exists in any package in current schema
-    for (OraclePackage pkg : data.getPackages()) {
-      if (pkg.hasVariable(varName)) {
+    // Check both spec and body packages
+    for (OraclePackage pkg : data.getPackageSpecAst()) {
+      if (hasVariable(pkg, varName)) {
+        return true;
+      }
+    }
+    for (OraclePackage pkg : data.getPackageBodyAst()) {
+      if (hasVariable(pkg, varName)) {
         return true;
       }
     }
@@ -269,8 +276,14 @@ public class PackageVariableReferenceTransformer {
     }
     
     // Find which package contains this variable
-    for (OraclePackage pkg : data.getPackages()) {
-      if (pkg.hasVariable(varName)) {
+    // Check both spec and body packages
+    for (OraclePackage pkg : data.getPackageSpecAst()) {
+      if (hasVariable(pkg, varName)) {
+        return pkg;
+      }
+    }
+    for (OraclePackage pkg : data.getPackageBodyAst()) {
+      if (hasVariable(pkg, varName)) {
         return pkg;
       }
     }
@@ -290,9 +303,9 @@ public class PackageVariableReferenceTransformer {
       return "text";
     }
     
-    PackageVariable var = pkg.findVariable(varName);
+    Variable var = findVariable(pkg, varName);
     if (var != null) {
-      return var.getDataType();
+      return var.getDataType().toPostgre(new Everything()); // Convert DataTypeSpec to string
     }
     
     return "text";
@@ -321,5 +334,47 @@ public class PackageVariableReferenceTransformer {
    */
   public static java.util.Set<String> getSupportedDataTypes() {
     return DATA_TYPE_TO_ACCESSOR.keySet();
+  }
+
+  /**
+   * Check if a package has a variable with the given name.
+   * 
+   * @param pkg Package to search
+   * @param varName Variable name to find
+   * @return true if the package contains the variable
+   */
+  private static boolean hasVariable(OraclePackage pkg, String varName) {
+    if (pkg == null || varName == null) {
+      return false;
+    }
+    
+    for (Variable var : pkg.getVariables()) {
+      if (varName.equals(var.getName())) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Find a variable in a package by name.
+   * 
+   * @param pkg Package to search
+   * @param varName Variable name to find
+   * @return Variable if found, null otherwise
+   */
+  private static Variable findVariable(OraclePackage pkg, String varName) {
+    if (pkg == null || varName == null) {
+      return null;
+    }
+    
+    for (Variable var : pkg.getVariables()) {
+      if (varName.equals(var.getName())) {
+        return var;
+      }
+    }
+    
+    return null;
   }
 }

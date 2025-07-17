@@ -177,10 +177,10 @@ BEGIN
   RETURN value;
 EXCEPTION
   WHEN undefined_table THEN
-    -- Table doesn't exist, return null (will be handled by caller)
+    -- Table doesn't exist, return NULL (will be handled by caller)
     RETURN NULL;
   WHEN others THEN
-    -- Log error and return null for graceful degradation
+    -- Log error and return NULL for graceful degradation
     RAISE WARNING 'Error reading package variable %.%: %', package_name, var_name, SQLERRM;
     RETURN NULL;
 END;
