@@ -26,6 +26,38 @@ END;
 $$ LANGUAGE plpgsql
 ;
 
+-- For NUMERIC (custom formatting, e.g., 2 decimal places)
+CREATE OR REPLACE PROCEDURE SYS.HTP_p(content NUMERIC)
+AS $$
+BEGIN
+INSERT INTO temp_htp_buffer (content) VALUES (TO_CHAR(content, 'FM999999999.99'));
+END;
+$$ LANGUAGE plpgsql;
+
+-- For INTEGER
+CREATE OR REPLACE PROCEDURE SYS.HTP_p(content INTEGER)
+AS $$
+BEGIN
+INSERT INTO temp_htp_buffer (content) VALUES (content::TEXT);
+END;
+$$ LANGUAGE plpgsql;
+
+-- For VARCHAR
+CREATE OR REPLACE PROCEDURE SYS.HTP_p(content VARCHAR)
+AS $$
+BEGIN
+INSERT INTO temp_htp_buffer (content) VALUES (content);
+END;
+$$ LANGUAGE plpgsql;
+
+-- For DATE (custom formatting)
+CREATE OR REPLACE PROCEDURE SYS.HTP_p(content DATE)
+AS $$
+BEGIN
+INSERT INTO temp_htp_buffer (content) VALUES (TO_CHAR(content, 'YYYY-MM-DD'));
+END;
+$$ LANGUAGE plpgsql;
+
 -- Get complete HTML page from buffer - equivalent to Oracle's HTP.get_page
 CREATE OR REPLACE FUNCTION SYS.HTP_page()
 RETURNS TEXT AS $$

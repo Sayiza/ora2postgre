@@ -31,7 +31,7 @@ public class ExportProjectPostgre {
       
       if (inputStream == null) {
         log.error("Could not find htp_schema_functions.sql resource file");
-        return getFallbackHtpSchema();
+        throw new IllegalStateException("Could not find htp_schema_functions.sql resource file");
       }
       
       String content = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
@@ -40,53 +40,8 @@ public class ExportProjectPostgre {
       
     } catch (IOException e) {
       log.error("Error reading htp_schema_functions.sql resource file: {}", e.getMessage());
-      return getFallbackHtpSchema();
+      throw new IllegalStateException("Could not find htp_schema_functions.sql resource file (2)");
     }
   }
-  
-  /**
-   * Provides fallback HTP schema in case the resource file cannot be loaded.
-   * 
-   * @return Basic HTP schema implementation
-   */
-  private static String getFallbackHtpSchema() {
-    log.warn("Using fallback HTP schema implementation");
-    return """
-CREATE SCHEMA IF NOT EXISTS SYS
-;
 
-CREATE OR REPLACE PROCEDURE SYS.HTP_init()
-AS $$
-BEGIN
-    DROP TABLE IF EXISTS temp_htp_buffer;
-    CREATE TEMP TABLE temp_htp_buffer (
-        line_no SERIAL,
-        content TEXT
-    );
-END;
-$$ LANGUAGE plpgsql
-;
-
-CREATE OR REPLACE PROCEDURE SYS.HTP_p(content TEXT)
-AS $$
-BEGIN
-    INSERT INTO temp_htp_buffer (content) VALUES (content);
-END;
-$$ LANGUAGE plpgsql
-;
-
-CREATE OR REPLACE FUNCTION SYS.HTP_page()
-RETURNS TEXT AS $$
-DECLARE
-    html_output TEXT := '';
-BEGIN
-    SELECT string_agg(content, chr(10) ORDER BY line_no)
-    INTO html_output
-    FROM temp_htp_buffer;
-   
-    RETURN COALESCE(html_output, '');
-END;
-$$ LANGUAGE plpgsql;
-            """;
-  }
 }
