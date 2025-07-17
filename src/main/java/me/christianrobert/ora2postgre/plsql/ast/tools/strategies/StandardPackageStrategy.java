@@ -37,7 +37,7 @@ public class StandardPackageStrategy implements PackageTransformationStrategy {
     // Transform package variables to PostgreSQL schema-level variables
     // Only generate variables in the spec phase (specOnly=true) to avoid duplication
     if (specOnly && !oraclePackage.getVariables().isEmpty()) {
-      b.append(generatePackageVariables(oraclePackage, context));
+      b.append(generatePackageInitializationProcedure(oraclePackage, context));
       b.append("\n");
     }
     
@@ -112,7 +112,7 @@ public class StandardPackageStrategy implements PackageTransformationStrategy {
     
     // Add notes about implemented transformations
     if (!oraclePackage.getVariables().isEmpty()) {
-      notes.append("; Package variables implemented as session-specific temporary tables (one per variable)");
+      notes.append("; Package variables implemented as session-specific temporary tables with runtime initialization procedure");
     }
     if (!oraclePackage.getSubtypes().isEmpty()) {
       notes.append("; Package subtypes not yet implemented");  
@@ -133,27 +133,35 @@ public class StandardPackageStrategy implements PackageTransformationStrategy {
     return notes.toString();
   }
 
+  
   /**
-   * Generates PostgreSQL DDL for package variables using session-specific temporary tables approach.
-   * This creates one temporary table per variable for session isolation and direct type safety.
+   * Generates a PostgreSQL procedure for initializing package variables at runtime.
+   * This procedure creates temporary tables if they don't exist and initializes them with default values.
+   * The procedure is called by the modplsql simulator before executing package procedures.
    */
-  private String generatePackageVariables(OraclePackage oraclePackage, Everything context) {
+  private String generatePackageInitializationProcedure(OraclePackage oraclePackage, Everything context) {
     StringBuilder b = new StringBuilder();
     String packageName = oraclePackage.getName().toLowerCase();
+    String schemaName = oraclePackage.getSchema().toLowerCase();
+    String procedureName = schemaName + "." + packageName + "_init_variables";
     
-    b.append("-- Package Variables for ").append(oraclePackage.getSchema()).append(".").append(packageName).append("\n");
-    b.append("-- Implemented using PostgreSQL session-specific temporary tables (one per variable)\n\n");
+    b.append("-- Package Variable Initialization Procedure for ").append(oraclePackage.getSchema()).append(".").append(packageName).append("\n");
+    b.append("-- This procedure creates and initializes temporary tables for package variables\n");
+    b.append("-- Called by the modplsql simulator before executing package procedures\n\n");
     
-    // Create one temporary table per package variable
+    b.append("CREATE OR REPLACE FUNCTION ").append(procedureName).append("()\n");
+    b.append("RETURNS void LANGUAGE plpgsql AS $$\n");
+    b.append("BEGIN\n");
+    
+    // Create temporary tables for each package variable
     for (Variable variable : oraclePackage.getVariables()) {
       String varName = variable.getName().toLowerCase();
-      String schemaName = oraclePackage.getSchema().toLowerCase();
       String varType = variable.getDataType().toPostgre(context, oraclePackage.getSchema(), oraclePackage.getName());
       String tableName = schemaName + "_" + packageName + "_" + varName;
       
-      b.append("-- Temporary table for variable: ").append(variable.getName()).append("\n");
-      b.append("CREATE TEMPORARY TABLE ").append(tableName).append(" (\n");
-      b.append("  value ").append(varType);
+      b.append("  -- Create temporary table for variable: ").append(variable.getName()).append("\n");
+      b.append("  CREATE TEMPORARY TABLE IF NOT EXISTS ").append(tableName).append(" (\n");
+      b.append("    value ").append(varType);
       
       // Add default value if present
       if (variable.getDefaultValue() != null) {
@@ -166,15 +174,33 @@ public class StandardPackageStrategy implements PackageTransformationStrategy {
         }
       }
       
-      b.append("\n) ON COMMIT PRESERVE ROWS;\n");
+      b.append("\n  ) ON COMMIT PRESERVE ROWS;\n");
       
-      // Insert initial value
-      b.append("INSERT INTO ").append(tableName).append(" VALUES (DEFAULT);\n\n");
+      // Initialize table if empty (idempotent)
+      b.append("  -- Initialize if empty\n");
+      b.append("  INSERT INTO ").append(tableName).append(" \n");
+      b.append("  SELECT ");
+      
+      if (variable.getDefaultValue() != null) {
+        String defaultValue = variable.getDefaultValue().toPostgre(context);
+        if (needsQuotes(variable.getDataType(), defaultValue)) {
+          b.append("'").append(defaultValue.replace("'", "''")).append("'");
+        } else {
+          b.append(defaultValue);
+        }
+      } else {
+        b.append("NULL");
+      }
+      
+      b.append(" WHERE NOT EXISTS (SELECT 1 FROM ").append(tableName).append(");\n\n");
     }
     
-    b.append("-- Variable Access Pattern:\n");
-    b.append("-- Read:  SELECT value FROM schema_packagename_variablename LIMIT 1;\n");
-    b.append("-- Write: UPDATE schema_packagename_variablename SET value = new_value;\n\n");
+    b.append("END;\n");
+    b.append("$$;\n\n");
+    
+    b.append("-- Usage Pattern:\n");
+    b.append("-- Call this procedure before executing any package procedures:\n");
+    b.append("-- SELECT ").append(procedureName).append("();\n\n");
     
     return b.toString();
   }

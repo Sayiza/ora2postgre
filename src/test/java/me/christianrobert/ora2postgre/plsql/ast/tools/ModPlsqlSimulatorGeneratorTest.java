@@ -4,6 +4,8 @@ import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.ModPlsqlSimulatorGenerator;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Method;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -32,21 +34,28 @@ public class ModPlsqlSimulatorGeneratorTest {
   }
 
   @Test 
-  public void testModPlsqlExecutorExists() {
-    // Verify the ModPlsqlExecutor class exists and has required methods
+  public void testModPlsqlExecutorGeneration() {
+    // Verify the ModPlsqlExecutor generation logic in ExportModPlsqlSimulator
+    // Note: ModPlsqlExecutor is now generated code in the target project, not source code
     try {
-      Class<?> executorClass = Class.forName("me.christianrobert.ora2postgre.plsql.ast.tools.helpers.ModPlsqlExecutor");
+      Class<?> exportClass = Class.forName("me.christianrobert.ora2postgre.writing.ExportModPlsqlSimulator");
       
-      // Check key methods exist
-      executorClass.getMethod("initializeHtpBuffer", java.sql.Connection.class);
-      executorClass.getMethod("executeProcedureWithHtp", 
-          java.sql.Connection.class, String.class, java.util.Map.class);
-      executorClass.getMethod("flushHtpBuffer", java.sql.Connection.class);
-      executorClass.getMethod("getHtpBufferSize", java.sql.Connection.class);
+      // Check that the generation method exists
+      Method generateMethod = exportClass.getDeclaredMethod("generateModPlsqlExecutorContent", String.class);
+      assertNotNull(generateMethod, "generateModPlsqlExecutorContent method should exist");
       
-      assertTrue(true, "All required ModPlsqlExecutor methods exist");
-    } catch (ClassNotFoundException | NoSuchMethodException e) {
-      fail("ModPlsqlExecutor class or methods missing: " + e.getMessage());
+      // Test that the method generates content with package initialization
+      generateMethod.setAccessible(true);
+      String generatedContent = (String) generateMethod.invoke(null, "com.test.generated");
+      
+      assertNotNull(generatedContent, "Generated content should not be null");
+      assertTrue(generatedContent.contains("initializePackageVariables"), 
+                 "Generated ModPlsqlExecutor should contain package variable initialization");
+      assertTrue(generatedContent.contains("getPackageInitializationProcedure"), 
+                 "Generated ModPlsqlExecutor should contain package initialization procedure logic");
+      
+    } catch (Exception e) {
+      fail("ModPlsqlExecutor generation test failed: " + e.getMessage());
     }
   }
 

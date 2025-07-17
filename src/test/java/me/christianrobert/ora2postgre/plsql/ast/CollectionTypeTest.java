@@ -972,14 +972,14 @@ END testpackage;
     // Verify the generated code
     assertNotNull(postgresCode);
     
-    // The key test: verify that the temporary table DEFAULT clause does NOT have quotes around the ARRAY
-    // This is the bug we're trying to fix
-    assertTrue(postgresCode.contains("CREATE TEMPORARY TABLE test_schema_testpackage_garray1"), 
-               "Should contain temporary table creation");
+    // The key test: verify that the initialization procedure creates temporary tables with correct DEFAULT clause
+    // This is the bug we're trying to fix - ensure ARRAY expressions are NOT quoted
+    assertTrue(postgresCode.contains("CREATE OR REPLACE FUNCTION test_schema.testpackage_init_variables()"), 
+               "Should contain package initialization procedure");
     
-    // Check for the CORRECT format (without quotes)
+    // Check for the CORRECT format (without quotes) in the initialization procedure
     assertTrue(postgresCode.contains("DEFAULT ARRAY[1, 2, 3, 4, 5, 6]"), 
-               "Should contain DEFAULT ARRAY[1, 2, 3, 4, 5, 6] without quotes");
+               "Should contain DEFAULT ARRAY[1, 2, 3, 4, 5, 6] without quotes in initialization procedure");
     
     // Check that the INCORRECT format (with quotes) is NOT present
     assertFalse(postgresCode.contains("DEFAULT 'ARRAY[1, 2, 3, 4, 5, 6]'"), 
