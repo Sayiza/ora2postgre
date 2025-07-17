@@ -40,6 +40,12 @@ The PRE/POST pattern violates the established patterns in the codebase:
 - **ModPlsqlExecutor**: Per-connection state management works correctly
 - **Temporary Tables**: Session isolation via connection boundaries is proven
 
+### **Problem 4: Collection Types Also Affected**
+The existing collection implementation (`PackageCollectionHelper`) suffers from the same fundamental flaws:
+- **Collection variables** use temporary tables with array storage but still use PRE/POST materialization
+- **Working but flawed**: Collection save/retrieve works but has the same synchronization issues
+- **Same timing problem**: Collection modifications within inter-procedure calls don't persist properly
+
 ---
 
 ## **Proposed Solution: Direct Table Access Pattern**
@@ -80,9 +86,46 @@ UPDATE test_schema_minitest_gX SET value = gX;
 **Proposed Direct Access PostgreSQL:**
 ```plsql
 -- Direct table access on every use
-SELECT sys.set_package_var('minitest', 'gX', 
-  sys.get_package_var('minitest', 'gX')::numeric + 1);
-SELECT sys.htp_p(sys.get_package_var('minitest', 'gX'));
+SELECT sys.set_package_var_numeric('minitest', 'gX', 
+  sys.get_package_var_numeric('minitest', 'gX') + 1);
+SELECT sys.htp_p(sys.get_package_var_numeric('minitest', 'gX'));
+```
+
+### **Collection Variable Transformation Example**
+
+**Oracle Collection Code:**
+```plsql
+-- Oracle package collection variable access
+TYPE my_array IS VARRAY(10) OF NUMBER;
+arr my_array := my_array(1, 2, 3);
+
+-- Modify collection
+arr(1) := 42;
+arr.extend();
+arr(4) := 99;
+```
+
+**Current Broken PostgreSQL (PRE/POST):**
+```plsql
+-- Load at procedure start (PRE)
+SELECT CASE WHEN COUNT(*) = 0 THEN ARRAY[]::numeric[]
+            ELSE array_agg(value ORDER BY row_number() OVER ())
+       END INTO arr FROM test_schema_minitest_arr;
+
+-- Use stale local variable
+arr[1] := 42;  -- Local array only
+arr := array_append(arr, 99);  -- Local array only
+
+-- Save at procedure end (POST)
+DELETE FROM test_schema_minitest_arr;
+INSERT INTO test_schema_minitest_arr (value) SELECT unnest(arr);
+```
+
+**Proposed Direct Access PostgreSQL:**
+```plsql
+-- Direct table access on every use
+SELECT sys.set_package_collection_element('minitest', 'arr', 1, 42);
+SELECT sys.extend_package_collection('minitest', 'arr', 99);
 ```
 
 ---
@@ -171,6 +214,107 @@ BEGIN
   PERFORM sys.set_package_var(package_name, var_name, value::text);
 END;
 $$ LANGUAGE plpgsql;
+```
+
+#### **1.3 Create Collection Accessor Functions**
+Create functions for Oracle collection types (VARRAY/TABLE OF):
+
+```sql
+-- Get entire collection as PostgreSQL array
+CREATE OR REPLACE FUNCTION sys.get_package_collection(package_name text, var_name text) 
+RETURNS text[] LANGUAGE plpgsql AS $$
+DECLARE
+  table_name text;
+  result text[];
+BEGIN
+  table_name := lower(current_schema()) || '_' || lower(package_name) || '_' || lower(var_name);
+  
+  -- Reconstruct array from table rows
+  EXECUTE format('SELECT CASE WHEN COUNT(*) = 0 THEN ARRAY[]::text[]
+                               ELSE array_agg(value ORDER BY row_number() OVER ())
+                          END FROM %I', table_name) INTO result;
+  
+  RETURN result;
+EXCEPTION
+  WHEN undefined_table THEN
+    RETURN ARRAY[]::text[];
+END;
+$$;
+
+-- Set entire collection from PostgreSQL array
+CREATE OR REPLACE FUNCTION sys.set_package_collection(package_name text, var_name text, value text[]) 
+RETURNS void LANGUAGE plpgsql AS $$
+DECLARE
+  table_name text;
+BEGIN
+  table_name := lower(current_schema()) || '_' || lower(package_name) || '_' || lower(var_name);
+  
+  -- Clear and repopulate table
+  EXECUTE format('DELETE FROM %I', table_name);
+  EXECUTE format('INSERT INTO %I (value) SELECT unnest(%L)', table_name, value);
+END;
+$$;
+
+-- Get collection element by index (1-based)
+CREATE OR REPLACE FUNCTION sys.get_package_collection_element(package_name text, var_name text, index_pos integer) 
+RETURNS text LANGUAGE plpgsql AS $$
+DECLARE
+  table_name text;
+  result text;
+BEGIN
+  table_name := lower(current_schema()) || '_' || lower(package_name) || '_' || lower(var_name);
+  
+  -- Get element at specific position
+  EXECUTE format('SELECT value FROM (SELECT value, row_number() OVER () as rn FROM %I) t 
+                  WHERE rn = %L', table_name, index_pos) INTO result;
+  
+  RETURN result;
+END;
+$$;
+
+-- Set collection element by index (1-based)
+CREATE OR REPLACE FUNCTION sys.set_package_collection_element(package_name text, var_name text, index_pos integer, value text) 
+RETURNS void LANGUAGE plpgsql AS $$
+DECLARE
+  table_name text;
+BEGIN
+  table_name := lower(current_schema()) || '_' || lower(package_name) || '_' || lower(var_name);
+  
+  -- Update element at specific position
+  EXECUTE format('UPDATE %I SET value = %L WHERE ctid = (
+                    SELECT ctid FROM (SELECT ctid, row_number() OVER () as rn FROM %I) t 
+                    WHERE rn = %L
+                  )', table_name, value, table_name, index_pos);
+END;
+$$;
+
+-- Collection COUNT method
+CREATE OR REPLACE FUNCTION sys.get_package_collection_count(package_name text, var_name text) 
+RETURNS integer LANGUAGE plpgsql AS $$
+DECLARE
+  table_name text;
+  result integer;
+BEGIN
+  table_name := lower(current_schema()) || '_' || lower(package_name) || '_' || lower(var_name);
+  
+  EXECUTE format('SELECT COUNT(*) FROM %I', table_name) INTO result;
+  
+  RETURN result;
+END;
+$$;
+
+-- Collection EXTEND method (add element)
+CREATE OR REPLACE FUNCTION sys.extend_package_collection(package_name text, var_name text, value text DEFAULT NULL) 
+RETURNS void LANGUAGE plpgsql AS $$
+DECLARE
+  table_name text;
+BEGIN
+  table_name := lower(current_schema()) || '_' || lower(package_name) || '_' || lower(var_name);
+  
+  -- Add new element to end
+  EXECUTE format('INSERT INTO %I (value) VALUES (%L)', table_name, value);
+END;
+$$;
 ```
 
 #### **1.3 Integration with Existing Infrastructure**
@@ -284,8 +428,9 @@ private OraclePackage findContainingPackage(Everything data) {
 **Estimated Time**: 2 hours  
 **Status**: Ready to implement
 
-#### **3.1 Remove PackageVariableHelper**
+#### **3.1 Remove PRE/POST Helper Classes**
 - **Delete**: `/src/main/java/tools/helpers/PackageVariableHelper.java`
+- **Delete**: `/src/main/java/tools/helpers/PackageCollectionHelper.java`
 - **Reason**: No longer needed with direct access pattern
 
 #### **3.2 Remove PRE/POST Integration**

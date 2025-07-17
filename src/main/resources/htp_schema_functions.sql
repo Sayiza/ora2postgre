@@ -155,6 +155,341 @@ END;
 $$ LANGUAGE plpgsql
 ;
 
+-- Package Variable Accessor Functions
+-- These functions provide direct access to package variables stored in temporary tables
+-- Following the same session-isolated pattern as HTP buffer functions
+
+-- Read package variable (returns text, caller handles casting)
+CREATE OR REPLACE FUNCTION SYS.get_package_var(
+  package_name text, 
+  var_name text
+) RETURNS text LANGUAGE plpgsql AS $$
+DECLARE
+  table_name text;
+  value text;
+BEGIN
+  -- Build table name using existing naming convention
+  table_name := lower(current_schema()) || '_' || lower(package_name) || '_' || lower(var_name);
+  
+  -- Read from session temp table
+  EXECUTE format('SELECT value FROM %I LIMIT 1', table_name) INTO value;
+  
+  RETURN value;
+EXCEPTION
+  WHEN undefined_table THEN
+    -- Table doesn't exist, return null (will be handled by caller)
+    RETURN NULL;
+  WHEN others THEN
+    -- Log error and return null for graceful degradation
+    RAISE WARNING 'Error reading package variable %.%: %', package_name, var_name, SQLERRM;
+    RETURN NULL;
+END;
+$$;
+
+-- Write package variable (accepts text, caller handles casting)
+CREATE OR REPLACE FUNCTION SYS.set_package_var(
+  package_name text, 
+  var_name text, 
+  value text
+) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE
+  table_name text;
+BEGIN
+  -- Build table name using existing naming convention
+  table_name := lower(current_schema()) || '_' || lower(package_name) || '_' || lower(var_name);
+  
+  -- Update session temp table
+  EXECUTE format('UPDATE %I SET value = %L', table_name, value);
+EXCEPTION
+  WHEN undefined_table THEN
+    -- Table doesn't exist, log warning for debugging
+    RAISE WARNING 'Package variable table does not exist: %', table_name;
+  WHEN others THEN
+    -- Log error for debugging
+    RAISE WARNING 'Error writing package variable %.%: %', package_name, var_name, SQLERRM;
+END;
+$$;
+
+-- Type-safe wrapper functions for common data types
+
+-- Numeric getter/setter
+CREATE OR REPLACE FUNCTION SYS.get_package_var_numeric(package_name text, var_name text) 
+RETURNS numeric LANGUAGE plpgsql AS $$
+DECLARE
+  value text;
+BEGIN
+  value := SYS.get_package_var(package_name, var_name);
+  IF value IS NULL THEN
+    RETURN NULL;
+  END IF;
+  RETURN value::numeric;
+EXCEPTION
+  WHEN invalid_text_representation THEN
+    RAISE WARNING 'Invalid numeric value for package variable %.%: %', package_name, var_name, value;
+    RETURN NULL;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION SYS.set_package_var_numeric(package_name text, var_name text, value numeric) 
+RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM SYS.set_package_var(package_name, var_name, value::text);
+END;
+$$;
+
+-- Boolean getter/setter
+CREATE OR REPLACE FUNCTION SYS.get_package_var_boolean(package_name text, var_name text) 
+RETURNS boolean LANGUAGE plpgsql AS $$
+DECLARE
+  value text;
+BEGIN
+  value := SYS.get_package_var(package_name, var_name);
+  IF value IS NULL THEN
+    RETURN NULL;
+  END IF;
+  RETURN value::boolean;
+EXCEPTION
+  WHEN invalid_text_representation THEN
+    RAISE WARNING 'Invalid boolean value for package variable %.%: %', package_name, var_name, value;
+    RETURN NULL;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION SYS.set_package_var_boolean(package_name text, var_name text, value boolean) 
+RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM SYS.set_package_var(package_name, var_name, value::text);
+END;
+$$;
+
+-- Text/VARCHAR2 getter/setter
+CREATE OR REPLACE FUNCTION SYS.get_package_var_text(package_name text, var_name text) 
+RETURNS text LANGUAGE plpgsql AS $$
+BEGIN
+  RETURN SYS.get_package_var(package_name, var_name);
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION SYS.set_package_var_text(package_name text, var_name text, value text) 
+RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM SYS.set_package_var(package_name, var_name, value);
+END;
+$$;
+
+-- Date/Timestamp getter/setter
+CREATE OR REPLACE FUNCTION SYS.get_package_var_timestamp(package_name text, var_name text) 
+RETURNS timestamp LANGUAGE plpgsql AS $$
+DECLARE
+  value text;
+BEGIN
+  value := SYS.get_package_var(package_name, var_name);
+  IF value IS NULL THEN
+    RETURN NULL;
+  END IF;
+  RETURN value::timestamp;
+EXCEPTION
+  WHEN invalid_text_representation THEN
+    RAISE WARNING 'Invalid timestamp value for package variable %.%: %', package_name, var_name, value;
+    RETURN NULL;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION SYS.set_package_var_timestamp(package_name text, var_name text, value timestamp) 
+RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM SYS.set_package_var(package_name, var_name, value::text);
+END;
+$$;
+
+-- Collection Accessor Functions
+-- These functions provide direct access to package collection variables (VARRAY/TABLE OF)
+-- Following the same session-isolated pattern as regular package variables
+
+-- Get entire collection as PostgreSQL array
+CREATE OR REPLACE FUNCTION SYS.get_package_collection(package_name text, var_name text) 
+RETURNS text[] LANGUAGE plpgsql AS $$
+DECLARE
+  table_name text;
+  result text[];
+BEGIN
+  table_name := lower(current_schema()) || '_' || lower(package_name) || '_' || lower(var_name);
+  
+  -- Reconstruct array from table rows (same as PackageCollectionHelper prologue)
+  EXECUTE format('SELECT CASE WHEN COUNT(*) = 0 THEN ARRAY[]::text[]
+                               ELSE array_agg(value ORDER BY row_number() OVER ())
+                          END FROM %I', table_name) INTO result;
+  
+  RETURN result;
+EXCEPTION
+  WHEN undefined_table THEN
+    RETURN ARRAY[]::text[];
+  WHEN others THEN
+    RAISE WARNING 'Error reading package collection %.%: %', package_name, var_name, SQLERRM;
+    RETURN ARRAY[]::text[];
+END;
+$$;
+
+-- Set entire collection from PostgreSQL array
+CREATE OR REPLACE FUNCTION SYS.set_package_collection(package_name text, var_name text, value text[]) 
+RETURNS void LANGUAGE plpgsql AS $$
+DECLARE
+  table_name text;
+BEGIN
+  table_name := lower(current_schema()) || '_' || lower(package_name) || '_' || lower(var_name);
+  
+  -- Clear and repopulate table (same as PackageCollectionHelper epilogue)
+  EXECUTE format('DELETE FROM %I', table_name);
+  EXECUTE format('INSERT INTO %I (value) SELECT unnest(%L)', table_name, value);
+EXCEPTION
+  WHEN undefined_table THEN
+    RAISE WARNING 'Package collection table does not exist: %', table_name;
+  WHEN others THEN
+    RAISE WARNING 'Error writing package collection %.%: %', package_name, var_name, SQLERRM;
+END;
+$$;
+
+-- Get collection element by index (1-based, Oracle-style)
+CREATE OR REPLACE FUNCTION SYS.get_package_collection_element(package_name text, var_name text, index_pos integer) 
+RETURNS text LANGUAGE plpgsql AS $$
+DECLARE
+  table_name text;
+  result text;
+BEGIN
+  table_name := lower(current_schema()) || '_' || lower(package_name) || '_' || lower(var_name);
+  
+  -- Get element at specific position (1-based indexing)
+  EXECUTE format('SELECT value FROM (SELECT value, row_number() OVER () as rn FROM %I) t 
+                  WHERE rn = %L', table_name, index_pos) INTO result;
+  
+  RETURN result;
+EXCEPTION
+  WHEN undefined_table THEN
+    RETURN NULL;
+  WHEN others THEN
+    RAISE WARNING 'Error reading package collection element %.%[%]: %', package_name, var_name, index_pos, SQLERRM;
+    RETURN NULL;
+END;
+$$;
+
+-- Set collection element by index (1-based, Oracle-style)
+CREATE OR REPLACE FUNCTION SYS.set_package_collection_element(package_name text, var_name text, index_pos integer, value text) 
+RETURNS void LANGUAGE plpgsql AS $$
+DECLARE
+  table_name text;
+BEGIN
+  table_name := lower(current_schema()) || '_' || lower(package_name) || '_' || lower(var_name);
+  
+  -- Update element at specific position using ctid for direct row access
+  EXECUTE format('UPDATE %I SET value = %L WHERE ctid = (
+                    SELECT ctid FROM (SELECT ctid, row_number() OVER () as rn FROM %I) t 
+                    WHERE rn = %L
+                  )', table_name, value, table_name, index_pos);
+EXCEPTION
+  WHEN undefined_table THEN
+    RAISE WARNING 'Package collection table does not exist: %', table_name;
+  WHEN others THEN
+    RAISE WARNING 'Error writing package collection element %.%[%]: %', package_name, var_name, index_pos, SQLERRM;
+END;
+$$;
+
+-- Collection COUNT method (Oracle arr.COUNT equivalent)
+CREATE OR REPLACE FUNCTION SYS.get_package_collection_count(package_name text, var_name text) 
+RETURNS integer LANGUAGE plpgsql AS $$
+DECLARE
+  table_name text;
+  result integer;
+BEGIN
+  table_name := lower(current_schema()) || '_' || lower(package_name) || '_' || lower(var_name);
+  
+  EXECUTE format('SELECT COUNT(*) FROM %I', table_name) INTO result;
+  
+  RETURN result;
+EXCEPTION
+  WHEN undefined_table THEN
+    RETURN 0;
+  WHEN others THEN
+    RAISE WARNING 'Error counting package collection %.%: %', package_name, var_name, SQLERRM;
+    RETURN 0;
+END;
+$$;
+
+-- Collection EXTEND method (Oracle arr.EXTEND equivalent)
+CREATE OR REPLACE FUNCTION SYS.extend_package_collection(package_name text, var_name text, value text DEFAULT NULL) 
+RETURNS void LANGUAGE plpgsql AS $$
+DECLARE
+  table_name text;
+BEGIN
+  table_name := lower(current_schema()) || '_' || lower(package_name) || '_' || lower(var_name);
+  
+  -- Add new element to end of collection
+  EXECUTE format('INSERT INTO %I (value) VALUES (%L)', table_name, value);
+EXCEPTION
+  WHEN undefined_table THEN
+    RAISE WARNING 'Package collection table does not exist: %', table_name;
+  WHEN others THEN
+    RAISE WARNING 'Error extending package collection %.%: %', package_name, var_name, SQLERRM;
+END;
+$$;
+
+-- Collection FIRST method (Oracle arr.FIRST equivalent) - always returns 1
+CREATE OR REPLACE FUNCTION SYS.get_package_collection_first(package_name text, var_name text) 
+RETURNS integer LANGUAGE plpgsql AS $$
+DECLARE
+  table_name text;
+  count_result integer;
+BEGIN
+  table_name := lower(current_schema()) || '_' || lower(package_name) || '_' || lower(var_name);
+  
+  EXECUTE format('SELECT COUNT(*) FROM %I', table_name) INTO count_result;
+  
+  -- Return 1 if collection has elements, NULL if empty
+  IF count_result > 0 THEN
+    RETURN 1;
+  ELSE
+    RETURN NULL;
+  END IF;
+EXCEPTION
+  WHEN undefined_table THEN
+    RETURN NULL;
+END;
+$$;
+
+-- Collection LAST method (Oracle arr.LAST equivalent) - returns count
+CREATE OR REPLACE FUNCTION SYS.get_package_collection_last(package_name text, var_name text) 
+RETURNS integer LANGUAGE plpgsql AS $$
+BEGIN
+  RETURN SYS.get_package_collection_count(package_name, var_name);
+END;
+$$;
+
+-- Type-safe collection wrappers for common data types
+
+-- Numeric collection element getter/setter
+CREATE OR REPLACE FUNCTION SYS.get_package_collection_element_numeric(package_name text, var_name text, index_pos integer) 
+RETURNS numeric LANGUAGE plpgsql AS $$
+DECLARE
+  value text;
+BEGIN
+  value := SYS.get_package_collection_element(package_name, var_name, index_pos);
+  IF value IS NULL THEN
+    RETURN NULL;
+  END IF;
+  RETURN value::numeric;
+EXCEPTION
+  WHEN invalid_text_representation THEN
+    RAISE WARNING 'Invalid numeric value for package collection element %.%[%]: %', package_name, var_name, index_pos, value;
+    RETURN NULL;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION SYS.set_package_collection_element_numeric(package_name text, var_name text, index_pos integer, value numeric) 
+RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM SYS.set_package_collection_element(package_name, var_name, index_pos, value::text);
+END;
+$$;
+
 -- Example usage (commented out):
 /*
 -- Example of using HTP functions
@@ -171,6 +506,50 @@ BEGIN
     
     -- Get the complete page
     RAISE NOTICE 'Generated HTML: %', SYS.HTP_page();
+END;
+$$;
+
+-- Example of using package variable functions
+DO $$
+BEGIN
+    -- Example assumes package variable table exists
+    -- CREATE TEMP TABLE test_schema_minitest_gx (value text DEFAULT '1');
+    
+    -- Read package variable
+    RAISE NOTICE 'Package variable gX: %', SYS.get_package_var_numeric('minitest', 'gX');
+    
+    -- Write package variable
+    PERFORM SYS.set_package_var_numeric('minitest', 'gX', 42);
+    
+    -- Read updated value
+    RAISE NOTICE 'Updated package variable gX: %', SYS.get_package_var_numeric('minitest', 'gX');
+END;
+$$;
+
+-- Example of using package collection functions
+DO $$
+BEGIN
+    -- Example assumes package collection table exists
+    -- CREATE TEMP TABLE test_schema_minitest_arr (value text);
+    -- INSERT INTO test_schema_minitest_arr (value) VALUES ('1'), ('2'), ('3');
+    
+    -- Read collection element
+    RAISE NOTICE 'Collection element arr[1]: %', SYS.get_package_collection_element_numeric('minitest', 'arr', 1);
+    
+    -- Write collection element
+    PERFORM SYS.set_package_collection_element_numeric('minitest', 'arr', 1, 42);
+    
+    -- Read updated element
+    RAISE NOTICE 'Updated collection element arr[1]: %', SYS.get_package_collection_element_numeric('minitest', 'arr', 1);
+    
+    -- Collection operations
+    RAISE NOTICE 'Collection count: %', SYS.get_package_collection_count('minitest', 'arr');
+    RAISE NOTICE 'Collection first: %', SYS.get_package_collection_first('minitest', 'arr');
+    RAISE NOTICE 'Collection last: %', SYS.get_package_collection_last('minitest', 'arr');
+    
+    -- Extend collection
+    PERFORM SYS.extend_package_collection('minitest', 'arr', '99');
+    RAISE NOTICE 'Collection after extend: %', SYS.get_package_collection_count('minitest', 'arr');
 END;
 $$;
 */

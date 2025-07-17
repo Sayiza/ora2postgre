@@ -1,6 +1,7 @@
 package me.christianrobert.ora2postgre.plsql.ast;
 
 import me.christianrobert.ora2postgre.global.Everything;
+import me.christianrobert.ora2postgre.plsql.ast.tools.transformers.PackageVariableReferenceTransformer;
 
 import java.util.List;
 
@@ -350,6 +351,18 @@ public class UnaryExpression extends PlSqlAst {
     
     String arrayExpression = childExpression.toPostgre(data);
     
+    // Check if this is a package collection variable
+    String baseVariable = extractBaseVariableName(arrayExpression);
+    if (baseVariable != null && PackageVariableReferenceTransformer.isPackageVariableReference(baseVariable, data)) {
+      OraclePackage pkg = PackageVariableReferenceTransformer.findContainingPackage(baseVariable, data);
+      if (pkg != null) {
+        // Transform package collection method to direct table access
+        return PackageVariableReferenceTransformer.transformCollectionMethod(pkg.getName(), baseVariable, collectionMethod);
+      }
+    }
+    
+    // Regular collection method transformation (function-local collections)
+    
     switch (collectionMethod.toUpperCase()) {
       case "COUNT":
         // Oracle: arr.COUNT → PostgreSQL: array_length(arr, 1)
@@ -408,9 +421,51 @@ public class UnaryExpression extends PlSqlAst {
       return "/* INVALID ARRAY INDEXING */";
     }
     
-    // Transform Oracle arr(i) to PostgreSQL arr[i]
     String indexString = indexExpression.toPostgre(data);
+    
+    // Check if this is a package collection variable
+    if (PackageVariableReferenceTransformer.isPackageVariableReference(arrayVariable, data)) {
+      OraclePackage pkg = PackageVariableReferenceTransformer.findContainingPackage(arrayVariable, data);
+      if (pkg != null) {
+        String dataType = PackageVariableReferenceTransformer.getPackageVariableDataType(arrayVariable, pkg);
+        
+        // For package collections, we need to get the element type
+        String elementType = extractElementDataType(dataType);
+        
+        // Transform package collection element access to direct table access
+        return PackageVariableReferenceTransformer.transformCollectionElementRead(
+            pkg.getName(), arrayVariable, elementType, indexString);
+      }
+    }
+    
+    // Regular array indexing transformation (function-local collections)
+    // Transform Oracle arr(i) to PostgreSQL arr[i]
     return arrayVariable + "[" + indexString + "]";
+  }
+  
+  /**
+   * Extract the element data type from a collection data type.
+   */
+  private String extractElementDataType(String collectionType) {
+    if (collectionType == null) {
+      return "text";
+    }
+    
+    // Handle VARRAY and TABLE OF types
+    if (collectionType.toUpperCase().contains("VARRAY") || collectionType.toUpperCase().contains("TABLE")) {
+      // Look for "OF type" pattern
+      int ofIndex = collectionType.toUpperCase().indexOf(" OF ");
+      if (ofIndex != -1) {
+        String elementType = collectionType.substring(ofIndex + 4).trim();
+        // Remove any trailing size specifications
+        if (elementType.contains("(")) {
+          elementType = elementType.substring(0, elementType.indexOf("(")).trim();
+        }
+        return elementType;
+      }
+    }
+    
+    return "text"; // Default fallback
   }
 
   /**
@@ -465,5 +520,56 @@ public class UnaryExpression extends PlSqlAst {
       // Default to TEXT for unknown types
       return "TEXT";
     }
+  }
+  
+  /**
+   * Extract the base variable name from a PostgreSQL expression.
+   * This is used to identify package collection variables.
+   */
+  private String extractBaseVariableName(String expression) {
+    if (expression == null || expression.trim().isEmpty()) {
+      return null;
+    }
+    
+    String trimmed = expression.trim();
+    
+    // Handle function calls - extract variable name from function parameters
+    if (trimmed.startsWith("sys.get_package_collection(")) {
+      // This is already a transformed package collection - extract the variable name
+      // Expected format: sys.get_package_collection('package', 'variable')
+      int firstQuote = trimmed.indexOf("'", trimmed.indexOf(','));
+      if (firstQuote != -1) {
+        int secondQuote = trimmed.indexOf("'", firstQuote + 1);
+        if (secondQuote != -1) {
+          return trimmed.substring(firstQuote + 1, secondQuote);
+        }
+      }
+    }
+    
+    // Handle simple variable names (for function-local collections)
+    if (trimmed.matches("[a-zA-Z_][a-zA-Z0-9_]*")) {
+      return trimmed;
+    }
+    
+    // Handle complex expressions - try to extract the first identifier
+    if (trimmed.contains("[") || trimmed.contains("(") || trimmed.contains(".")) {
+      // Extract the first identifier before any special characters
+      int specialChar = Integer.MAX_VALUE;
+      for (char c : new char[]{'[', '(', '.', ' ', '\t', '\n'}) {
+        int pos = trimmed.indexOf(c);
+        if (pos != -1 && pos < specialChar) {
+          specialChar = pos;
+        }
+      }
+      
+      if (specialChar != Integer.MAX_VALUE && specialChar > 0) {
+        String candidate = trimmed.substring(0, specialChar);
+        if (candidate.matches("[a-zA-Z_][a-zA-Z0-9_]*")) {
+          return candidate;
+        }
+      }
+    }
+    
+    return null;
   }
 }
