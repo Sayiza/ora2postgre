@@ -357,7 +357,7 @@ public class UnaryExpression extends PlSqlAst {
       OraclePackage pkg = PackageVariableReferenceTransformer.findContainingPackage(baseVariable, data);
       if (pkg != null) {
         // Transform package collection method to direct table access
-        return PackageVariableReferenceTransformer.transformCollectionMethod(pkg.getName(), baseVariable, collectionMethod);
+        return PackageVariableReferenceTransformer.transformCollectionMethod(pkg.getSchema(), pkg.getName(), baseVariable, collectionMethod);
       }
     }
     
@@ -434,7 +434,7 @@ public class UnaryExpression extends PlSqlAst {
         
         // Transform package collection element access to direct table access
         return PackageVariableReferenceTransformer.transformCollectionElementRead(
-            pkg.getName(), arrayVariable, elementType, indexString);
+            pkg.getSchema(), pkg.getName(), arrayVariable, elementType, indexString);
       }
     }
     

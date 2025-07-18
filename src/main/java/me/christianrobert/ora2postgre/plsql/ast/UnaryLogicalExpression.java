@@ -98,10 +98,10 @@ public class UnaryLogicalExpression extends PlSqlAst {
                     // Transform package variable reference to direct table access
                     if (PackageVariableReferenceTransformer.isCollectionType(dataType)) {
                         // Collection variables - return as array
-                        sb.append(PackageVariableReferenceTransformer.transformRead(pkg.getName(), rawText.trim(), dataType));
+                        sb.append(PackageVariableReferenceTransformer.transformRead(pkg.getSchema(), pkg.getName(), rawText.trim(), dataType));
                     } else {
                         // Regular package variables
-                        sb.append(PackageVariableReferenceTransformer.transformRead(pkg.getName(), rawText.trim(), dataType));
+                        sb.append(PackageVariableReferenceTransformer.transformRead(pkg.getSchema(), pkg.getName(), rawText.trim(), dataType));
                     }
                 } else {
                     sb.append(rawText);

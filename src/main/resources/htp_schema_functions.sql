@@ -161,6 +161,7 @@ $$ LANGUAGE plpgsql
 
 -- Read package variable (returns text, caller handles casting)
 CREATE OR REPLACE FUNCTION SYS.get_package_var(
+  target_schema text,
   package_name text, 
   var_name text
 ) RETURNS text LANGUAGE plpgsql AS $$
@@ -168,8 +169,8 @@ DECLARE
   table_name text;
   value text;
 BEGIN
-  -- Build table name using existing naming convention
-  table_name := lower(current_schema()) || '_' || lower(package_name) || '_' || lower(var_name);
+  -- Build table name using target schema instead of current_schema()
+  table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
   
   -- Read from session temp table
   EXECUTE format('SELECT value FROM %I LIMIT 1', table_name) INTO value;
@@ -188,6 +189,7 @@ $$;
 
 -- Write package variable (accepts text, caller handles casting)
 CREATE OR REPLACE FUNCTION SYS.set_package_var(
+  target_schema text,
   package_name text, 
   var_name text, 
   value text
@@ -195,8 +197,8 @@ CREATE OR REPLACE FUNCTION SYS.set_package_var(
 DECLARE
   table_name text;
 BEGIN
-  -- Build table name using existing naming convention
-  table_name := lower(current_schema()) || '_' || lower(package_name) || '_' || lower(var_name);
+  -- Build table name using target schema instead of current_schema()
+  table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
   
   -- Update session temp table
   EXECUTE format('UPDATE %I SET value = %L', table_name, value);
@@ -213,12 +215,12 @@ $$;
 -- Type-safe wrapper functions for common data types
 
 -- Numeric getter/setter
-CREATE OR REPLACE FUNCTION SYS.get_package_var_numeric(package_name text, var_name text) 
+CREATE OR REPLACE FUNCTION SYS.get_package_var_numeric(target_schema text, package_name text, var_name text) 
 RETURNS numeric LANGUAGE plpgsql AS $$
 DECLARE
   value text;
 BEGIN
-  value := SYS.get_package_var(package_name, var_name);
+  value := SYS.get_package_var(target_schema, package_name, var_name);
   IF value IS NULL THEN
     RETURN NULL;
   END IF;
@@ -230,20 +232,20 @@ EXCEPTION
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION SYS.set_package_var_numeric(package_name text, var_name text, value numeric) 
+CREATE OR REPLACE FUNCTION SYS.set_package_var_numeric(target_schema text, package_name text, var_name text, value numeric) 
 RETURNS void LANGUAGE plpgsql AS $$
 BEGIN
-  PERFORM SYS.set_package_var(package_name, var_name, value::text);
+  PERFORM SYS.set_package_var(target_schema, package_name, var_name, value::text);
 END;
 $$;
 
 -- Boolean getter/setter
-CREATE OR REPLACE FUNCTION SYS.get_package_var_boolean(package_name text, var_name text) 
+CREATE OR REPLACE FUNCTION SYS.get_package_var_boolean(target_schema text, package_name text, var_name text) 
 RETURNS boolean LANGUAGE plpgsql AS $$
 DECLARE
   value text;
 BEGIN
-  value := SYS.get_package_var(package_name, var_name);
+  value := SYS.get_package_var(target_schema, package_name, var_name);
   IF value IS NULL THEN
     RETURN NULL;
   END IF;
@@ -255,35 +257,35 @@ EXCEPTION
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION SYS.set_package_var_boolean(package_name text, var_name text, value boolean) 
+CREATE OR REPLACE FUNCTION SYS.set_package_var_boolean(target_schema text, package_name text, var_name text, value boolean) 
 RETURNS void LANGUAGE plpgsql AS $$
 BEGIN
-  PERFORM SYS.set_package_var(package_name, var_name, value::text);
+  PERFORM SYS.set_package_var(target_schema, package_name, var_name, value::text);
 END;
 $$;
 
 -- Text/VARCHAR2 getter/setter
-CREATE OR REPLACE FUNCTION SYS.get_package_var_text(package_name text, var_name text) 
+CREATE OR REPLACE FUNCTION SYS.get_package_var_text(target_schema text, package_name text, var_name text) 
 RETURNS text LANGUAGE plpgsql AS $$
 BEGIN
-  RETURN SYS.get_package_var(package_name, var_name);
+  RETURN SYS.get_package_var(target_schema, package_name, var_name);
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION SYS.set_package_var_text(package_name text, var_name text, value text) 
+CREATE OR REPLACE FUNCTION SYS.set_package_var_text(target_schema text, package_name text, var_name text, value text) 
 RETURNS void LANGUAGE plpgsql AS $$
 BEGIN
-  PERFORM SYS.set_package_var(package_name, var_name, value);
+  PERFORM SYS.set_package_var(target_schema, package_name, var_name, value);
 END;
 $$;
 
 -- Date/Timestamp getter/setter
-CREATE OR REPLACE FUNCTION SYS.get_package_var_timestamp(package_name text, var_name text) 
+CREATE OR REPLACE FUNCTION SYS.get_package_var_timestamp(target_schema text, package_name text, var_name text) 
 RETURNS timestamp LANGUAGE plpgsql AS $$
 DECLARE
   value text;
 BEGIN
-  value := SYS.get_package_var(package_name, var_name);
+  value := SYS.get_package_var(target_schema, package_name, var_name);
   IF value IS NULL THEN
     RETURN NULL;
   END IF;
@@ -295,10 +297,10 @@ EXCEPTION
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION SYS.set_package_var_timestamp(package_name text, var_name text, value timestamp) 
+CREATE OR REPLACE FUNCTION SYS.set_package_var_timestamp(target_schema text, package_name text, var_name text, value timestamp) 
 RETURNS void LANGUAGE plpgsql AS $$
 BEGIN
-  PERFORM SYS.set_package_var(package_name, var_name, value::text);
+  PERFORM SYS.set_package_var(target_schema, package_name, var_name, value::text);
 END;
 $$;
 
@@ -307,13 +309,13 @@ $$;
 -- Following the same session-isolated pattern as regular package variables
 
 -- Get entire collection as PostgreSQL array
-CREATE OR REPLACE FUNCTION SYS.get_package_collection(package_name text, var_name text) 
+CREATE OR REPLACE FUNCTION SYS.get_package_collection(target_schema text, package_name text, var_name text) 
 RETURNS text[] LANGUAGE plpgsql AS $$
 DECLARE
   table_name text;
   result text[];
 BEGIN
-  table_name := lower(current_schema()) || '_' || lower(package_name) || '_' || lower(var_name);
+  table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
   
   -- Reconstruct array from table rows (same as PackageCollectionHelper prologue)
   EXECUTE format('SELECT CASE WHEN COUNT(*) = 0 THEN ARRAY[]::text[]
@@ -331,12 +333,12 @@ END;
 $$;
 
 -- Set entire collection from PostgreSQL array
-CREATE OR REPLACE FUNCTION SYS.set_package_collection(package_name text, var_name text, value text[]) 
+CREATE OR REPLACE FUNCTION SYS.set_package_collection(target_schema text, package_name text, var_name text, value text[]) 
 RETURNS void LANGUAGE plpgsql AS $$
 DECLARE
   table_name text;
 BEGIN
-  table_name := lower(current_schema()) || '_' || lower(package_name) || '_' || lower(var_name);
+  table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
   
   -- Clear and repopulate table (same as PackageCollectionHelper epilogue)
   EXECUTE format('DELETE FROM %I', table_name);
@@ -350,13 +352,13 @@ END;
 $$;
 
 -- Get collection element by index (1-based, Oracle-style)
-CREATE OR REPLACE FUNCTION SYS.get_package_collection_element(package_name text, var_name text, index_pos integer) 
+CREATE OR REPLACE FUNCTION SYS.get_package_collection_element(target_schema text, package_name text, var_name text, index_pos integer) 
 RETURNS text LANGUAGE plpgsql AS $$
 DECLARE
   table_name text;
   result text;
 BEGIN
-  table_name := lower(current_schema()) || '_' || lower(package_name) || '_' || lower(var_name);
+  table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
   
   -- Get element at specific position (1-based indexing)
   EXECUTE format('SELECT value FROM (SELECT value, row_number() OVER () as rn FROM %I) t 
@@ -373,12 +375,12 @@ END;
 $$;
 
 -- Set collection element by index (1-based, Oracle-style)
-CREATE OR REPLACE FUNCTION SYS.set_package_collection_element(package_name text, var_name text, index_pos integer, value text) 
+CREATE OR REPLACE FUNCTION SYS.set_package_collection_element(target_schema text, package_name text, var_name text, index_pos integer, value text) 
 RETURNS void LANGUAGE plpgsql AS $$
 DECLARE
   table_name text;
 BEGIN
-  table_name := lower(current_schema()) || '_' || lower(package_name) || '_' || lower(var_name);
+  table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
   
   -- Update element at specific position using ctid for direct row access
   EXECUTE format('UPDATE %I SET value = %L WHERE ctid = (
@@ -394,13 +396,13 @@ END;
 $$;
 
 -- Collection COUNT method (Oracle arr.COUNT equivalent)
-CREATE OR REPLACE FUNCTION SYS.get_package_collection_count(package_name text, var_name text) 
+CREATE OR REPLACE FUNCTION SYS.get_package_collection_count(target_schema text, package_name text, var_name text) 
 RETURNS integer LANGUAGE plpgsql AS $$
 DECLARE
   table_name text;
   result integer;
 BEGIN
-  table_name := lower(current_schema()) || '_' || lower(package_name) || '_' || lower(var_name);
+  table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
   
   EXECUTE format('SELECT COUNT(*) FROM %I', table_name) INTO result;
   
@@ -415,12 +417,12 @@ END;
 $$;
 
 -- Collection EXTEND method (Oracle arr.EXTEND equivalent)
-CREATE OR REPLACE FUNCTION SYS.extend_package_collection(package_name text, var_name text, value text DEFAULT NULL) 
+CREATE OR REPLACE FUNCTION SYS.extend_package_collection(target_schema text, package_name text, var_name text, value text DEFAULT NULL) 
 RETURNS void LANGUAGE plpgsql AS $$
 DECLARE
   table_name text;
 BEGIN
-  table_name := lower(current_schema()) || '_' || lower(package_name) || '_' || lower(var_name);
+  table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
   
   -- Add new element to end of collection
   EXECUTE format('INSERT INTO %I (value) VALUES (%L)', table_name, value);
@@ -433,13 +435,13 @@ END;
 $$;
 
 -- Collection FIRST method (Oracle arr.FIRST equivalent) - always returns 1
-CREATE OR REPLACE FUNCTION SYS.get_package_collection_first(package_name text, var_name text) 
+CREATE OR REPLACE FUNCTION SYS.get_package_collection_first(target_schema text, package_name text, var_name text) 
 RETURNS integer LANGUAGE plpgsql AS $$
 DECLARE
   table_name text;
   count_result integer;
 BEGIN
-  table_name := lower(current_schema()) || '_' || lower(package_name) || '_' || lower(var_name);
+  table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
   
   EXECUTE format('SELECT COUNT(*) FROM %I', table_name) INTO count_result;
   
@@ -456,22 +458,22 @@ END;
 $$;
 
 -- Collection LAST method (Oracle arr.LAST equivalent) - returns count
-CREATE OR REPLACE FUNCTION SYS.get_package_collection_last(package_name text, var_name text) 
+CREATE OR REPLACE FUNCTION SYS.get_package_collection_last(target_schema text, package_name text, var_name text) 
 RETURNS integer LANGUAGE plpgsql AS $$
 BEGIN
-  RETURN SYS.get_package_collection_count(package_name, var_name);
+  RETURN SYS.get_package_collection_count(target_schema, package_name, var_name);
 END;
 $$;
 
 -- Type-safe collection wrappers for common data types
 
 -- Numeric collection element getter/setter
-CREATE OR REPLACE FUNCTION SYS.get_package_collection_element_numeric(package_name text, var_name text, index_pos integer) 
+CREATE OR REPLACE FUNCTION SYS.get_package_collection_element_numeric(target_schema text, package_name text, var_name text, index_pos integer) 
 RETURNS numeric LANGUAGE plpgsql AS $$
 DECLARE
   value text;
 BEGIN
-  value := SYS.get_package_collection_element(package_name, var_name, index_pos);
+  value := SYS.get_package_collection_element(target_schema, package_name, var_name, index_pos);
   IF value IS NULL THEN
     RETURN NULL;
   END IF;
@@ -483,10 +485,10 @@ EXCEPTION
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION SYS.set_package_collection_element_numeric(package_name text, var_name text, index_pos integer, value numeric) 
+CREATE OR REPLACE FUNCTION SYS.set_package_collection_element_numeric(target_schema text, package_name text, var_name text, index_pos integer, value numeric) 
 RETURNS void LANGUAGE plpgsql AS $$
 BEGIN
-  PERFORM SYS.set_package_collection_element(package_name, var_name, index_pos, value::text);
+  PERFORM SYS.set_package_collection_element(target_schema, package_name, var_name, index_pos, value::text);
 END;
 $$;
 
@@ -516,13 +518,13 @@ BEGIN
     -- CREATE TEMP TABLE test_schema_minitest_gx (value text DEFAULT '1');
     
     -- Read package variable
-    RAISE NOTICE 'Package variable gX: %', SYS.get_package_var_numeric('minitest', 'gX');
+    RAISE NOTICE 'Package variable gX: %', SYS.get_package_var_numeric('user_robert', 'minitest', 'gX');
     
     -- Write package variable
-    PERFORM SYS.set_package_var_numeric('minitest', 'gX', 42);
+    PERFORM SYS.set_package_var_numeric('user_robert', 'minitest', 'gX', 42);
     
     -- Read updated value
-    RAISE NOTICE 'Updated package variable gX: %', SYS.get_package_var_numeric('minitest', 'gX');
+    RAISE NOTICE 'Updated package variable gX: %', SYS.get_package_var_numeric('user_robert', 'minitest', 'gX');
 END;
 $$;
 
@@ -534,22 +536,22 @@ BEGIN
     -- INSERT INTO test_schema_minitest_arr (value) VALUES ('1'), ('2'), ('3');
     
     -- Read collection element
-    RAISE NOTICE 'Collection element arr[1]: %', SYS.get_package_collection_element_numeric('minitest', 'arr', 1);
+    RAISE NOTICE 'Collection element arr[1]: %', SYS.get_package_collection_element_numeric('user_robert', 'minitest', 'arr', 1);
     
     -- Write collection element
-    PERFORM SYS.set_package_collection_element_numeric('minitest', 'arr', 1, 42);
+    PERFORM SYS.set_package_collection_element_numeric('user_robert', 'minitest', 'arr', 1, 42);
     
     -- Read updated element
-    RAISE NOTICE 'Updated collection element arr[1]: %', SYS.get_package_collection_element_numeric('minitest', 'arr', 1);
+    RAISE NOTICE 'Updated collection element arr[1]: %', SYS.get_package_collection_element_numeric('user_robert', 'minitest', 'arr', 1);
     
     -- Collection operations
-    RAISE NOTICE 'Collection count: %', SYS.get_package_collection_count('minitest', 'arr');
-    RAISE NOTICE 'Collection first: %', SYS.get_package_collection_first('minitest', 'arr');
-    RAISE NOTICE 'Collection last: %', SYS.get_package_collection_last('minitest', 'arr');
+    RAISE NOTICE 'Collection count: %', SYS.get_package_collection_count('user_robert', 'minitest', 'arr');
+    RAISE NOTICE 'Collection first: %', SYS.get_package_collection_first('user_robert', 'minitest', 'arr');
+    RAISE NOTICE 'Collection last: %', SYS.get_package_collection_last('user_robert', 'minitest', 'arr');
     
     -- Extend collection
-    PERFORM SYS.extend_package_collection('minitest', 'arr', '99');
-    RAISE NOTICE 'Collection after extend: %', SYS.get_package_collection_count('minitest', 'arr');
+    PERFORM SYS.extend_package_collection('user_robert', 'minitest', 'arr', '99');
+    RAISE NOTICE 'Collection after extend: %', SYS.get_package_collection_count('user_robert', 'minitest', 'arr');
 END;
 $$;
 */

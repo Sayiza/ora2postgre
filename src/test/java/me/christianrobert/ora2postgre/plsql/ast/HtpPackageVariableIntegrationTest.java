@@ -43,7 +43,7 @@ public class HtpPackageVariableIntegrationTest {
         // This will tell us if the existing package variable detection works
         if (result.contains("sys.get_package_var_")) {
             System.out.println("✅ Package variable transformation working!");
-            assertTrue(result.contains("sys.get_package_var_numeric('testpkg', 'gx')"), 
+            assertTrue(result.contains("sys.get_package_var_numeric('user_robert', 'testpkg', 'gx')"), 
                        "Should transform package variable reference");
         } else {
             System.out.println("⚠️  Package variable transformation not working yet - infrastructure is ready");
@@ -72,7 +72,7 @@ public class HtpPackageVariableIntegrationTest {
                 System.out.println("Variable data type: " + dataType);
                 
                 String transformation = PackageVariableReferenceTransformer.transformRead(
-                    pkg.getName(), "gX", dataType);
+                    pkg.getSchema(), pkg.getName(), "gX", dataType);
                 System.out.println("Transformation result: " + transformation);
                 
                 assertTrue(transformation.contains("sys.get_package_var_"), 
@@ -98,7 +98,7 @@ public class HtpPackageVariableIntegrationTest {
         // Check if the transformation is working
         if (result.contains("sys.get_package_var_")) {
             System.out.println("✅ UnaryLogicalExpression package variable transformation working!");
-            assertTrue(result.contains("sys.get_package_var_numeric('testpkg', 'gx')"), 
+            assertTrue(result.contains("sys.get_package_var_numeric('user_robert', 'testpkg', 'gx')"), 
                        "Should transform package variable reference");
         } else {
             System.out.println("⚠️  UnaryLogicalExpression package variable transformation not working yet");

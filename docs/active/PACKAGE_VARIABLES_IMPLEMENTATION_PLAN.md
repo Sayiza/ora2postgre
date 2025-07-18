@@ -1,4 +1,4 @@
-# Package Variables Implementation Plan - Direct Table Access Pattern
+# PACKAGE_VARIABLES_IMPLEMENTATION_PLAN.md Package Variables Implementation Plan - Direct Table Access Pattern
 
 **Date**: 2025-07-17  
 **Status**: ✅ **DIRECT TABLE ACCESS PATTERN IMPLEMENTED** - Core refactoring complete  
@@ -789,6 +789,129 @@ CALL SYS.HTP_p(sys.get_package_var_numeric('minitest', 'gx'));
 - **Package Variable Transformation**: ✅ **100% Complete** - Assignments and expressions both working
 - **Testing Infrastructure**: ✅ **100% Complete** - Unit tests, integration tests, and validation complete
 - **Documentation**: ✅ **100% Complete** - Comprehensive documentation with implementation details
+
+---
+
+## **🚨 CRITICAL BUGS IDENTIFIED (2025-07-17)**
+
+### **Issue 4: PostgreSQL Syntax Error in transformWrite Method** 🔥
+
+**Problem**: The `transformWrite` method in `PackageVariableReferenceTransformer` uses `SELECT` syntax for `void`-returning functions, which is invalid PostgreSQL syntax.
+
+**File**: `/src/main/java/me/christianrobert/ora2postgre/plsql/ast/tools/transformers/PackageVariableReferenceTransformer.java:108-109`
+
+**Current Incorrect Code**:
+```java
+return String.format("SELECT sys.set_package_var_%s('%s', '%s', %s)", 
+    accessorType, packageName.toLowerCase(), varName.toLowerCase(), value);
+```
+
+**Root Cause**: The `sys.set_package_var_*` functions return `void`, but `SELECT` requires a return value.
+
+**Required Fix**: Change `SELECT` to `PERFORM` for void-returning functions:
+```java
+return String.format("PERFORM sys.set_package_var_%s('%s', '%s', %s)", 
+    accessorType, packageName.toLowerCase(), varName.toLowerCase(), value);
+```
+
+**Impact**: All package variable assignments will fail with PostgreSQL syntax errors.
+
+### **Issue 5: Schema Context Mismatch in Accessor Functions** 🔥
+
+**Problem**: The accessor functions use `current_schema()` to build table names, but they execute in the `sys` schema context, not the target schema where tables are actually created.
+
+**Files**: 
+- `/src/main/resources/htp_schema_functions.sql:172` (and 8 other locations)
+- Documentation: `/docs/active/PACKAGE_VARIABLES_IMPLEMENTATION_PLAN.md:154` (and 8 other locations)
+
+**Current Incorrect Code**:
+```sql
+-- In sys.get_package_var() function
+table_name := lower(current_schema()) || '_' || lower(package_name) || '_' || lower(var_name);
+-- Results in: 'sys_minitest_gx' or 'public_minitest_gx'
+```
+
+**Root Cause**: 
+1. Accessor functions run in `sys` schema, so `current_schema()` returns `'sys'` or `'public'`
+2. But actual temporary tables are created with names like `'user_robert_minitest_gx'`
+3. This causes table lookup failures
+
+**Expected Behavior**:
+- Table name should be: `'user_robert_minitest_gx'`
+- Actual lookup attempts: `'sys_minitest_gx'` or `'public_minitest_gx'`
+
+**Required Fix Options**:
+
+**Option 1: Add schema parameter to accessor functions**
+```sql
+CREATE OR REPLACE FUNCTION sys.get_package_var(
+  target_schema text,
+  package_name text, 
+  var_name text
+) RETURNS text AS $$
+DECLARE
+  table_name text;
+BEGIN
+  table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
+  -- ... rest of function
+END;
+$$;
+```
+
+**Option 2: Use session variable to store target schema**
+```sql
+-- Set at connection start
+SET session.target_schema = 'user_robert';
+
+-- Use in accessor functions
+table_name := lower(current_setting('session.target_schema')) || '_' || lower(package_name) || '_' || lower(var_name);
+```
+
+**Impact**: All package variable access will fail because tables cannot be found.
+
+---
+
+## **📋 Priority Action Items for Next Session**
+
+### **Immediate Fixes Required (Critical Path)**
+
+**Priority 1: Fix transformWrite PostgreSQL Syntax** 🔥
+- **File**: `PackageVariableReferenceTransformer.java:108-109`
+- **Action**: Change `SELECT` to `PERFORM` for void functions
+- **Effort**: 5 minutes
+- **Risk**: Low - simple syntax fix
+
+**Priority 2: Fix Schema Context in Accessor Functions** 🔥
+- **Files**: `htp_schema_functions.sql` (8 locations) + documentation
+- **Action**: Implement schema parameter solution (Option 1 recommended)
+- **Effort**: 2-3 hours (function signatures + all callers + tests)
+- **Risk**: Medium - requires updating all package variable transformations
+
+**Priority 3: Update PackageVariableReferenceTransformer Callers**
+- **Action**: Update all calls to accessor functions to pass target schema
+- **Files**: All classes that call `PackageVariableReferenceTransformer.transformRead/Write`
+- **Effort**: 1-2 hours
+- **Risk**: Medium - requires coordinated updates
+
+**Priority 4: Comprehensive Testing**
+- **Action**: Test complete `minitest` example end-to-end with fixes
+- **Verify**: Package variable synchronization works correctly
+- **Validate**: No PostgreSQL syntax errors, correct table lookups
+
+### **Recommended Implementation Sequence**
+
+1. **Fix transformWrite syntax** (quick win to eliminate PostgreSQL errors)
+2. **Update accessor function signatures** (add target_schema parameter)
+3. **Update all transformer calls** (pass correct schema parameter)
+4. **Update generated SQL** (use new function signatures)
+5. **End-to-end testing** (validate complete functionality)
+
+### **Success Criteria**
+
+✅ No PostgreSQL syntax errors from package variable operations
+✅ Package variables correctly read/write from proper temporary tables  
+✅ Complete `minitest` example works end-to-end
+✅ All existing tests continue to pass
 
 ---
 

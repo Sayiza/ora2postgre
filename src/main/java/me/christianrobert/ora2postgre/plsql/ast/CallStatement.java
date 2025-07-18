@@ -24,6 +24,10 @@ public class CallStatement extends Statement {
     private boolean isFunction;           // true for functions, false for procedures
     private Expression returnTarget;      // Target variable for function return (if any)
     
+    // Context for resolving package-less calls
+    private String callingPackage;        // Package that contains this call statement
+    private String callingSchema;         // Schema that contains this call statement
+    
     /**
      * Constructor for procedure call without arguments.
      * 
@@ -90,6 +94,13 @@ public class CallStatement extends Statement {
     
     public Expression getReturnTarget() { return returnTarget; }
     public void setReturnTarget(Expression returnTarget) { this.returnTarget = returnTarget; }
+    
+    // Calling context getters and setters
+    public String getCallingPackage() { return callingPackage; }
+    public void setCallingPackage(String callingPackage) { this.callingPackage = callingPackage; }
+    
+    public String getCallingSchema() { return callingSchema; }
+    public void setCallingSchema(String callingSchema) { this.callingSchema = callingSchema; }
     
     @Override
     public <T> T accept(PlSqlAstVisitor<T> visitor) {
@@ -211,13 +222,24 @@ public class CallStatement extends Statement {
      * @return Resolved schema name
      */
     private String resolveSchema(Everything data) {
-        // Get the current schema context - use the first available schema as default
-        String currentSchema = "USER_ROBERT"; // Default fallback
+        // Get the current schema context - use calling schema if available
+        String currentSchema = callingSchema != null ? callingSchema : "USER_ROBERT";
         if (!data.getPackageSpecAst().isEmpty()) {
             currentSchema = data.getPackageSpecAst().get(0).getSchema();
         }
         
-        // Use the new lookup methods to resolve schema
+        // If no explicit package specified, try calling package first
+        if (packageName == null && callingPackage != null) {
+            String resolvedSchema = data.lookupProcedureSchema(routineName, callingPackage, currentSchema);
+            if (resolvedSchema != null) {
+                // Found in calling package - set the package context
+                this.packageName = callingPackage;
+                this.isFunction = data.isFunction(routineName, callingPackage, resolvedSchema);
+                return resolvedSchema;
+            }
+        }
+        
+        // Use the existing lookup methods to resolve schema
         String resolvedSchema = data.lookupProcedureSchema(routineName, packageName, currentSchema);
         
         if (resolvedSchema != null) {

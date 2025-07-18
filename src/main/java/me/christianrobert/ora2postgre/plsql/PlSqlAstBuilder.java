@@ -11,6 +11,7 @@ import java.util.List;
 
 public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
   private final String schema;
+  private String currentPackageName;  // Track current package context for call resolution
 
   public PlSqlAstBuilder(String schema) {
     this.schema = schema;
@@ -371,12 +372,19 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     }
     
     // Create appropriate CallStatement
+    CallStatement callStatement;
     if (isFunction && returnTarget != null) {
-      return new CallStatement(routineName, packageName, arguments, returnTarget);
+      callStatement = new CallStatement(routineName, packageName, arguments, returnTarget);
     } else {
       // Determine if this is a function or procedure (will be resolved later)
-      return new CallStatement(routineName, packageName, arguments, false);
+      callStatement = new CallStatement(routineName, packageName, arguments, false);
     }
+    
+    // Set calling context for package-less call resolution
+    callStatement.setCallingPackage(currentPackageName);
+    callStatement.setCallingSchema(schema);
+    
+    return callStatement;
   }
   
   /**
@@ -1649,6 +1657,9 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
         packageName = p.getText();
       }
     }
+    
+    // Store current package context for call resolution
+    this.currentPackageName = packageName;
     List<Procedure> procedures = new ArrayList<>();
     List<Function> funcs = new ArrayList<>();
     List<Variable> variables = new ArrayList<>();

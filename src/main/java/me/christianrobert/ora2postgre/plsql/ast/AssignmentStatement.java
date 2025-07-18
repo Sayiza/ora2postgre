@@ -48,7 +48,7 @@ public class AssignmentStatement extends Statement {
           
           // Transform package collection element assignment to direct table access
           String writeCall = PackageVariableReferenceTransformer.transformCollectionElementWrite(
-              pkg.getName(), collectionName, elementType, indexPart, expression.toPostgre(data));
+              pkg.getSchema(), pkg.getName(), collectionName, elementType, indexPart, expression.toPostgre(data));
           
           b.append(data.getIntendation())
               .append(writeCall)
@@ -67,7 +67,7 @@ public class AssignmentStatement extends Statement {
         
         // Transform package variable assignment to direct table access
         String writeCall = PackageVariableReferenceTransformer.transformWrite(
-            pkg.getName(), target, dataType, expression.toPostgre(data));
+            pkg.getSchema(), pkg.getName(), target, dataType, expression.toPostgre(data));
         
         b.append(data.getIntendation())
             .append(writeCall)
