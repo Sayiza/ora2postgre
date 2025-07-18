@@ -39,6 +39,7 @@ public class ModPlsqlSimulatorGenerator {
     sb.append("import jakarta.ws.rs.core.Context;\n");
     sb.append("import java.sql.Connection;\n");
     sb.append("import java.sql.SQLException;\n");
+    sb.append("import java.sql.Statement;\n");
     sb.append("import java.util.Map;\n");
     sb.append("import java.util.stream.Collectors;\n");
     sb.append("import io.agroal.api.AgroalDataSource;\n");
@@ -55,6 +56,15 @@ public class ModPlsqlSimulatorGenerator {
     // DataSource injection
     sb.append("  @Inject\n");
     sb.append("  AgroalDataSource dataSource;\n\n");
+    
+    sb.append("  /**\n");
+    sb.append("   * Session Isolation Strategy:\n");
+    sb.append("   * Each web request executes DISCARD ALL to completely reset the session state.\n");
+    sb.append("   * This drops all temporary tables (including package variables), deallocates\n");
+    sb.append("   * prepared statements, and resets session-local state, ensuring no state\n");
+    sb.append("   * leakage between requests. This replicates Oracle's session-scoped behavior\n");
+    sb.append("   * even with connection pooling.\n");
+    sb.append("   */\n\n");
 
     // Generate methods for procedures only (mod-plsql doesn't support functions)
     for (Procedure procedure : pkg.getProcedures()) {
@@ -83,6 +93,12 @@ public class ModPlsqlSimulatorGenerator {
 
     // Method body
     sb.append("    try (Connection conn = dataSource.getConnection()) {\n");
+    sb.append("      // Ensure fresh session isolation by resetting all session state\n");
+    sb.append("      // This drops all temporary tables (package variables) from previous requests\n");
+    sb.append("      try (Statement stmt = conn.createStatement()) {\n");
+    sb.append("        stmt.execute(\"DISCARD ALL\");\n");
+    sb.append("      }\n");
+    sb.append("      conn.setAutoCommit(false);\n\n");
     sb.append("      // Initialize HTP buffer\n");
     sb.append("      ModPlsqlExecutor.initializeHtpBuffer(conn);\n\n");
 
@@ -97,17 +113,21 @@ public class ModPlsqlSimulatorGenerator {
     sb.append("      String html = ModPlsqlExecutor.executeProcedureWithHtp(\n");
     sb.append("        conn, \"").append(pgProcedureName).append("\", params);\n\n");
 
-    sb.append("      // Return HTML response\n");
+    sb.append("      // Commit transaction and return HTML response\n");
+    sb.append("      conn.commit();\n");
     sb.append("      return Response.ok(html)\n");
     sb.append("        .type(MediaType.TEXT_HTML)\n");
     sb.append("        .header(\"Cache-Control\", \"no-cache\")\n");
     sb.append("        .build();\n\n");
 
     sb.append("    } catch (SQLException e) {\n");
+    sb.append("      // Transaction will be automatically rolled back when connection closes\n");
+    sb.append("      // Session state was already reset by DISCARD ALL at the beginning\n");
     sb.append("      // Return error page with proper HTML structure\n");
     sb.append("      String errorHtml = \"<html><head><title>Error</title></head><body>\" +\n");
     sb.append("        \"<h1>Database Error</h1>\" +\n");
     sb.append("        \"<p>\" + e.getMessage() + \"</p>\" +\n");
+    sb.append("        \"<p><em>Session state was reset - no data leakage</em></p>\" +\n");
     sb.append("        \"</body></html>\";\n");
     sb.append("      return Response.serverError()\n");
     sb.append("        .entity(errorHtml)\n");

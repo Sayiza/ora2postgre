@@ -309,9 +309,7 @@ public class ExportModPlsqlSimulator {
     sb.append("import java.sql.ResultSet;\n");
     sb.append("import java.sql.SQLException;\n");
     sb.append("import java.util.Map;\n");
-    sb.append("import java.util.Set;\n");
-    sb.append("import java.util.StringJoiner;\n");
-    sb.append("import java.util.concurrent.ConcurrentHashMap;\n\n");
+    sb.append("import java.util.StringJoiner;\n\n");
     
     sb.append("/**\n");
     sb.append(" * Utility class for executing PostgreSQL procedures with HTP buffer management.\n");
@@ -325,11 +323,10 @@ public class ExportModPlsqlSimulator {
     sb.append("public class ModPlsqlExecutor {\n\n");
     
     sb.append("  /**\n");
-    sb.append("   * Session-specific cache to track which packages have been initialized.\n");
-    sb.append("   * This prevents redundant initialization calls within the same database session.\n");
-    sb.append("   * Uses connection object as key to maintain session isolation.\n");
-    sb.append("   */\n");
-    sb.append("  private static final Map<Connection, Set<String>> initializedPackages = new ConcurrentHashMap<>();\n\n");
+    sb.append("   * Session isolation: Each connection gets fresh package variable state.\n");
+    sb.append("   * Since we use forced connection closure per request, we always initialize\n");
+    sb.append("   * package variables for each fresh connection without caching.\n");
+    sb.append("   */\n\n");
     
     sb.append("  /**\n");
     sb.append("   * Initializes the HTP buffer by calling SYS.HTP_init().\n");
@@ -426,31 +423,43 @@ public class ExportModPlsqlSimulator {
     sb.append("  }\n\n");
     
     sb.append("  /**\n");
+    sb.append("   * Public method to force package variable initialization for a specific procedure.\n");
+    sb.append("   * This is useful for testing session isolation and ensuring package variables\n");
+    sb.append("   * are properly initialized for each fresh connection.\n");
+    sb.append("   * \n");
+    sb.append("   * @param conn Database connection\n");
+    sb.append("   * @param procedureName Fully qualified PostgreSQL procedure name\n");
+    sb.append("   * @throws SQLException If database operation fails\n");
+    sb.append("   */\n");
+    sb.append("  public static void forcePackageVariableInitialization(Connection conn, String procedureName) throws SQLException {\n");
+    sb.append("    initializePackageVariables(conn, procedureName);\n");
+    sb.append("  }\n\n");
+    
+    sb.append("  /**\n");
     sb.append("   * Initializes package variables for a given procedure by calling the package initialization procedure.\n");
     sb.append("   * This method extracts the package name from the procedure name and calls the corresponding\n");
     sb.append("   * initialization procedure (e.g., \"SCHEMA.PACKAGE_init_variables\").\n");
-    sb.append("   * Uses a session-specific cache to avoid redundant initialization calls.\n");
     sb.append("   * \n");
-    sb.append("   * @param conn Database connection\n");
+    sb.append("   * IMPORTANT: No caching is used to ensure fresh package variable state for each request.\n");
+    sb.append("   * This provides proper session isolation when connections are closed per request.\n");
+    sb.append("   * \n");
+    sb.append("   * @param conn Database connection (should be a fresh connection per request)\n");
     sb.append("   * @param procedureName Fully qualified PostgreSQL procedure name (e.g., \"SCHEMA.PACKAGE_procedure\")\n");
     sb.append("   * @throws SQLException If database operation fails\n");
     sb.append("   */\n");
     sb.append("  private static void initializePackageVariables(Connection conn, String procedureName) throws SQLException {\n");
     sb.append("    String packageInitProcedure = getPackageInitializationProcedure(procedureName);\n");
     sb.append("    if (packageInitProcedure != null) {\n");
-    sb.append("      // Check if this package has already been initialized in this session\n");
-    sb.append("      Set<String> sessionInitialized = initializedPackages.computeIfAbsent(conn, k -> ConcurrentHashMap.newKeySet());\n");
-    sb.append("      \n");
-    sb.append("      if (!sessionInitialized.contains(packageInitProcedure)) {\n");
-    sb.append("        try (CallableStatement stmt = conn.prepareCall(\"SELECT \" + packageInitProcedure + \"()\")) {\n");
-    sb.append("          stmt.execute();\n");
-    sb.append("          // Mark as initialized on successful execution\n");
-    sb.append("          sessionInitialized.add(packageInitProcedure);\n");
-    sb.append("        } catch (SQLException e) {\n");
-    sb.append("          // Silently ignore if initialization procedure doesn't exist\n");
-    sb.append("          // This allows procedures without package variables to work normally\n");
-    sb.append("          // Don't mark as initialized if it failed\n");
-    sb.append("        }\n");
+    sb.append("      // Always initialize package variables for fresh connections\n");
+    sb.append("      // This ensures each web request gets a clean package variable state\n");
+    sb.append("      try (CallableStatement stmt = conn.prepareCall(\"SELECT \" + packageInitProcedure + \"()\")) {\n");
+    sb.append("        stmt.execute();\n");
+    sb.append("        // Package variables are now initialized with default values\n");
+    sb.append("      } catch (SQLException e) {\n");
+    sb.append("        // Silently ignore if initialization procedure doesn't exist\n");
+    sb.append("        // This allows procedures without package variables to work normally\n");
+    sb.append("        // Log the error for debugging if needed\n");
+    sb.append("        // System.err.println(\"Package initialization failed for \" + packageInitProcedure + \": \" + e.getMessage());\n");
     sb.append("      }\n");
     sb.append("    }\n");
     sb.append("  }\n\n");
@@ -506,23 +515,6 @@ public class ExportModPlsqlSimulator {
     sb.append("    }\n");
     sb.append("  }\n\n");
     
-    sb.append("  /**\n");
-    sb.append("   * Cleans up the package initialization cache for a specific connection.\n");
-    sb.append("   * This should be called when a connection is closed to prevent memory leaks.\n");
-    sb.append("   * \n");
-    sb.append("   * @param conn Database connection being closed\n");
-    sb.append("   */\n");
-    sb.append("  public static void cleanupConnectionCache(Connection conn) {\n");
-    sb.append("    initializedPackages.remove(conn);\n");
-    sb.append("  }\n\n");
-    
-    sb.append("  /**\n");
-    sb.append("   * Clears all package initialization cache entries.\n");
-    sb.append("   * Useful for testing or when the application is shutting down.\n");
-    sb.append("   */\n");
-    sb.append("  public static void clearAllCaches() {\n");
-    sb.append("    initializedPackages.clear();\n");
-    sb.append("  }\n");
     sb.append("}\n");
     
     return sb.toString();
