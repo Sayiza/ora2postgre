@@ -88,17 +88,20 @@ This document outlines the systematic refactoring of the `PlSqlAstBuilder` class
 - **Complexity**: Medium - package spec parsing with multiple member types
 - **Status**: Fully refactored with member type classification (Variables, RecordType, VarrayType, etc.)
 
-### 9. **visitDelete_statement** (Lines 391-420, ~30 lines)
-- **Implementation**: DELETE statement with table name and WHERE clause
-- **Refactor to**: VisitDeleteStatement
+### ✅ 9. **visitDelete_statement** → VisitDeleteStatement **COMPLETED** ✅
+- **Lines Removed**: ~30 lines
+- **Complexity**: Medium - DELETE statement with table name and WHERE clause
+- **Status**: Fully refactored with proper table name parsing and WHERE clause handling
 
-### 10. **visitConstructor_declaration** (Lines 524-552, ~29 lines)
-- **Implementation**: Constructor parsing with parameters and body
-- **Refactor to**: VisitConstructorDeclaration
+### ✅ 10. **visitConstructor_declaration** → VisitConstructorDeclaration **COMPLETED** ✅
+- **Lines Removed**: ~29 lines
+- **Complexity**: Medium - Constructor parsing with parameters and body
+- **Status**: Fully refactored with parameter extraction and statement parsing
 
-### 11. **visitConcatenation** (Lines 1295-1320, ~26 lines)
-- **Implementation**: Binary operations and model expressions
-- **Refactor to**: VisitConcatenation
+### ✅ 11. **visitConcatenation** → VisitConcatenation **COMPLETED** ✅
+- **Lines Removed**: ~26 lines
+- **Complexity**: Medium - Binary operations and model expressions
+- **Status**: Fully refactored with binary operation handling and model expression parsing
 
 ### 12. **visitType_body** (Lines 577-601, ~25 lines)
 - **Implementation**: Type body parsing with member parsing
@@ -204,12 +207,12 @@ public class VisitMethodName {
 
 - [x] **Tier 1: 7/7 complex methods completed** ✅ 🎉 **COMPLETE!** 🎉
   - ✅ All methods: visitUnary_expression, visitOther_function, visitFunction_body, visitProcedure_body, visitCreate_function_body, visitCreate_package_body, visitCreate_procedure_body
-- [x] Tier 2: 1/7 medium methods completed ✅ (visitCreate_package)
-  - [ ] 6 remaining: visitDelete_statement, visitConstructor_declaration, visitConcatenation, visitType_body, visitRelational_expression, visitOver_clause  
+- [x] Tier 2: 4/7 medium methods completed ✅ (visitCreate_package, visitDelete_statement, visitConstructor_declaration, visitConcatenation)
+  - [ ] 3 remaining: visitType_body, visitRelational_expression, visitOver_clause  
 - [ ] Tier 3: 9 smaller methods (5-20 lines each)
 - [ ] Tier 4: 22 simple methods (2-10 lines each)
 
-**Total**: 35 methods remaining (359 lines removed so far)
+**Total**: 29 methods remaining (444 lines removed so far)
 
 ## Success Criteria
 
@@ -230,6 +233,6 @@ public class VisitMethodName {
 ---
 
 **Last Updated**: 2025-07-19  
-**Status**: Tier 2 in progress (1/7 completed) - Tier 1 COMPLETE! 🎉
-**Current Progress**: 359 lines removed from PlSqlAstBuilder
-**Next Priority**: Continue Tier 2 with visitDelete_statement (30 lines)
+**Status**: Tier 2 in progress (4/7 completed) - Tier 1 COMPLETE! 🎉
+**Current Progress**: 444 lines removed from PlSqlAstBuilder
+**Next Priority**: Continue Tier 2 with visitType_body (25 lines)

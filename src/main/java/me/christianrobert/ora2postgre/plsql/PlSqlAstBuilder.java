@@ -43,6 +43,9 @@ import me.christianrobert.ora2postgre.plsql.builderfncs.VisitCreateFunctionBody;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitCreatePackageBody;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitCreateProcedureBody;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitCreatePackage;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitDeleteStatement;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitConstructorDeclaration;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitConcatenation;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -401,34 +404,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
 
   @Override
   public PlSqlAst visitDelete_statement(PlSqlParser.Delete_statementContext ctx) {
-    // Parse table name from general_table_ref
-    String schemaName = null;
-    String tableName = null;
-    
-    if (ctx.general_table_ref() != null && 
-        ctx.general_table_ref().dml_table_expression_clause() != null &&
-        ctx.general_table_ref().dml_table_expression_clause().tableview_name() != null) {
-      
-      var tableview = ctx.general_table_ref().dml_table_expression_clause().tableview_name();
-      if (tableview.identifier() != null) {
-        if (tableview.id_expression() != null) {
-          // Schema.Table format
-          schemaName = tableview.identifier().getText();
-          tableName = tableview.id_expression().getText();
-        } else {
-          // Just table name
-          tableName = tableview.identifier().getText();
-        }
-      }
-    }
-    
-    // Parse WHERE clause if present
-    Expression whereClause = null;
-    if (ctx.where_clause() != null && ctx.where_clause().condition() != null) {
-      whereClause = (Expression) visit(ctx.where_clause().condition());
-    }
-    
-    return new DeleteStatement(schemaName, tableName, whereClause);
+    return VisitDeleteStatement.visit(ctx, this);
   }
 
   @Override
@@ -534,33 +510,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
 
   @Override
   public PlSqlAst visitConstructor_declaration(PlSqlParser.Constructor_declarationContext ctx) {
-    String name = null;
-
-    List<Parameter> parameters = new ArrayList<>();
-
-    if (ctx.type_spec() != null) {
-      for (var constpart : ctx.type_spec()) {
-        if (constpart instanceof PlSqlParser.Type_specContext) {
-          name = constpart.getText();
-        }
-      }
-    }
-
-    for (PlSqlParser.Type_elements_parameterContext e : ctx.type_elements_parameter()) {
-      parameters.add((Parameter) visit(e));
-    }
-    List<Statement> statements = new ArrayList<>();
-    if (ctx.body() != null
-            && ctx.body().seq_of_statements() != null
-            && ctx.body().seq_of_statements().statement() != null) {
-      for (PlSqlParser.StatementContext stmt : ctx.body().seq_of_statements().statement()) {
-        statements.add((Statement) visit(stmt));
-      }
-    }
-
-    if (name != null)
-      return new Constructor(name, parameters, statements);
-    return null;
+    return VisitConstructorDeclaration.visit(ctx, this);
   }
 
   @Override
@@ -804,30 +754,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
    */
   @Override
   public PlSqlAst visitConcatenation(PlSqlParser.ConcatenationContext ctx) {
-    // Handle simple model expression (most common case)
-    if (ctx.model_expression() != null) {
-      PlSqlAst modelAst = visit(ctx.model_expression());
-      if (modelAst instanceof ModelExpression) {
-        return new Concatenation((ModelExpression) modelAst);
-      }
-      // Fallback
-      return visitChildren(ctx);
-    }
-    
-    // Handle binary operations (arithmetic/concatenation operations)
-    if (ctx.concatenation() != null && ctx.concatenation().size() == 2 && ctx.op != null) {
-      // Parse left and right operands recursively
-      PlSqlAst leftAst = visit(ctx.concatenation(0));
-      PlSqlAst rightAst = visit(ctx.concatenation(1));
-      
-      if (leftAst instanceof Concatenation && rightAst instanceof Concatenation) {
-        String operator = ctx.op.getText();
-        return new Concatenation((Concatenation) leftAst, operator, (Concatenation) rightAst);
-      }
-    }
-    
-    // For other concatenation patterns, fall back to default behavior
-    return new Concatenation(new ModelExpression(UnaryExpression.forAtom(new Expression(new LogicalExpression(new UnaryLogicalExpression(ctx.getText()))))));
+    return VisitConcatenation.visit(ctx, this);
   }
 
   /**
