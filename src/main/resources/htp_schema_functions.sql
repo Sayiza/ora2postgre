@@ -492,6 +492,55 @@ BEGIN
 END;
 $$;
 
+-- Collection DELETE operations - Oracle collection.DELETE equivalent
+-- These functions provide DELETE method support for package collection variables
+
+-- Delete collection element by index (Oracle arr.DELETE(i) equivalent)
+CREATE OR REPLACE FUNCTION SYS.delete_package_collection_element(
+  target_schema text, 
+  package_name text, 
+  var_name text, 
+  index_pos integer
+) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE
+  table_name text;
+BEGIN
+  table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
+  
+  -- Delete element at specific position using row_number for 1-based indexing
+  EXECUTE format('DELETE FROM %I WHERE ctid = (
+                    SELECT ctid FROM (SELECT ctid, row_number() OVER () as rn FROM %I) t 
+                    WHERE rn = %L
+                  )', table_name, table_name, index_pos);
+EXCEPTION
+  WHEN undefined_table THEN
+    RAISE WARNING 'Package collection table does not exist: %', table_name;
+  WHEN others THEN
+    RAISE WARNING 'Error deleting package collection element %.%[%]: %', package_name, var_name, index_pos, SQLERRM;
+END;
+$$;
+
+-- Delete all collection elements (Oracle arr.DELETE equivalent)
+CREATE OR REPLACE FUNCTION SYS.delete_package_collection_all(
+  target_schema text, 
+  package_name text, 
+  var_name text
+) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE
+  table_name text;
+BEGIN
+  table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
+  
+  -- Clear all elements
+  EXECUTE format('DELETE FROM %I', table_name);
+EXCEPTION
+  WHEN undefined_table THEN
+    RAISE WARNING 'Package collection table does not exist: %', table_name;
+  WHEN others THEN
+    RAISE WARNING 'Error deleting all package collection elements %.%: %', package_name, var_name, SQLERRM;
+END;
+$$;
+
 -- Example usage (commented out):
 /*
 -- Example of using HTP functions

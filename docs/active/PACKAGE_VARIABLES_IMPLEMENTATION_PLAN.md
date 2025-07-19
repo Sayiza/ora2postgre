@@ -1,10 +1,11 @@
 # PACKAGE_VARIABLES_IMPLEMENTATION_PLAN.md Package Variables Implementation Plan - Direct Table Access Pattern
 
-**Date**: 2025-07-17  
-**Status**: ✅ **DIRECT TABLE ACCESS PATTERN IMPLEMENTED** - Core refactoring complete  
+**Date**: 2025-07-19 (Updated)  
+**Status**: ✅ **FULLY IMPLEMENTED FOR SIMPLE DATA TYPES** - Package variables working successfully  
 **Issue**: Original PRE/POST pattern had session isolation and synchronization problems  
 **Solution**: Direct Table Access Pattern successfully implemented  
-**Current Phase**: Manual testing identified two remaining issues to address  
+**Current Status**: Simple data types (numeric, boolean, text, timestamp) are working. Session isolation issues resolved.  
+**Remaining Work**: Varray and nested-table collection operations need enhancement  
 
 ---
 
@@ -783,12 +784,15 @@ CALL SYS.HTP_p(sys.get_package_var_numeric('minitest', 'gx'));
 3. **✅ Maintainable code**: Clear, well-documented transformation logic
 4. **✅ Robust error handling**: Graceful handling of edge cases
 
-### **Current Achievement Status** (2025-07-17)
+### **Current Achievement Status** (2025-07-19 Updated)
 - **Direct Table Access Pattern**: ✅ **100% Complete** - Core architecture implemented
 - **Call Statement Implementation**: ✅ **100% Complete** - All 5 phases completed
-- **Package Variable Transformation**: ✅ **100% Complete** - Assignments and expressions both working
+- **Package Variable Transformation**: ✅ **100% Complete** - Simple data types working successfully  
+- **Session Isolation**: ✅ **100% Complete** - Isolation issues fully resolved
 - **Testing Infrastructure**: ✅ **100% Complete** - Unit tests, integration tests, and validation complete
 - **Documentation**: ✅ **100% Complete** - Comprehensive documentation with implementation details
+- **Simple Data Types**: ✅ **100% Complete** - Numeric, boolean, text, timestamp fully working
+- **Varray/Nested-Table Collections**: ⏳ **Partially Complete** - Core infrastructure exists, some operations missing
 
 ---
 
@@ -1091,6 +1095,382 @@ try (Connection conn = dataSource.getConnection()) {
 - **Logging**: Enhanced error messages include session state information
 - **Testing**: Comprehensive test coverage ensures session isolation works correctly
 - **Documentation**: Clear comments explain the isolation strategy for maintenance
+
+---
+
+## **🚧 VARRAY AND NESTED-TABLE COLLECTION ENHANCEMENT PLAN (2025-07-19)**
+
+### **Current Status Assessment**
+
+**✅ What's Already Working:**
+- **Collection Infrastructure**: Complete PostgreSQL function library in `htp_schema_functions.sql`
+- **Basic Operations**: COUNT, FIRST, LAST, EXTEND methods fully implemented
+- **Element Access**: Type-safe getter/setter functions for collection elements
+- **Package Variable Integration**: Collections properly recognized and transformed
+- **Session Isolation**: Collections follow same isolation pattern as simple variables
+
+**🚨 Identified Gaps:**
+
+#### **Issue 1: Missing DELETE Method Support**
+**Problem**: Oracle collections support `collection.DELETE(index)` and `collection.DELETE` operations, but these are not implemented.
+
+**Current State**: 
+- `transformCollectionMethod()` returns TODO comment for unknown methods
+- No PostgreSQL functions exist for DELETE operations
+- DELETE statements are not parsed/transformed in AST
+
+**Impact**: Collection manipulation code using DELETE will not work correctly.
+
+#### **Issue 2: Missing TRIM Method Support**  
+**Problem**: Oracle collections support `collection.TRIM(n)` to remove elements from the end.
+
+**Current State**:
+- No TRIM method implementation in `PackageVariableReferenceTransformer`
+- No PostgreSQL function for TRIM operations
+- TRIM statements not handled in AST transformation
+
+**Impact**: Code using TRIM operations will fail to transform properly.
+
+#### **Issue 3: Enhanced EXISTS Method Support**
+**Problem**: While basic infrastructure exists, the EXISTS method may need refinement for edge cases.
+
+**Current State**:
+- No explicit EXISTS method in `transformCollectionMethod()`
+- Existing infrastructure could be enhanced
+
+**Impact**: Collection bounds checking using EXISTS may not work optimally.
+
+### **Implementation Plan: Collection Operations Enhancement**
+
+#### **Phase 1: PostgreSQL Function Extensions** 
+**Estimated Time**: 3 hours  
+**Status**: ⏳ **PLANNED**
+
+**1.1 Add DELETE Functions to htp_schema_functions.sql**
+
+**Delete Single Element:**
+```sql
+-- Delete collection element by index (Oracle arr.DELETE(i) equivalent)
+CREATE OR REPLACE FUNCTION SYS.delete_package_collection_element(
+  target_schema text, 
+  package_name text, 
+  var_name text, 
+  index_pos integer
+) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE
+  table_name text;
+BEGIN
+  table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
+  
+  -- Delete element at specific position
+  EXECUTE format('DELETE FROM %I WHERE ctid = (
+                    SELECT ctid FROM (SELECT ctid, row_number() OVER () as rn FROM %I) t 
+                    WHERE rn = %L
+                  )', table_name, table_name, index_pos);
+EXCEPTION
+  WHEN undefined_table THEN
+    RAISE WARNING 'Package collection table does not exist: %', table_name;
+  WHEN others THEN
+    RAISE WARNING 'Error deleting package collection element %.%[%]: %', package_name, var_name, index_pos, SQLERRM;
+END;
+$$;
+```
+
+**Delete All Elements:**
+```sql
+-- Delete all collection elements (Oracle arr.DELETE equivalent)
+CREATE OR REPLACE FUNCTION SYS.delete_package_collection_all(
+  target_schema text, 
+  package_name text, 
+  var_name text
+) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE
+  table_name text;
+BEGIN
+  table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
+  
+  -- Clear all elements
+  EXECUTE format('DELETE FROM %I', table_name);
+EXCEPTION
+  WHEN undefined_table THEN
+    RAISE WARNING 'Package collection table does not exist: %', table_name;
+  WHEN others THEN
+    RAISE WARNING 'Error deleting all package collection elements %.%: %', package_name, var_name, SQLERRM;
+END;
+$$;
+```
+
+**1.2 Add TRIM Functions to htp_schema_functions.sql**
+
+**Trim N Elements:**
+```sql
+-- Trim N elements from end of collection (Oracle arr.TRIM(n) equivalent)
+CREATE OR REPLACE FUNCTION SYS.trim_package_collection(
+  target_schema text, 
+  package_name text, 
+  var_name text, 
+  trim_count integer DEFAULT 1
+) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE
+  table_name text;
+  current_count integer;
+  keep_count integer;
+BEGIN
+  table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
+  
+  -- Get current count
+  EXECUTE format('SELECT COUNT(*) FROM %I', table_name) INTO current_count;
+  
+  -- Calculate how many to keep
+  keep_count := current_count - trim_count;
+  IF keep_count < 0 THEN
+    keep_count := 0;
+  END IF;
+  
+  -- Delete elements beyond keep_count
+  EXECUTE format('DELETE FROM %I WHERE ctid NOT IN (
+                    SELECT ctid FROM (SELECT ctid, row_number() OVER () as rn FROM %I) t 
+                    WHERE rn <= %L
+                  )', table_name, table_name, keep_count);
+EXCEPTION
+  WHEN undefined_table THEN
+    RAISE WARNING 'Package collection table does not exist: %', table_name;
+  WHEN others THEN
+    RAISE WARNING 'Error trimming package collection %.%: %', package_name, var_name, SQLERRM;
+END;
+$$;
+```
+
+**1.3 Enhanced EXISTS Function**
+
+```sql
+-- Enhanced EXISTS method (Oracle arr.EXISTS(i) equivalent)
+CREATE OR REPLACE FUNCTION SYS.package_collection_exists(
+  target_schema text, 
+  package_name text, 
+  var_name text, 
+  index_pos integer
+) RETURNS boolean LANGUAGE plpgsql AS $$
+DECLARE
+  table_name text;
+  element_count integer;
+BEGIN
+  table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
+  
+  -- Check if element exists at specific position
+  EXECUTE format('SELECT COUNT(*) FROM (SELECT row_number() OVER () as rn FROM %I) t 
+                  WHERE rn = %L', table_name, index_pos) INTO element_count;
+  
+  RETURN element_count > 0;
+EXCEPTION
+  WHEN undefined_table THEN
+    RETURN FALSE;
+  WHEN others THEN
+    RAISE WARNING 'Error checking package collection existence %.%[%]: %', package_name, var_name, index_pos, SQLERRM;
+    RETURN FALSE;
+END;
+$$;
+```
+
+#### **Phase 2: Transformation Logic Enhancement**
+**Estimated Time**: 2 hours  
+**Status**: ⏳ **PLANNED**
+
+**2.1 Update PackageVariableReferenceTransformer.java**
+
+**Enhanced transformCollectionMethod:**
+```java
+public static String transformCollectionMethod(String targetSchema, String packageName, String collectionName, String methodName) {
+  String method = methodName.toUpperCase();
+  
+  switch (method) {
+    case "COUNT":
+      return String.format("sys.get_package_collection_count('%s', '%s', '%s')", 
+          targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase());
+    case "FIRST":
+      return String.format("sys.get_package_collection_first('%s', '%s', '%s')", 
+          targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase());
+    case "LAST":
+      return String.format("sys.get_package_collection_last('%s', '%s', '%s')", 
+          targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase());
+    case "EXISTS":
+      // Note: EXISTS requires an index parameter, handled in parameter processing
+      return String.format("sys.package_collection_exists('%s', '%s', '%s', %%s)", 
+          targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase());
+    case "EXTEND":
+      // EXTEND is a procedure, not a function - handle in statement transformation
+      return String.format("sys.extend_package_collection('%s', '%s', '%s', NULL)", 
+          targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase());
+    default:
+      // Unknown method - return as comment for manual handling
+      return String.format("/* TODO: Transform collection method %s.%s for package %s */", 
+          collectionName, methodName, packageName);
+  }
+}
+```
+
+**New DELETE Method Transformations:**
+```java
+/**
+ * Transform Oracle collection DELETE method call to PostgreSQL function call.
+ * 
+ * @param targetSchema Target schema name
+ * @param packageName Name of the Oracle package
+ * @param collectionName Name of the collection variable
+ * @param index Optional index to delete (null for delete all)
+ * @return PostgreSQL function call for deleting collection elements
+ */
+public static String transformCollectionDelete(String targetSchema, String packageName, String collectionName, String index) {
+  if (index == null || index.trim().isEmpty()) {
+    return String.format("PERFORM sys.delete_package_collection_all('%s', '%s', '%s')", 
+        targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase());
+  } else {
+    return String.format("PERFORM sys.delete_package_collection_element('%s', '%s', '%s', %s)", 
+        targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase(), index);
+  }
+}
+
+/**
+ * Transform Oracle collection TRIM method call to PostgreSQL function call.
+ * 
+ * @param targetSchema Target schema name
+ * @param packageName Name of the Oracle package
+ * @param collectionName Name of the collection variable
+ * @param trimCount Optional number of elements to trim (default 1)
+ * @return PostgreSQL function call for trimming collection
+ */
+public static String transformCollectionTrim(String targetSchema, String packageName, String collectionName, String trimCount) {
+  if (trimCount == null || trimCount.trim().isEmpty()) {
+    return String.format("PERFORM sys.trim_package_collection('%s', '%s', '%s', 1)", 
+        targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase());
+  } else {
+    return String.format("PERFORM sys.trim_package_collection('%s', '%s', '%s', %s)", 
+        targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase(), trimCount);
+  }
+}
+```
+
+#### **Phase 3: AST Integration**
+**Estimated Time**: 2 hours  
+**Status**: ⏳ **PLANNED**
+
+**3.1 Update UnaryExpression.java**
+
+**Enhanced Collection Method Detection:**
+```java
+// In toPostgre() method, add support for DELETE, TRIM, EXISTS
+if (PackageVariableReferenceTransformer.isPackageVariableReference(leftSide.name, data)) {
+  OraclePackage pkg = PackageVariableReferenceTransformer.findContainingPackage(leftSide.name, data);
+  String targetSchema = data.getTargetSchema(); // Or appropriate schema lookup
+  
+  switch (operator.toUpperCase()) {
+    case "DELETE":
+      if (arguments != null && !arguments.isEmpty()) {
+        return PackageVariableReferenceTransformer.transformCollectionDelete(
+            targetSchema, pkg.getName(), leftSide.name, arguments.get(0).toPostgre(data));
+      } else {
+        return PackageVariableReferenceTransformer.transformCollectionDelete(
+            targetSchema, pkg.getName(), leftSide.name, null);
+      }
+    case "TRIM":
+      if (arguments != null && !arguments.isEmpty()) {
+        return PackageVariableReferenceTransformer.transformCollectionTrim(
+            targetSchema, pkg.getName(), leftSide.name, arguments.get(0).toPostgre(data));
+      } else {
+        return PackageVariableReferenceTransformer.transformCollectionTrim(
+            targetSchema, pkg.getName(), leftSide.name, null);
+      }
+    case "EXISTS":
+      if (arguments != null && !arguments.isEmpty()) {
+        String existsCall = PackageVariableReferenceTransformer.transformCollectionMethod(
+            targetSchema, pkg.getName(), leftSide.name, "EXISTS");
+        return String.format(existsCall, arguments.get(0).toPostgre(data));
+      }
+      // Fall through to default case
+    default:
+      return PackageVariableReferenceTransformer.transformCollectionMethod(
+          targetSchema, pkg.getName(), leftSide.name, operator);
+  }
+}
+```
+
+#### **Phase 4: Testing and Validation**
+**Estimated Time**: 2 hours  
+**Status**: ⏳ **PLANNED**
+
+**4.1 Update Collection Tests**
+
+**Enhanced PackageVariableTest.java:**
+- Add test cases for DELETE method (single element and all elements)
+- Add test cases for TRIM method (with and without count parameter)
+- Add test cases for EXISTS method with various index values
+- Add edge case testing (empty collections, out-of-bounds operations)
+
+**4.2 Integration Testing**
+
+**New test scenarios:**
+```java
+@Test
+public void testPackageCollectionDeleteOperations() {
+  // Test arr.DELETE(1) transformation
+  // Test arr.DELETE transformation
+  // Verify PostgreSQL function calls are generated correctly
+}
+
+@Test
+public void testPackageCollectionTrimOperations() {
+  // Test arr.TRIM transformation
+  // Test arr.TRIM(3) transformation
+  // Verify PostgreSQL function calls are generated correctly
+}
+
+@Test
+public void testPackageCollectionExistsOperations() {
+  // Test arr.EXISTS(1) transformation
+  // Verify boolean return type handling
+}
+```
+
+### **Implementation Priority**
+
+#### **High Priority: DELETE Method** 🔥
+- **Most Critical**: DELETE is commonly used in Oracle PL/SQL collection manipulation
+- **Immediate Impact**: Many migration scenarios will require DELETE support
+- **Implementation Order**: PostgreSQL functions → Transformer → AST integration → Tests
+
+#### **Medium Priority: TRIM Method** ⚠️
+- **Common Usage**: TRIM is frequently used for collection size management
+- **Dependencies**: Can build on DELETE implementation patterns
+- **Implementation Order**: Follow same pattern as DELETE
+
+#### **Low Priority: Enhanced EXISTS Method** 📝
+- **Nice to Have**: EXISTS method refinement for completeness
+- **Current State**: Basic infrastructure already exists
+- **Implementation Order**: Final enhancement after DELETE and TRIM
+
+### **Success Criteria**
+
+**Primary Goals:**
+1. **DELETE Operations**: `arr.DELETE` and `arr.DELETE(i)` transform correctly
+2. **TRIM Operations**: `arr.TRIM` and `arr.TRIM(n)` transform correctly
+3. **Backward Compatibility**: All existing collection operations continue working
+4. **Test Coverage**: Comprehensive test suite for new operations
+
+**Secondary Goals:**
+1. **Performance**: New operations maintain session isolation and performance
+2. **Error Handling**: Graceful handling of edge cases and invalid operations
+3. **Documentation**: Clear examples and usage patterns
+4. **Code Quality**: Consistent with existing transformation patterns
+
+### **Implementation Timeline**
+
+| Phase | Task | Estimated Time | Priority | Dependencies |
+|-------|------|----------------|----------|--------------|
+| 1 | PostgreSQL DELETE/TRIM Functions | 3 hours | High | None |
+| 2 | Transformer Enhancement | 2 hours | High | Phase 1 |
+| 3 | AST Integration | 2 hours | Medium | Phase 2 |
+| 4 | Testing and Validation | 2 hours | Medium | Phase 3 |
+| **Total** | **Complete Collection Enhancement** | **9 hours** | | |
 
 ---
 
