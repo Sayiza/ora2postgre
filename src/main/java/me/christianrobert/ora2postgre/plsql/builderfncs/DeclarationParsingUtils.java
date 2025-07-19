@@ -44,8 +44,8 @@ public class DeclarationParsingUtils {
     List<NestedTableType> nestedTableTypes = new ArrayList<>();
 
     if (declareSpecs != null) {
-      variables = VisitSeqOfDeclareSpecs.extractVariablesFromDeclareSpecs(declareSpecs, astBuilder);
-      cursorDeclarations = astBuilder.extractCursorDeclarationsFromDeclareSpecs(declareSpecs);
+      variables = extractVariablesFromDeclareSpecs(declareSpecs, astBuilder);
+      cursorDeclarations = extractCursorDeclarationsFromDeclareSpecs(declareSpecs, astBuilder);
       recordTypes = astBuilder.extractRecordTypesFromDeclareSpecs(declareSpecs);
       varrayTypes = astBuilder.extractVarrayTypesFromDeclareSpecs(declareSpecs);
       nestedTableTypes = astBuilder.extractNestedTableTypesFromDeclareSpecs(declareSpecs);
@@ -96,5 +96,53 @@ public class DeclarationParsingUtils {
     public List<RecordType> getRecordTypes() { return recordTypes; }
     public List<VarrayType> getVarrayTypes() { return varrayTypes; }
     public List<NestedTableType> getNestedTableTypes() { return nestedTableTypes; }
+  }
+
+  /**
+   * Extracts variables from seq_of_declare_specs context.
+   * Returns a list of Variable objects found in the DECLARE section.
+   */
+  public static List<Variable> extractVariablesFromDeclareSpecs(
+          PlSqlParser.Seq_of_declare_specsContext ctx,
+          PlSqlAstBuilder astBuilder) {
+    List<Variable> variables = new ArrayList<>();
+
+    if (ctx != null && ctx.declare_spec() != null) {
+      for (PlSqlParser.Declare_specContext declareSpec : ctx.declare_spec()) {
+        if (declareSpec.variable_declaration() != null) {
+          Variable variable = (Variable) astBuilder.visit(declareSpec.variable_declaration());
+          if (variable != null) {
+            variables.add(variable);
+          }
+        }
+        // Note: Other declare_spec types (procedure_spec, function_spec, cursor_declaration, etc.)
+        // are handled elsewhere in the parsing process
+      }
+    }
+
+    return variables;
+  }
+
+  /**
+   * Extracts cursor declarations from seq_of_declare_specs context.
+   * Returns a list of CursorDeclaration objects found in the DECLARE section.
+   */
+  public static List<CursorDeclaration> extractCursorDeclarationsFromDeclareSpecs(
+          PlSqlParser.Seq_of_declare_specsContext ctx,
+          PlSqlAstBuilder astBuilder) {
+    List<CursorDeclaration> cursors = new ArrayList<>();
+
+    if (ctx != null && ctx.declare_spec() != null) {
+      for (PlSqlParser.Declare_specContext declareSpec : ctx.declare_spec()) {
+        if (declareSpec.cursor_declaration() != null) {
+          CursorDeclaration cursor = (CursorDeclaration) astBuilder.visit(declareSpec.cursor_declaration());
+          if (cursor != null) {
+            cursors.add(cursor);
+          }
+        }
+      }
+    }
+
+    return cursors;
   }
 }

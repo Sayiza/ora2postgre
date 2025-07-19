@@ -5,6 +5,7 @@ import me.christianrobert.ora2postgre.antlr.PlSqlParserBaseVisitor;
 import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.plsql.ast.*;
 import me.christianrobert.ora2postgre.oracledb.tools.NameNormalizer;
+import me.christianrobert.ora2postgre.plsql.builderfncs.DeclarationParsingUtils;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitCallStatement;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitCursorDeclaration;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitLogicalExpression;
@@ -28,12 +29,18 @@ import me.christianrobert.ora2postgre.plsql.builderfncs.VisitSqlScript;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitTypeSpec;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitUnaryLogicalExpression;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitVariableDeclaration;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitUpdateStatement;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitSingleTableInsert;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitQueryBlock;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitSubqueryFactoringClause;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitTableRefAuxInternalTwo;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitDmlTableExpressionClause;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
-  private final String schema;
+  public final String schema;
   private String currentPackageName;  // Track current package context for call resolution
 
   public PlSqlAstBuilder(String schema) {
@@ -61,27 +68,6 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
   @Override
   public PlSqlAst visitCursor_declaration(PlSqlParser.Cursor_declarationContext ctx) {
     return VisitCursorDeclaration.visit(ctx, this);
-  }
-
-  /**
-   * Extracts cursor declarations from seq_of_declare_specs context.
-   * Returns a list of CursorDeclaration objects found in the DECLARE section.
-   */
-  public List<CursorDeclaration> extractCursorDeclarationsFromDeclareSpecs(PlSqlParser.Seq_of_declare_specsContext ctx) {
-    List<CursorDeclaration> cursors = new ArrayList<>();
-    
-    if (ctx != null && ctx.declare_spec() != null) {
-      for (PlSqlParser.Declare_specContext declareSpec : ctx.declare_spec()) {
-        if (declareSpec.cursor_declaration() != null) {
-          CursorDeclaration cursor = (CursorDeclaration) visit(declareSpec.cursor_declaration());
-          if (cursor != null) {
-            cursors.add(cursor);
-          }
-        }
-      }
-    }
-    
-    return cursors;
   }
 
   /**
@@ -273,33 +259,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
 
   @Override
   public PlSqlAst visitQuery_block(PlSqlParser.Query_blockContext ctx) {
-    List<SelectListElement> selectedFields = new ArrayList<>();
-    List<TableReference> fromTables = new ArrayList<>();
-    WhereClause whereClause = null;
-
-    if (ctx.selected_list().ASTERISK() != null) {
-      // TODO get all fields from the tables
-    } else {
-      for (PlSqlParser.Select_list_elementsContext se : ctx.selected_list().select_list_elements()) {
-        selectedFields.add((SelectListElement) visit(se));
-      }
-    }
-
-    if (ctx.from_clause() != null &&
-            ctx.from_clause().table_ref_list() != null &&
-            ctx.from_clause().table_ref_list().table_ref() != null
-    ) {
-      for (PlSqlParser.Table_refContext tr : ctx.from_clause().table_ref_list().table_ref()) {
-        fromTables.add((TableReference) visit(tr));
-      }
-    } // TODO fix this
-
-    // Handle WHERE clause if present
-    if (ctx.where_clause() != null) {
-      whereClause = (WhereClause) visit(ctx.where_clause());
-    }
-
-    return new SelectQueryBlock(schema, selectedFields, fromTables, whereClause);
+    return VisitQueryBlock.visit(ctx, this);
   }
 
   /**
@@ -332,31 +292,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
    */
   @Override
   public PlSqlAst visitSubquery_factoring_clause(PlSqlParser.Subquery_factoring_clauseContext ctx) {
-    // Extract query name
-    String queryName = ctx.query_name().getText();
-    
-    // Extract optional column list
-    List<String> columnList = null;
-    if (ctx.paren_column_list() != null) {
-      columnList = new ArrayList<>();
-      for (PlSqlParser.Column_nameContext colCtx : ctx.paren_column_list().column_list().column_name()) {
-        columnList.add(colCtx.getText());
-      }
-    }
-    
-    // Extract subquery
-    SelectSubQuery subQuery = null;
-    if (ctx.subquery() != null) {
-      subQuery = (SelectSubQuery) visit(ctx.subquery());
-    }
-    
-    // Check for recursive CTE (Oracle uses SEARCH and CYCLE clauses to indicate recursion)
-    boolean recursive = (ctx.search_clause() != null || ctx.cycle_clause() != null);
-    
-    // TODO: Handle search_clause and cycle_clause transformation
-    // For now, we'll just detect their presence to mark as recursive
-    
-    return new CommonTableExpression(queryName, columnList, subQuery, recursive);
+    return VisitSubqueryFactoringClause.visit(ctx, this);
   }
 
   @Override
@@ -396,33 +332,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
 
   @Override
   public PlSqlAst visitTable_ref_aux_internal_two(PlSqlParser.Table_ref_aux_internal_twoContext ctx) {
-    List<SelectSubQueryBasicElement> unionList = new ArrayList<>();
-    List<SelectSubQueryBasicElement> unionAllList = new ArrayList<>();
-    List<SelectSubQueryBasicElement> minusList = new ArrayList<>();
-    List<SelectSubQueryBasicElement> intersectList = new ArrayList<>();
-    for (PlSqlParser.Subquery_operation_partContext s1 : ctx.subquery_operation_part()) {
-      if (s1.UNION() != null) {
-        unionList.add((SelectSubQueryBasicElement) visit(s1.subquery_basic_elements()));
-      }
-      if (s1.ALL() != null) {
-        unionAllList.add((SelectSubQueryBasicElement) visit(s1.subquery_basic_elements()));
-      }
-      if (s1.MINUS() != null) {
-        minusList.add((SelectSubQueryBasicElement) visit(s1.subquery_basic_elements()));
-      }
-      if (s1.INTERSECT() != null) {
-        intersectList.add((SelectSubQueryBasicElement) visit(s1.subquery_basic_elements()));
-      }
-    }
-
-    return new TableReferenceAuxInternal(
-            schema,
-            (TableReference) visit(ctx.table_ref()),
-            unionList,
-            unionAllList,
-            minusList,
-            intersectList
-    );
+    return VisitTableRefAuxInternalTwo.visit(ctx, this);
   }
 
   @Override
@@ -438,21 +348,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
 
   @Override
   public PlSqlAst visitDml_table_expression_clause(PlSqlParser.Dml_table_expression_clauseContext ctx) {
-    String schemaName = null;
-    String tableName = "?";
-    if (ctx.tableview_name() != null) {
-      if (ctx.tableview_name().id_expression() != null) {
-        schemaName = ctx.tableview_name().identifier().getText();
-        tableName = ctx.tableview_name().id_expression().getText();
-      } else {
-        tableName = ctx.tableview_name().identifier().getText();
-      }
-    }
-
-    return new TableExpressionClause(
-            schemaName,
-            tableName
-    );
+    return VisitDmlTableExpressionClause.visit(ctx, this);
   }
   // Table-From END
 
@@ -483,115 +379,12 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
 
   @Override
   public PlSqlAst visitSingle_table_insert(PlSqlParser.Single_table_insertContext ctx) {
-    // Parse the insert_into_clause
-    String schemaName = null;
-    String tableName = null;
-    List<String> columnNames = null;
-    
-    if (ctx.insert_into_clause() != null) {
-      // Parse table name from general_table_ref
-      if (ctx.insert_into_clause().general_table_ref() != null && 
-          ctx.insert_into_clause().general_table_ref().dml_table_expression_clause() != null &&
-          ctx.insert_into_clause().general_table_ref().dml_table_expression_clause().tableview_name() != null) {
-        
-        var tableview = ctx.insert_into_clause().general_table_ref().dml_table_expression_clause().tableview_name();
-        if (tableview.identifier() != null) {
-          if (tableview.id_expression() != null) {
-            // Schema.Table format
-            schemaName = tableview.identifier().getText();
-            tableName = tableview.id_expression().getText();
-          } else {
-            // Just table name
-            tableName = tableview.identifier().getText();
-          }
-        }
-      }
-      
-      // Parse column list if present
-      if (ctx.insert_into_clause().paren_column_list() != null &&
-          ctx.insert_into_clause().paren_column_list().column_list() != null &&
-          ctx.insert_into_clause().paren_column_list().column_list().column_name() != null) {
-        columnNames = new ArrayList<>();
-        for (var columnName : ctx.insert_into_clause().paren_column_list().column_list().column_name()) {
-          columnNames.add(columnName.getText());
-        }
-      }
-    }
-    
-    // Parse VALUES clause
-    if (ctx.values_clause() != null) {
-      List<Expression> values = new ArrayList<>();
-      
-      // Handle VALUES (expr1, expr2, ...)
-      if (ctx.values_clause().expressions_() != null &&
-          ctx.values_clause().expressions_().expression() != null) {
-        for (var expr : ctx.values_clause().expressions_().expression()) {
-          Expression expression = (Expression) visit(expr);
-          if (expression != null) {
-            values.add(expression);
-          }
-        }
-      }
-      
-      return new InsertStatement(schemaName, tableName, columnNames, values);
-    }
-    
-    // Parse SELECT statement
-    if (ctx.select_statement() != null) {
-      SelectStatement selectStatement = (SelectStatement) visit(ctx.select_statement());
-      return new InsertStatement(schemaName, tableName, columnNames, selectStatement);
-    }
-    
-    return new Comment("INSERT statement structure not recognized");
+    return VisitSingleTableInsert.visit(ctx, this);
   }
 
   @Override
   public PlSqlAst visitUpdate_statement(PlSqlParser.Update_statementContext ctx) {
-    // Parse table name from general_table_ref
-    String schemaName = null;
-    String tableName = null;
-    
-    if (ctx.general_table_ref() != null && 
-        ctx.general_table_ref().dml_table_expression_clause() != null &&
-        ctx.general_table_ref().dml_table_expression_clause().tableview_name() != null) {
-      
-      var tableview = ctx.general_table_ref().dml_table_expression_clause().tableview_name();
-      if (tableview.identifier() != null) {
-        if (tableview.id_expression() != null) {
-          // Schema.Table format
-          schemaName = tableview.identifier().getText();
-          tableName = tableview.id_expression().getText();
-        } else {
-          // Just table name
-          tableName = tableview.identifier().getText();
-        }
-      }
-    }
-    
-    // Parse SET clauses from update_set_clause
-    List<UpdateStatement.UpdateSetClause> setColumns = new ArrayList<>();
-    if (ctx.update_set_clause() != null) {
-      // Handle column_based_update_set_clause list
-      if (ctx.update_set_clause().column_based_update_set_clause() != null) {
-        for (var setClause : ctx.update_set_clause().column_based_update_set_clause()) {
-          if (setClause.column_name() != null && setClause.expression() != null) {
-            String columnName = setClause.column_name().getText();
-            Expression value = (Expression) visit(setClause.expression());
-            if (value != null) {
-              setColumns.add(new UpdateStatement.UpdateSetClause(columnName, value));
-            }
-          }
-        }
-      }
-    }
-    
-    // Parse WHERE clause if present
-    Expression whereClause = null;
-    if (ctx.where_clause() != null && ctx.where_clause().condition() != null) {
-      whereClause = (Expression) visit(ctx.where_clause().condition());
-    }
-    
-    return new UpdateStatement(schemaName, tableName, setColumns, whereClause);
+    return VisitUpdateStatement.visit(ctx, this);
   }
 
   @Override
@@ -842,9 +635,10 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     List<VarrayType> varrayTypes = new ArrayList<>();
     List<NestedTableType> nestedTableTypes = new ArrayList<>();
     if (ctx.seq_of_declare_specs() != null) {
-      variables = VisitSeqOfDeclareSpecs.extractVariablesFromDeclareSpecs(
+      variables = DeclarationParsingUtils.extractVariablesFromDeclareSpecs(
               ctx.seq_of_declare_specs(), this);
-      cursorDeclarations = extractCursorDeclarationsFromDeclareSpecs(ctx.seq_of_declare_specs());
+      cursorDeclarations = DeclarationParsingUtils.extractCursorDeclarationsFromDeclareSpecs(
+              ctx.seq_of_declare_specs(), this);
       recordTypes = extractRecordTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
       varrayTypes = extractVarrayTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
       nestedTableTypes = extractNestedTableTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
@@ -894,9 +688,10 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     List<VarrayType> varrayTypes = new ArrayList<>();
     List<NestedTableType> nestedTableTypes = new ArrayList<>();
     if (ctx.seq_of_declare_specs() != null) {
-      variables = VisitSeqOfDeclareSpecs.extractVariablesFromDeclareSpecs(
+      variables = DeclarationParsingUtils.extractVariablesFromDeclareSpecs(
               ctx.seq_of_declare_specs(), this);
-      cursorDeclarations = extractCursorDeclarationsFromDeclareSpecs(ctx.seq_of_declare_specs());
+      cursorDeclarations = DeclarationParsingUtils.extractCursorDeclarationsFromDeclareSpecs(
+              ctx.seq_of_declare_specs(), this);
       recordTypes = extractRecordTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
       varrayTypes = extractVarrayTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
       nestedTableTypes = extractNestedTableTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
@@ -1046,9 +841,10 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     List<VarrayType> varrayTypes = new ArrayList<>();
     List<NestedTableType> nestedTableTypes = new ArrayList<>();
     if (ctx.seq_of_declare_specs() != null) {
-      variables = VisitSeqOfDeclareSpecs.extractVariablesFromDeclareSpecs(
+      variables = DeclarationParsingUtils.extractVariablesFromDeclareSpecs(
               ctx.seq_of_declare_specs(), this);
-      cursorDeclarations = extractCursorDeclarationsFromDeclareSpecs(ctx.seq_of_declare_specs());
+      cursorDeclarations = DeclarationParsingUtils.extractCursorDeclarationsFromDeclareSpecs(
+              ctx.seq_of_declare_specs(), this);
       recordTypes = extractRecordTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
       varrayTypes = extractVarrayTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
       nestedTableTypes = extractNestedTableTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
@@ -1079,9 +875,10 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     List<VarrayType> varrayTypes = new ArrayList<>();
     List<NestedTableType> nestedTableTypes = new ArrayList<>();
     if (ctx.seq_of_declare_specs() != null) {
-      variables = VisitSeqOfDeclareSpecs.extractVariablesFromDeclareSpecs(
+      variables = DeclarationParsingUtils.extractVariablesFromDeclareSpecs(
               ctx.seq_of_declare_specs(), this);
-      cursorDeclarations = extractCursorDeclarationsFromDeclareSpecs(ctx.seq_of_declare_specs());
+      cursorDeclarations = DeclarationParsingUtils.extractCursorDeclarationsFromDeclareSpecs(
+              ctx.seq_of_declare_specs(), this);
       recordTypes = extractRecordTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
       varrayTypes = extractVarrayTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
       nestedTableTypes = extractNestedTableTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
