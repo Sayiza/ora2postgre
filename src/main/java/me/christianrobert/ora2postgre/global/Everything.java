@@ -786,6 +786,25 @@ public class Everything {
    * @return The resolved schema name, or null if not found
    */
   public String lookupProcedureSchema(String procedureName, String packageName, String currentSchema) {
+    return lookupProcedureSchema(procedureName, packageName, currentSchema, 0);
+  }
+  
+  /**
+   * Internal lookup procedure with recursion depth tracking to prevent infinite loops.
+   * 
+   * @param procedureName The name of the procedure to find
+   * @param packageName The package name (optional)
+   * @param currentSchema The current schema context
+   * @param recursionDepth Current recursion depth for infinite loop prevention
+   * @return The resolved schema name, or null if not found
+   */
+  private String lookupProcedureSchema(String procedureName, String packageName, String currentSchema, int recursionDepth) {
+    // Prevent infinite recursion in synonym resolution
+    if (recursionDepth > 10) {
+      System.err.println("Warning: Maximum recursion depth reached in lookupProcedureSchema for " + 
+                        procedureName + " (package: " + packageName + ", schema: " + currentSchema + ")");
+      return null;
+    }
     if (packageName != null) {
       // Look for package.procedure
       for (OraclePackage pkg : packageSpecAst) {
@@ -809,7 +828,7 @@ public class Everything {
       try {
         SynonymResolutionResult synonymResult = lookupSchemaAndName(packageName, currentSchema, DatabaseObjectType.PACKAGE);
         if (synonymResult != null) {
-          return lookupProcedureSchema(procedureName, synonymResult.objectTypeName, synonymResult.schema);
+          return lookupProcedureSchema(procedureName, synonymResult.objectTypeName, synonymResult.schema, recursionDepth + 1);
         }
       } catch (IllegalStateException e) {
         // Package synonym not found, continue

@@ -2,6 +2,7 @@ package me.christianrobert.ora2postgre.plsql.ast;
 
 import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.plsql.ast.tools.transformers.PackageVariableReferenceTransformer;
+import me.christianrobert.ora2postgre.plsql.ast.tools.OracleBuiltinRegistry;
 
 import java.util.List;
 import java.util.ArrayList;
@@ -135,19 +136,34 @@ public class CallStatement extends Statement {
         StringBuilder b = new StringBuilder();
         b.append(data.getIntendation());
         
-        // Resolve schema if not already set
-        if (schema == null) {
-            schema = resolveSchema(data);
-        }
-        
-        // Transform arguments, handling package variables
+        // Transform arguments first, as they're needed for built-in checks
         List<String> transformedArgs = new ArrayList<>();
         for (Expression arg : arguments) {
             String transformedArg = transformArgument(arg, data);
             transformedArgs.add(transformedArg);
         }
         
-        // Generate PostgreSQL statement
+        // Check if this is an Oracle built-in function/procedure first
+        if (OracleBuiltinRegistry.isOracleBuiltin(packageName, routineName)) {
+            // Transform Oracle built-in to PostgreSQL equivalent
+            String builtinTransformation = OracleBuiltinRegistry.transformBuiltin(packageName, routineName, transformedArgs);
+            b.append(builtinTransformation);
+            b.append(";\n");
+            return b.toString();
+        } else if (OracleBuiltinRegistry.isOracleBuiltin(routineName)) {
+            // Handle standalone built-in (no package)
+            String builtinTransformation = OracleBuiltinRegistry.transformBuiltin(routineName, transformedArgs);
+            b.append(builtinTransformation);
+            b.append(";\n");
+            return b.toString();
+        }
+        
+        // Resolve schema if not already set (only for user-defined procedures)
+        if (schema == null) {
+            schema = resolveSchema(data);
+        }
+        
+        // Generate PostgreSQL statement for user-defined procedures
         if (isFunction && returnTarget != null) {
             // Function call with return target: SELECT function_name(args) INTO target
             b.append("SELECT ");
