@@ -46,6 +46,9 @@ import me.christianrobert.ora2postgre.plsql.builderfncs.VisitCreatePackage;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitDeleteStatement;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitConstructorDeclaration;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitConcatenation;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitTypeBody;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitRelationalExpression;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitOverClause;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -537,29 +540,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
 
   @Override
   public PlSqlAst visitType_body(PlSqlParser.Type_bodyContext ctx) {
-    String name = NameNormalizer.normalizeObjectTypeName(ctx.type_name().getText());
-    List<Constructor> constr = new ArrayList<>();
-    List<Procedure> procedures = new ArrayList<>();
-    List<Function> funcs = new ArrayList<>();
-    if (ctx.type_body_elements() != null) {
-      for (var member : ctx.type_body_elements()) {
-        PlSqlAst memberAst = visit(member);
-        if (memberAst instanceof Constructor) {
-          constr.add((Constructor) memberAst);
-        }
-        if (memberAst instanceof Function) {
-          funcs.add((Function) memberAst);
-        }
-        if (memberAst instanceof Procedure) {
-          procedures.add((Procedure) memberAst);
-        }
-      }
-    }
-    ObjectType o = new ObjectType(name, schema, null, funcs, procedures, constr, null, null);
-    o.getConstuctors().forEach(e -> e.setParentType(o));
-    o.getFunctions().forEach(e -> e.setParentType(o));
-    o.getProcedures().forEach(e -> e.setParentType(o));
-    return o;
+    return VisitTypeBody.visit(ctx, this);
   }
 
   // PACKAGE
@@ -705,29 +686,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
    */
   @Override
   public PlSqlAst visitRelational_expression(PlSqlParser.Relational_expressionContext ctx) {
-    if (ctx.compound_expression() != null) {
-      PlSqlAst compoundAst = visit(ctx.compound_expression());
-      if (compoundAst instanceof CompoundExpression) {
-        return new RelationalExpression((CompoundExpression) compoundAst);
-      }
-      // Fallback
-      return visitChildren(ctx);
-    }
-    
-    // Handle relational operations: relational_expression relational_operator relational_expression
-    if (ctx.relational_expression() != null && ctx.relational_expression().size() == 2 
-        && ctx.relational_operator() != null) {
-      PlSqlAst leftAst = visit(ctx.relational_expression(0));
-      PlSqlAst rightAst = visit(ctx.relational_expression(1));
-      String operator = ctx.relational_operator().getText();
-      
-      if (leftAst instanceof RelationalExpression && rightAst instanceof RelationalExpression) {
-        return new RelationalExpression((RelationalExpression) leftAst, operator, (RelationalExpression) rightAst);
-      }
-    }
-    
-    // Fallback for other cases - should not normally happen, but use raw text
-    throw new IllegalStateException("Unhandled relational expression case: " + ctx.getText());
+    return VisitRelationalExpression.visit(ctx, this);
   }
 
   /**
@@ -786,32 +745,13 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
    */
   @Override
   public PlSqlAst visitOver_clause(PlSqlParser.Over_clauseContext ctx) {
-    java.util.List<Expression> partitionByColumns = null;
-    java.util.List<OrderByElement> orderByElements = null;
-    WindowingClause windowingClause = null;
-    
-    // Parse PARTITION BY clause
-    if (ctx.query_partition_clause() != null) {
-      partitionByColumns = parsePartitionByClause(ctx.query_partition_clause());
-    }
-    
-    // Parse ORDER BY clause
-    if (ctx.order_by_clause() != null) {
-      orderByElements = parseOrderByClause(ctx.order_by_clause());
-    }
-    
-    // Parse windowing clause
-    if (ctx.windowing_clause() != null) {
-      windowingClause = (WindowingClause) visit(ctx.windowing_clause());
-    }
-    
-    return new OverClause(partitionByColumns, orderByElements, windowingClause);
+    return VisitOverClause.visit(ctx, this);
   }
 
   /**
    * Parse PARTITION BY clause.
    */
-  private java.util.List<Expression> parsePartitionByClause(PlSqlParser.Query_partition_clauseContext ctx) {
+  public java.util.List<Expression> parsePartitionByClause(PlSqlParser.Query_partition_clauseContext ctx) {
     java.util.List<Expression> partitionByColumns = new java.util.ArrayList<>();
     
     // Create simple text-based expressions for now
@@ -832,7 +772,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
   /**
    * Parse ORDER BY clause for OVER clause.
    */
-  private java.util.List<OrderByElement> parseOrderByClause(PlSqlParser.Order_by_clauseContext ctx) {
+  public java.util.List<OrderByElement> parseOrderByClause(PlSqlParser.Order_by_clauseContext ctx) {
     java.util.List<OrderByElement> orderByElements = new java.util.ArrayList<>();
     
     // Create simple text-based order by elements for now

@@ -81,7 +81,7 @@ This document outlines the systematic refactoring of the `PlSqlAstBuilder` class
 
 ## 🎉 **TIER 1 COMPLETE!** All 7 complex methods (40+ lines) have been successfully refactored! 🎉
 
-## Tier 2: Medium Priority - Moderate Complexity (20-40 lines)
+## 🎉 **TIER 2 COMPLETE!** All 7 medium complexity methods (20-40 lines) have been successfully refactored! 🎉
 
 ### ✅ 8. **visitCreate_package** → VisitCreatePackage **COMPLETED** ✅
 - **Lines Removed**: ~33 lines
@@ -103,17 +103,20 @@ This document outlines the systematic refactoring of the `PlSqlAstBuilder` class
 - **Complexity**: Medium - Binary operations and model expressions
 - **Status**: Fully refactored with binary operation handling and model expression parsing
 
-### 12. **visitType_body** (Lines 577-601, ~25 lines)
-- **Implementation**: Type body parsing with member parsing
-- **Refactor to**: VisitTypeBody
+### ✅ 12. **visitType_body** → VisitTypeBody **COMPLETED** ✅
+- **Lines Removed**: ~25 lines
+- **Complexity**: Medium - Type body parsing with member parsing
+- **Status**: Fully refactored with object type construction and member classification
 
-### 13. **visitRelational_expression** (Lines 1246-1270, ~25 lines)
-- **Implementation**: Relational operations and compound expressions
-- **Refactor to**: VisitRelationalExpression
+### ✅ 13. **visitRelational_expression** → VisitRelationalExpression **COMPLETED** ✅
+- **Lines Removed**: ~25 lines
+- **Complexity**: Medium - Relational operations and compound expressions
+- **Status**: Fully refactored with compound expression handling and relational operations
 
-### 14. **visitOver_clause** (Lines 1518-1539, ~22 lines)
-- **Implementation**: Analytical function OVER clause
-- **Refactor to**: VisitOverClause
+### ✅ 14. **visitOver_clause** → VisitOverClause **COMPLETED** ✅
+- **Lines Removed**: ~22 lines
+- **Complexity**: Medium - Analytical function OVER clause
+- **Status**: Fully refactored with PARTITION BY, ORDER BY, and windowing clause support
 
 ## Tier 3: Lower Priority - Smaller Methods (5-20 lines)
 
@@ -207,12 +210,12 @@ public class VisitMethodName {
 
 - [x] **Tier 1: 7/7 complex methods completed** ✅ 🎉 **COMPLETE!** 🎉
   - ✅ All methods: visitUnary_expression, visitOther_function, visitFunction_body, visitProcedure_body, visitCreate_function_body, visitCreate_package_body, visitCreate_procedure_body
-- [x] Tier 2: 4/7 medium methods completed ✅ (visitCreate_package, visitDelete_statement, visitConstructor_declaration, visitConcatenation)
-  - [ ] 3 remaining: visitType_body, visitRelational_expression, visitOver_clause  
+- [x] **Tier 2: 7/7 medium methods completed** ✅ 🎉 **COMPLETE!** 🎉
+  - ✅ All methods: visitCreate_package, visitDelete_statement, visitConstructor_declaration, visitConcatenation, visitType_body, visitRelational_expression, visitOver_clause  
 - [ ] Tier 3: 9 smaller methods (5-20 lines each)
 - [ ] Tier 4: 22 simple methods (2-10 lines each)
 
-**Total**: 29 methods remaining (444 lines removed so far)
+**Total**: 22 methods remaining (516 lines removed so far)
 
 ## Success Criteria
 
@@ -233,6 +236,6 @@ public class VisitMethodName {
 ---
 
 **Last Updated**: 2025-07-19  
-**Status**: Tier 2 in progress (4/7 completed) - Tier 1 COMPLETE! 🎉
-**Current Progress**: 444 lines removed from PlSqlAstBuilder
-**Next Priority**: Continue Tier 2 with visitType_body (25 lines)
+**Status**: Tier 2 COMPLETE! 🎉 Both Tier 1 and Tier 2 are done!
+**Current Progress**: 516 lines removed from PlSqlAstBuilder
+**Next Priority**: Continue with Tier 3 smaller methods (5-20 lines each)
