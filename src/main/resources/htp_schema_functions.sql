@@ -541,6 +541,72 @@ EXCEPTION
 END;
 $$;
 
+-- Collection TRIM operations - Oracle collection.TRIM equivalent  
+-- These functions provide TRIM method support for package collection variables
+
+-- Trim N elements from end of collection (Oracle arr.TRIM(n) equivalent)
+CREATE OR REPLACE FUNCTION SYS.trim_package_collection(
+  target_schema text, 
+  package_name text, 
+  var_name text, 
+  trim_count integer DEFAULT 1
+) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE
+  table_name text;
+  current_count integer;
+  keep_count integer;
+BEGIN
+  table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
+  
+  -- Get current count
+  EXECUTE format('SELECT COUNT(*) FROM %I', table_name) INTO current_count;
+  
+  -- Calculate how many to keep
+  keep_count := current_count - trim_count;
+  IF keep_count < 0 THEN
+    keep_count := 0;
+  END IF;
+  
+  -- Delete elements beyond keep_count (trim from the end)
+  EXECUTE format('DELETE FROM %I WHERE ctid NOT IN (
+                    SELECT ctid FROM (SELECT ctid, row_number() OVER () as rn FROM %I) t 
+                    WHERE rn <= %L
+                  )', table_name, table_name, keep_count);
+EXCEPTION
+  WHEN undefined_table THEN
+    RAISE WARNING 'Package collection table does not exist: %', table_name;
+  WHEN others THEN
+    RAISE WARNING 'Error trimming package collection %.%: %', package_name, var_name, SQLERRM;
+END;
+$$;
+
+-- Enhanced EXISTS method (Oracle arr.EXISTS(i) equivalent)
+CREATE OR REPLACE FUNCTION SYS.package_collection_exists(
+  target_schema text, 
+  package_name text, 
+  var_name text, 
+  index_pos integer
+) RETURNS boolean LANGUAGE plpgsql AS $$
+DECLARE
+  table_name text;
+  element_count integer;
+BEGIN
+  table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
+  
+  -- Check if element exists at specific position (1-based indexing)
+  EXECUTE format('SELECT COUNT(*) FROM (SELECT row_number() OVER () as rn FROM %I) t 
+                  WHERE rn = %L', table_name, index_pos) INTO element_count;
+  
+  RETURN element_count > 0;
+EXCEPTION
+  WHEN undefined_table THEN
+    RETURN FALSE;
+  WHEN others THEN
+    RAISE WARNING 'Error checking package collection existence %.%[%]: %', package_name, var_name, index_pos, SQLERRM;
+    RETURN FALSE;
+END;
+$$;
+
 -- Example usage (commented out):
 /*
 -- Example of using HTP functions
