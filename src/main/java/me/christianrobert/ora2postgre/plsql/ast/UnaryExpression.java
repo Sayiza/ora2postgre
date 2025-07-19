@@ -356,8 +356,55 @@ public class UnaryExpression extends PlSqlAst {
     if (baseVariable != null && PackageVariableReferenceTransformer.isPackageVariableReference(baseVariable, data)) {
       OraclePackage pkg = PackageVariableReferenceTransformer.findContainingPackage(baseVariable, data);
       if (pkg != null) {
-        // Transform package collection method to direct table access
-        return PackageVariableReferenceTransformer.transformCollectionMethod(pkg.getSchema(), pkg.getName(), baseVariable, collectionMethod);
+        String targetSchema = pkg.getSchema();
+        String packageName = pkg.getName();
+        
+        // Handle package collection methods with special parameter handling
+        switch (collectionMethod.toUpperCase()) {
+          case "DELETE":
+            if (methodArguments != null && !methodArguments.isEmpty()) {
+              // DELETE with index: arr.DELETE(i)
+              String index = methodArguments.get(0).toPostgre(data);
+              return PackageVariableReferenceTransformer.transformCollectionDelete(targetSchema, packageName, baseVariable, index);
+            } else {
+              // DELETE all: arr.DELETE
+              return PackageVariableReferenceTransformer.transformCollectionDelete(targetSchema, packageName, baseVariable, null);
+            }
+            
+          case "TRIM":
+            if (methodArguments != null && !methodArguments.isEmpty()) {
+              // TRIM with count: arr.TRIM(n)
+              String trimCount = methodArguments.get(0).toPostgre(data);
+              return PackageVariableReferenceTransformer.transformCollectionTrim(targetSchema, packageName, baseVariable, trimCount);
+            } else {
+              // TRIM default: arr.TRIM (removes 1 element)
+              return PackageVariableReferenceTransformer.transformCollectionTrim(targetSchema, packageName, baseVariable, null);
+            }
+            
+          case "EXISTS":
+            if (methodArguments != null && !methodArguments.isEmpty()) {
+              // EXISTS with index: arr.EXISTS(i)
+              String index = methodArguments.get(0).toPostgre(data);
+              String existsTemplate = PackageVariableReferenceTransformer.transformCollectionMethod(targetSchema, packageName, baseVariable, "EXISTS");
+              return String.format(existsTemplate, index);
+            } else {
+              return "/* EXISTS requires an index argument */";
+            }
+            
+          case "EXTEND":
+            if (methodArguments != null && !methodArguments.isEmpty()) {
+              // EXTEND with value: arr.EXTEND(value)
+              String value = methodArguments.get(0).toPostgre(data);
+              return PackageVariableReferenceTransformer.transformCollectionExtend(targetSchema, packageName, baseVariable, value);
+            } else {
+              // EXTEND default: arr.EXTEND
+              return PackageVariableReferenceTransformer.transformCollectionExtend(targetSchema, packageName, baseVariable, null);
+            }
+            
+          default:
+            // Other collection methods (COUNT, FIRST, LAST) - use standard method
+            return PackageVariableReferenceTransformer.transformCollectionMethod(targetSchema, packageName, baseVariable, collectionMethod);
+        }
       }
     }
     

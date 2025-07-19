@@ -182,6 +182,10 @@ public class PackageVariableReferenceTransformer {
       case "LAST":
         return String.format("sys.get_package_collection_last('%s', '%s', '%s')", 
             targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase());
+      case "EXISTS":
+        // EXISTS requires an index parameter, returns placeholder for parameter substitution
+        return String.format("sys.package_collection_exists('%s', '%s', '%s', %%s)", 
+            targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase());
       case "EXTEND":
         // EXTEND is a procedure, not a function - handle in statement transformation
         return String.format("sys.extend_package_collection('%s', '%s', '%s', NULL)", 
@@ -196,6 +200,7 @@ public class PackageVariableReferenceTransformer {
   /**
    * Transform Oracle collection EXTEND method call to PostgreSQL function call.
    * 
+   * @param targetSchema Target schema name
    * @param packageName Name of the Oracle package
    * @param collectionName Name of the collection variable
    * @param value Optional value to add (can be null)
@@ -208,6 +213,44 @@ public class PackageVariableReferenceTransformer {
     } else {
       return String.format("PERFORM sys.extend_package_collection('%s', '%s', '%s', %s)", 
           targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase(), value);
+    }
+  }
+
+  /**
+   * Transform Oracle collection DELETE method call to PostgreSQL function call.
+   * 
+   * @param targetSchema Target schema name
+   * @param packageName Name of the Oracle package
+   * @param collectionName Name of the collection variable
+   * @param index Optional index to delete (null for delete all)
+   * @return PostgreSQL function call for deleting collection elements
+   */
+  public static String transformCollectionDelete(String targetSchema, String packageName, String collectionName, String index) {
+    if (index == null || index.trim().isEmpty()) {
+      return String.format("PERFORM sys.delete_package_collection_all('%s', '%s', '%s')", 
+          targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase());
+    } else {
+      return String.format("PERFORM sys.delete_package_collection_element('%s', '%s', '%s', %s)", 
+          targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase(), index);
+    }
+  }
+
+  /**
+   * Transform Oracle collection TRIM method call to PostgreSQL function call.
+   * 
+   * @param targetSchema Target schema name
+   * @param packageName Name of the Oracle package
+   * @param collectionName Name of the collection variable
+   * @param trimCount Optional number of elements to trim (default 1)
+   * @return PostgreSQL function call for trimming collection
+   */
+  public static String transformCollectionTrim(String targetSchema, String packageName, String collectionName, String trimCount) {
+    if (trimCount == null || trimCount.trim().isEmpty()) {
+      return String.format("PERFORM sys.trim_package_collection('%s', '%s', '%s', 1)", 
+          targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase());
+    } else {
+      return String.format("PERFORM sys.trim_package_collection('%s', '%s', '%s', %s)", 
+          targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase(), trimCount);
     }
   }
 
