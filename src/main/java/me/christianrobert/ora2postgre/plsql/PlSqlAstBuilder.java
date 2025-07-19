@@ -20,6 +20,8 @@ import me.christianrobert.ora2postgre.plsql.builderfncs.VisitRecordTypeDef;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitTypeDeclaration;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitTypeDefinition;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitTypeElementsParameter;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitFuncDeclInType;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitProcDeclInType;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitWithClause;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitSeqOfDeclareSpecs;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitSqlScript;
@@ -717,79 +719,12 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
 
   @Override
   public PlSqlAst visitFunc_decl_in_type(PlSqlParser.Func_decl_in_typeContext ctx) {
-    List<Parameter> parameters = new ArrayList<>();
-    String returnType = ctx.type_spec().getText();
-
-    for (PlSqlParser.Type_elements_parameterContext e : ctx.type_elements_parameter()) {
-      parameters.add((Parameter) visit(e));
-    }
-
-    List<Statement> statements = new ArrayList<>();
-    if (ctx.body() != null
-            && ctx.body().seq_of_statements() != null
-            && ctx.body().seq_of_statements().statement() != null) {
-      for (PlSqlParser.StatementContext stmt : ctx.body().seq_of_statements().statement()) {
-        statements.add((Statement) visit(stmt));
-      }
-    }
-
-    // Extract declarations from DECLARE section
-    List<Variable> variables = new ArrayList<>();
-    List<CursorDeclaration> cursorDeclarations = new ArrayList<>();
-    List<RecordType> recordTypes = new ArrayList<>();
-    List<VarrayType> varrayTypes = new ArrayList<>();
-    List<NestedTableType> nestedTableTypes = new ArrayList<>();
-    if (ctx.seq_of_declare_specs() != null) {
-      variables = VisitSeqOfDeclareSpecs.extractVariablesFromDeclareSpecs(
-              ctx.seq_of_declare_specs(), this);
-      cursorDeclarations = extractCursorDeclarationsFromDeclareSpecs(ctx.seq_of_declare_specs());
-      recordTypes = extractRecordTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
-      varrayTypes = extractVarrayTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
-      nestedTableTypes = extractNestedTableTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
-    }
-    return new Function(ctx.function_name().getText(), parameters, variables, cursorDeclarations, recordTypes, varrayTypes, nestedTableTypes, returnType, statements, null);
+    return VisitFuncDeclInType.visit(ctx, this);
   }
 
   @Override
   public PlSqlAst visitProc_decl_in_type(PlSqlParser.Proc_decl_in_typeContext ctx) {
-    List<Parameter> parameters = new ArrayList<>();
-    String procedureName = ctx.procedure_name().getText();
-
-    for (PlSqlParser.Type_elements_parameterContext e : ctx.type_elements_parameter()) {
-      parameters.add((Parameter) visit(e));
-    }
-
-    // Extract declarations from DECLARE section
-    List<Variable> variables = new ArrayList<>();
-    List<CursorDeclaration> cursorDeclarations = new ArrayList<>();
-    List<RecordType> recordTypes = new ArrayList<>();
-    List<VarrayType> varrayTypes = new ArrayList<>();
-    List<NestedTableType> nestedTableTypes = new ArrayList<>();
-    if (ctx.seq_of_declare_specs() != null) {
-      variables = VisitSeqOfDeclareSpecs.extractVariablesFromDeclareSpecs(
-              ctx.seq_of_declare_specs(), this);
-      cursorDeclarations = extractCursorDeclarationsFromDeclareSpecs(ctx.seq_of_declare_specs());
-      recordTypes = extractRecordTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
-      varrayTypes = extractVarrayTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
-      nestedTableTypes = extractNestedTableTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
-    }
-
-    List<Statement> statements = new ArrayList<>();
-    if (ctx.body() != null
-            && ctx.body().seq_of_statements() != null
-            && ctx.body().seq_of_statements().statement() != null) {
-      for (PlSqlParser.StatementContext stmt : ctx.body().seq_of_statements().statement()) {
-        statements.add((Statement) visit(stmt));
-      }
-    }
-
-    // Parse exception handling if present
-    ExceptionBlock exceptionBlock = null;
-    if (ctx.body() != null && ctx.body().exception_handler() != null && !ctx.body().exception_handler().isEmpty()) {
-      exceptionBlock = parseExceptionBlock(ctx.body().exception_handler());
-    }
-
-    return new Procedure(procedureName, parameters, variables, cursorDeclarations, recordTypes, statements, exceptionBlock);
+    return VisitProcDeclInType.visit(ctx, this);
   }
 
   @Override
@@ -979,7 +914,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
   /**
    * Helper method to parse exception handlers into an ExceptionBlock
    */
-  private ExceptionBlock parseExceptionBlock(List<PlSqlParser.Exception_handlerContext> handlerContexts) {
+  public ExceptionBlock parseExceptionBlock(List<PlSqlParser.Exception_handlerContext> handlerContexts) {
     List<ExceptionHandler> handlers = new ArrayList<>();
     
     for (PlSqlParser.Exception_handlerContext handlerCtx : handlerContexts) {
