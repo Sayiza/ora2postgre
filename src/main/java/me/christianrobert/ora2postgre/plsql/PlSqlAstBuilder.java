@@ -5,6 +5,15 @@ import me.christianrobert.ora2postgre.antlr.PlSqlParserBaseVisitor;
 import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.plsql.ast.*;
 import me.christianrobert.ora2postgre.oracledb.tools.NameNormalizer;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitCallStatement;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitCursorDeclaration;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitLogicalExpression;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitLoopStatement;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitSeqOfDeclareSpecs;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitSqlScript;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitTypeSpec;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitUnaryLogicalExpression;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitVariableDeclaration;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,84 +26,27 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     this.schema = schema;
   }
 
+  public String getSchema() {
+    return schema;
+  }
+
+  public String getCurrentPackageName() {
+    return currentPackageName;
+  }
+
   @Override
   public PlSqlAst visitSql_script(PlSqlParser.Sql_scriptContext ctx) {
-    if (ctx.unit_statement() != null) {
-      for (var unit : ctx.unit_statement()) {
-        PlSqlAst ast = visit(unit);
-        if (ast != null) {
-          return ast; // Return first non-null AST
-        }
-      }
-    }
-    return null;
+    return VisitSqlScript.visit(ctx, this);
   }
 
   @Override
   public PlSqlAst visitVariable_declaration(PlSqlParser.Variable_declarationContext ctx) {
-    String varName = ctx.identifier().id_expression().getText();
-    DataTypeSpec dataType = (DataTypeSpec) visit(ctx.type_spec());
-    Expression defaultValue = ctx.default_value_part() != null ? (Expression) visit(ctx.default_value_part()) : null;
-    return new Variable(varName, dataType, defaultValue);
+    return VisitVariableDeclaration.visit(ctx, this);
   }
 
   @Override
   public PlSqlAst visitCursor_declaration(PlSqlParser.Cursor_declarationContext ctx) {
-    String cursorName = ctx.identifier().getText();
-    
-    // Parse parameters if present
-    List<Parameter> parameters = new ArrayList<>();
-    if (ctx.parameter_spec() != null) {
-      for (PlSqlParser.Parameter_specContext paramCtx : ctx.parameter_spec()) {
-        // Extract parameter name and type
-        String paramName = paramCtx.parameter_name().getText();
-        String paramType = paramCtx.type_spec() != null ? paramCtx.type_spec().getText() : "VARCHAR2";
-        
-        // Create parameter (assuming IN direction for cursor parameters)
-        Parameter param = new Parameter(paramName, new DataTypeSpec(paramType, null, null, null), null, true, false);
-        parameters.add(param);
-      }
-    }
-    
-    // Parse return type if present
-    String returnType = null;
-    if (ctx.type_spec() != null) {
-      returnType = ctx.type_spec().getText();
-    }
-    
-    // Parse SELECT statement if present
-    SelectStatement selectStatement = null;
-    if (ctx.select_statement() != null) {
-      PlSqlAst selectAst = visit(ctx.select_statement());
-      if (selectAst instanceof SelectStatement) {
-        selectStatement = (SelectStatement) selectAst;
-      }
-    }
-    
-    return new CursorDeclaration(cursorName, parameters, returnType, selectStatement);
-  }
-
-  /**
-   * Extracts variables from seq_of_declare_specs context.
-   * Returns a list of Variable objects found in the DECLARE section.
-   */
-  public List<Variable> extractVariablesFromDeclareSpecs(PlSqlParser.Seq_of_declare_specsContext ctx) {
-    List<Variable> variables = new ArrayList<>();
-    
-    if (ctx != null && ctx.declare_spec() != null) {
-      for (PlSqlParser.Declare_specContext declareSpec : ctx.declare_spec()) {
-        if (declareSpec.variable_declaration() != null) {
-          Variable variable = (Variable) visit(declareSpec.variable_declaration());
-          if (variable != null) {
-            variables.add(variable);
-          }
-        }
-        // Note: Other declare_spec types (procedure_spec, function_spec, cursor_declaration, etc.) 
-        // are handled elsewhere in the parsing process
-      }
-    }
-    
-    return variables;
+    return VisitCursorDeclaration.visit(ctx, this);
   }
 
   /**
@@ -183,62 +135,12 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
 
   @Override
   public PlSqlAst visitSeq_of_declare_specs(PlSqlParser.Seq_of_declare_specsContext ctx) {
-    // This method is called when seq_of_declare_specs is visited directly
-    // Usually we want to extract variables using the helper method above
-    List<Variable> variables = extractVariablesFromDeclareSpecs(ctx);
-    return new Comment("declare_specs with " + variables.size() + " variables");
+    return VisitSeqOfDeclareSpecs.visit(ctx, this);
   }
 
   @Override
   public PlSqlAst visitType_spec(PlSqlParser.Type_specContext ctx) {
-    String nativeDataType = null;
-    if (ctx.datatype() != null && ctx.datatype().native_datatype_element() != null ) {
-      nativeDataType = ctx.datatype().native_datatype_element().getText();
-    }
-    
-    StringBuilder b = new StringBuilder();
-    if (ctx.type_name() != null && ctx.type_name().id_expression() != null) {
-      List<PlSqlParser.Id_expressionContext> idExpression = ctx.type_name().id_expression();
-      for (int j = 0; j < idExpression.size(); j++) {
-        PlSqlParser.Id_expressionContext i = idExpression.get(j);
-        b.append(i.getText());
-        if (j < idExpression.size() - 1) {
-          b.append(".");
-        }
-      }
-    }
-
-    // Handle %ROWTYPE attributes with enhanced support
-    if (ctx.PERCENT_ROWTYPE() != null) {
-      String[] parts = b.toString().split("\\.");
-      if (parts.length == 2) {
-        // schema.table%ROWTYPE
-        return RecordTypeSpec.forRowType(parts[0], parts[1]);
-      } else if (parts.length == 1) {
-        // table%ROWTYPE (use current schema)
-        return RecordTypeSpec.forRowType(schema, parts[0]);
-      }
-    }
-    
-    // Handle %TYPE attributes with enhanced support
-    if (ctx.PERCENT_TYPE() != null) {
-      String[] parts = b.toString().split("\\.");
-      if (parts.length == 3) {
-        // schema.table.column%TYPE
-        return RecordTypeSpec.forColumnType(parts[0], parts[1], parts[2]);
-      } else if (parts.length == 2) {
-        // table.column%TYPE (use current schema)
-        return RecordTypeSpec.forColumnType(schema, parts[0], parts[1]);
-      }
-    }
-
-    // Fall back to standard DataTypeSpec for native types and custom types
-    return new DataTypeSpec(
-            nativeDataType,
-            ctx.PERCENT_ROWTYPE() == null && ctx.PERCENT_TYPE() == null ? b.toString() : null,
-            ctx.PERCENT_ROWTYPE() != null ? b.toString() : null,
-            ctx.PERCENT_TYPE() != null ? b.toString() : null
-    );
+    return VisitTypeSpec.visit(ctx, schema);
   }
 
   // Statement START
@@ -312,105 +214,11 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
 
   @Override
   public PlSqlAst visitCall_statement(PlSqlParser.Call_statementContext ctx) {
-    // Parse the primary routine name
-    if (ctx.routine_name() == null || ctx.routine_name().isEmpty()) {
-      return new Comment("/* Empty call statement */");
-    }
-    
-    String routineNameText = ctx.routine_name(0).getText();
-    
-    // Handle HTP calls specifically - now parse arguments through expression hierarchy
-    if (routineNameText.contains("htp.p")) {
-      if (ctx.function_argument(0) != null) {
-        // Parse the HTP argument through the expression hierarchy to enable package variable transformation
-        List<Expression> htpArgs = parseCallArguments(ctx.function_argument(0));
-        if (!htpArgs.isEmpty()) {
-          return new HtpStatement(htpArgs.get(0));
-        }
-      }
-      // Empty HTP call - create expression with empty string
-      return new HtpStatement(new Expression(new LogicalExpression(new UnaryLogicalExpression("''"))));
-    }
-    
-    // Parse routine name components
-    String packageName = null;
-    String routineName = null;
-    
-    if (routineNameText.contains(".")) {
-      // Package.routine format
-      String[] parts = routineNameText.split("\\.", 2);
-      packageName = parts[0];
-      routineName = parts[1];
-    } else {
-      // Simple routine name
-      routineName = routineNameText;
-    }
-    
-    // Parse arguments if present
-    List<Expression> arguments = new ArrayList<>();
-    if (ctx.function_argument(0) != null) {
-      arguments = parseCallArguments(ctx.function_argument(0));
-    }
-    
-    // Check if this is a function call with return target (INTO clause)
-    Expression returnTarget = null;
-    boolean isFunction = false;
-    if (ctx.bind_variable() != null) {
-      // Function call with INTO clause
-      isFunction = true;
-      String targetVar = ctx.bind_variable().getText();
-      // Create a simple expression for the target variable
-      UnaryLogicalExpression targetExpr = new UnaryLogicalExpression(targetVar);
-      returnTarget = new Expression(new LogicalExpression(targetExpr));
-    }
-    
-    // Handle chained calls (routine_name ('.' routine_name function_argument?)*)
-    if (ctx.routine_name().size() > 1) {
-      // For now, handle simple case of package.routine
-      // TODO: Implement full chained call support
-      return new Comment("/* Chained call not yet implemented: " + routineNameText + " */");
-    }
-    
-    // Create appropriate CallStatement
-    CallStatement callStatement;
-    if (isFunction && returnTarget != null) {
-      callStatement = new CallStatement(routineName, packageName, arguments, returnTarget);
-    } else {
-      // Determine if this is a function or procedure (will be resolved later)
-      callStatement = new CallStatement(routineName, packageName, arguments, false);
-    }
-    
-    // Set calling context for package-less call resolution
-    callStatement.setCallingPackage(currentPackageName);
-    callStatement.setCallingSchema(schema);
-    
-    return callStatement;
-  }
-  
-  /**
-   * Parse function arguments from ANTLR context.
-   * 
-   * @param funcArgCtx The function_argument context
-   * @return List of parsed Expression objects
-   */
-  private List<Expression> parseCallArguments(PlSqlParser.Function_argumentContext funcArgCtx) {
-    List<Expression> arguments = new ArrayList<>();
-    
-    if (funcArgCtx.argument() != null) {
-      for (PlSqlParser.ArgumentContext argCtx : funcArgCtx.argument()) {
-        Expression expr = (Expression) visit(argCtx.expression());
-        if (expr != null) {
-          arguments.add(expr);
-        }
-      }
-    }
-    
-    return arguments;
+    return VisitCallStatement.visit(ctx, this);
   }
 
   @Override
   public PlSqlAst visitReturn_statement(PlSqlParser.Return_statementContext ctx) {
-    // TODO process expression child
     Expression expression = (Expression) visit(ctx.expression());
     if (expression != null) {
       return new ReturnStatement(expression);
@@ -439,60 +247,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
   // LOOP and SELECT START
   @Override
   public PlSqlAst visitLoop_statement(PlSqlParser.Loop_statementContext ctx) {
-    List<Statement> statements = new ArrayList<>();
-    
-    // Handle FOR loops
-    if (ctx.FOR() != null) {
-      if (ctx.cursor_loop_param().record_name() != null
-              && ctx.cursor_loop_param().select_statement() != null) {
-        if (ctx.seq_of_statements() != null
-                && ctx.seq_of_statements().statement() != null) {
-          for (PlSqlParser.StatementContext stmt : ctx.seq_of_statements().statement()) {
-            statements.add((Statement) visit(stmt));
-          }
-        }
-        String nameRef = ctx.cursor_loop_param().record_name().getText();
-        ctx.cursor_loop_param().record_name().getText();
-        SelectStatement sel = (SelectStatement) visit(ctx.cursor_loop_param().select_statement());
-        return new ForLoopStatement(
-                schema,
-                nameRef,
-                sel,
-                statements
-        );
-      }
-    }
-    
-    // Handle WHILE loops
-    if (ctx.WHILE() != null) {
-      // Parse WHILE condition
-      Expression condition = (Expression) visit(ctx.condition());
-      
-      // Parse loop body statements
-      if (ctx.seq_of_statements() != null && ctx.seq_of_statements().statement() != null) {
-        for (PlSqlParser.StatementContext stmt : ctx.seq_of_statements().statement()) {
-          Statement statement = (Statement) visit(stmt);
-          if (statement != null) {
-            statements.add(statement);
-          }
-        }
-      }
-      
-      return new WhileLoopStatement(condition, statements);
-    }
-    
-    // Handle plain LOOP...END LOOP (no WHILE or FOR)
-    // Parse loop body statements
-    if (ctx.seq_of_statements() != null && ctx.seq_of_statements().statement() != null) {
-      for (PlSqlParser.StatementContext stmt : ctx.seq_of_statements().statement()) {
-        Statement statement = (Statement) visit(stmt);
-        if (statement != null) {
-          statements.add(statement);
-        }
-      }
-    }
-    
-    return new LoopStatement(statements);
+    return VisitLoopStatement.visit(ctx, this);
   }
 
   @Override
@@ -1151,90 +906,12 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
 
   @Override
   public PlSqlAst visitLogical_expression(PlSqlParser.Logical_expressionContext ctx) {
-    if (ctx.unary_logical_expression() != null && ctx.logical_expression().isEmpty()) {
-      // Simple case: just unary logical expression
-      UnaryLogicalExpression unaryExpr = (UnaryLogicalExpression) visit(ctx.unary_logical_expression());
-      return new LogicalExpression(unaryExpr);
-    }
-    
-    if (ctx.logical_expression().size() == 2) {
-      // Binary case: logical_expression AND/OR logical_expression
-      LogicalExpression left = (LogicalExpression) visit(ctx.logical_expression(0));
-      LogicalExpression right = (LogicalExpression) visit(ctx.logical_expression(1));
-      String operator = null;
-      
-      if (ctx.AND() != null) {
-        operator = "AND";
-      } else if (ctx.OR() != null) {
-        operator = "OR";
-      }
-      
-      return new LogicalExpression(left, operator, right);
-    }
-    
-    // Fallback - convert raw text to logical expression
-    LogicalExpression logicalExpr = new LogicalExpression(new UnaryLogicalExpression(ctx.getText()));
-    return new Expression(logicalExpr);
+    return VisitLogicalExpression.visit(ctx, this);
   }
 
   @Override
   public PlSqlAst visitUnary_logical_expression(PlSqlParser.Unary_logical_expressionContext ctx) {
-    boolean hasNot = ctx.NOT() != null;
-    Expression multisetExpr = null;
-    String logicalOperation = null;
-    
-    if (ctx.multiset_expression() != null) {
-      // Visit the multiset_expression to properly handle cursor attributes and other expressions
-      PlSqlAst multisetAst = visit(ctx.multiset_expression());
-      if (multisetAst instanceof MultisetExpression) {
-        // Create expression from the multiset expression
-        LogicalExpression logicalExpr = new LogicalExpression(new UnaryLogicalExpression("MULTISET_EXPR_PLACEHOLDER"));
-        multisetExpr = new Expression(logicalExpr) {
-          @Override
-          public String toPostgre(me.christianrobert.ora2postgre.global.Everything data) {
-            return ((MultisetExpression) multisetAst).toPostgre(data);
-          }
-          
-          @Override
-          public String toString() {
-            return multisetAst.toString();
-          }
-        };
-      } else {
-        // Fallback to text if visit returns something else
-        LogicalExpression logicalExpr = new LogicalExpression(new UnaryLogicalExpression(ctx.multiset_expression().getText()));
-        multisetExpr = new Expression(logicalExpr);
-      }
-    }
-    
-    if (ctx.unary_logical_operation() != null) {
-      // Build the logical operation string (IS NULL, IS NOT NULL, etc.)
-      StringBuilder opBuilder = new StringBuilder();
-      var operation = ctx.unary_logical_operation();
-      
-      if (operation.IS() != null) {
-        opBuilder.append("IS");
-        if (operation.NOT() != null) {
-          opBuilder.append(" NOT");
-        }
-        if (operation.logical_operation() != null) {
-          if (operation.logical_operation().NULL_() != null) {
-            opBuilder.append(" NULL");
-          } else if (operation.logical_operation().NAN_() != null) {
-            opBuilder.append(" NAN");
-          } else if (operation.logical_operation().EMPTY_() != null) {
-            opBuilder.append(" EMPTY");
-          } else {
-            // Handle other logical operations
-            opBuilder.append(" ").append(operation.logical_operation().getText());
-          }
-        }
-      }
-      
-      logicalOperation = opBuilder.toString();
-    }
-    
-    return new UnaryLogicalExpression(hasNot, multisetExpr, logicalOperation);
+    return VisitUnaryLogicalExpression.visit(ctx, this);
   }
 
   // Start CollectionTypes, other than Object Types:
@@ -1350,7 +1027,8 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     List<VarrayType> varrayTypes = new ArrayList<>();
     List<NestedTableType> nestedTableTypes = new ArrayList<>();
     if (ctx.seq_of_declare_specs() != null) {
-      variables = extractVariablesFromDeclareSpecs(ctx.seq_of_declare_specs());
+      variables = VisitSeqOfDeclareSpecs.extractVariablesFromDeclareSpecs(
+              ctx.seq_of_declare_specs(), this);
       cursorDeclarations = extractCursorDeclarationsFromDeclareSpecs(ctx.seq_of_declare_specs());
       recordTypes = extractRecordTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
       varrayTypes = extractVarrayTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
@@ -1375,7 +1053,8 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     List<VarrayType> varrayTypes = new ArrayList<>();
     List<NestedTableType> nestedTableTypes = new ArrayList<>();
     if (ctx.seq_of_declare_specs() != null) {
-      variables = extractVariablesFromDeclareSpecs(ctx.seq_of_declare_specs());
+      variables = VisitSeqOfDeclareSpecs.extractVariablesFromDeclareSpecs(
+              ctx.seq_of_declare_specs(), this);
       cursorDeclarations = extractCursorDeclarationsFromDeclareSpecs(ctx.seq_of_declare_specs());
       recordTypes = extractRecordTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
       varrayTypes = extractVarrayTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
@@ -1515,7 +1194,8 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     List<VarrayType> varrayTypes = new ArrayList<>();
     List<NestedTableType> nestedTableTypes = new ArrayList<>();
     if (ctx.seq_of_declare_specs() != null) {
-      variables = extractVariablesFromDeclareSpecs(ctx.seq_of_declare_specs());
+      variables = VisitSeqOfDeclareSpecs.extractVariablesFromDeclareSpecs(
+              ctx.seq_of_declare_specs(), this);
       cursorDeclarations = extractCursorDeclarationsFromDeclareSpecs(ctx.seq_of_declare_specs());
       recordTypes = extractRecordTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
       varrayTypes = extractVarrayTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
@@ -1566,7 +1246,8 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     List<VarrayType> varrayTypes = new ArrayList<>();
     List<NestedTableType> nestedTableTypes = new ArrayList<>();
     if (ctx.seq_of_declare_specs() != null) {
-      variables = extractVariablesFromDeclareSpecs(ctx.seq_of_declare_specs());
+      variables = VisitSeqOfDeclareSpecs.extractVariablesFromDeclareSpecs(
+              ctx.seq_of_declare_specs(), this);
       cursorDeclarations = extractCursorDeclarationsFromDeclareSpecs(ctx.seq_of_declare_specs());
       recordTypes = extractRecordTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
       varrayTypes = extractVarrayTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
@@ -1717,7 +1398,8 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     List<VarrayType> varrayTypes = new ArrayList<>();
     List<NestedTableType> nestedTableTypes = new ArrayList<>();
     if (ctx.seq_of_declare_specs() != null) {
-      variables = extractVariablesFromDeclareSpecs(ctx.seq_of_declare_specs());
+      variables = VisitSeqOfDeclareSpecs.extractVariablesFromDeclareSpecs(
+              ctx.seq_of_declare_specs(), this);
       cursorDeclarations = extractCursorDeclarationsFromDeclareSpecs(ctx.seq_of_declare_specs());
       recordTypes = extractRecordTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
       varrayTypes = extractVarrayTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
@@ -1749,7 +1431,8 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     List<VarrayType> varrayTypes = new ArrayList<>();
     List<NestedTableType> nestedTableTypes = new ArrayList<>();
     if (ctx.seq_of_declare_specs() != null) {
-      variables = extractVariablesFromDeclareSpecs(ctx.seq_of_declare_specs());
+      variables = VisitSeqOfDeclareSpecs.extractVariablesFromDeclareSpecs(
+              ctx.seq_of_declare_specs(), this);
       cursorDeclarations = extractCursorDeclarationsFromDeclareSpecs(ctx.seq_of_declare_specs());
       recordTypes = extractRecordTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
       varrayTypes = extractVarrayTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
