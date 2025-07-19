@@ -9,6 +9,11 @@ import me.christianrobert.ora2postgre.plsql.builderfncs.VisitCallStatement;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitCursorDeclaration;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitLogicalExpression;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitLoopStatement;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitIfStatement;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitSelectListElements;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitSelectStatement;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitSubquery;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitWithClause;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitSeqOfDeclareSpecs;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitSqlScript;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitTypeSpec;
@@ -252,150 +257,12 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
 
   @Override
   public PlSqlAst visitSelect_statement(PlSqlParser.Select_statementContext ctx) {
-    // Check if this is a SELECT INTO statement by looking for into_clause in query_block
-    if (ctx.select_only_statement() != null && 
-        ctx.select_only_statement().subquery() != null &&
-        ctx.select_only_statement().subquery().subquery_basic_elements() != null &&
-        ctx.select_only_statement().subquery().subquery_basic_elements().query_block() != null &&
-        ctx.select_only_statement().subquery().subquery_basic_elements().query_block().into_clause() != null) {
-      
-      // This is a SELECT INTO statement - route to SelectIntoStatement
-      // Extract WITH clause if present
-      SelectWithClause withClause = ctx.select_only_statement().with_clause() != null ?
-              (SelectWithClause) visit(ctx.select_only_statement().with_clause()) : null;
-      
-      return visitSelectIntoFromQueryBlock(ctx.select_only_statement().subquery().subquery_basic_elements().query_block(), withClause);
-    }
-    
-    // Regular SELECT statement - use existing logic
-    return new SelectStatement(
-            schema, // TODO only selectOnlyClause for now, to for,order etc later
-            (SelectSubQuery) visit(ctx.select_only_statement().subquery()),
-            ctx.select_only_statement().with_clause() != null ?
-                    (SelectWithClause) visit(ctx.select_only_statement().with_clause()) :
-                    null,
-            ctx.for_update_clause() != null && !ctx.for_update_clause().isEmpty() ?
-                    (SelectForUpdateClause) visit(ctx.for_update_clause(0)) :
-                    null,
-            ctx.order_by_clause() != null && !ctx.order_by_clause().isEmpty() ?
-                    (SelectOrderByClause) visit(ctx.order_by_clause(0)) :
-                    null,
-            ctx.offset_clause() != null && !ctx.offset_clause().isEmpty() ?
-                    (SelectOffsetClause) visit(ctx.offset_clause(0)) :
-                    null,
-            ctx.fetch_clause() != null && !ctx.offset_clause().isEmpty() ?
-                    (SelectFetchClause) visit(ctx.offset_clause(0)) :
-                    null
-    );
-  }
-
-  /**
-   * Helper method to parse SELECT INTO statements from query_block context
-   */
-  private PlSqlAst visitSelectIntoFromQueryBlock(PlSqlParser.Query_blockContext ctx, SelectWithClause withClause) {
-    // Parse selected columns
-    List<String> selectedColumns = new ArrayList<>();
-    if (ctx.selected_list().ASTERISK() != null) {
-      selectedColumns.add("*");
-    } else {
-      for (var selectElement : ctx.selected_list().select_list_elements()) {
-        // For simplicity, just get the text of each select element
-        // TODO: This could be enhanced to handle complex expressions
-        selectedColumns.add(selectElement.getText());
-      }
-    }
-    
-    // Check if this is BULK COLLECT INTO
-    boolean isBulkCollect = false;
-    if (ctx.into_clause() != null) {
-      // Check for BULK COLLECT keywords in the into_clause
-      String intoClauseText = ctx.into_clause().getText().toUpperCase();
-      isBulkCollect = intoClauseText.contains("BULKCOLLECT");
-    }
-    
-    // Parse INTO variables
-    List<String> intoVariables = new ArrayList<>();
-    if (ctx.into_clause() != null) {
-      for (var element : ctx.into_clause().general_element()) {
-        intoVariables.add(element.getText());
-      }
-      // Also handle bind_variable if present
-      if (ctx.into_clause().bind_variable() != null) {
-        for (var bindVar : ctx.into_clause().bind_variable()) {
-          intoVariables.add(bindVar.getText());
-        }
-      }
-    }
-    
-    // Parse FROM table (simplified approach)
-    String schemaName = null;
-    String tableName = null;
-    
-    if (ctx.from_clause() != null &&
-        ctx.from_clause().table_ref_list() != null &&
-        ctx.from_clause().table_ref_list().table_ref() != null &&
-        !ctx.from_clause().table_ref_list().table_ref().isEmpty()) {
-      
-      // For simplicity, just get the text of the first table reference
-      // TODO: This could be enhanced to properly parse complex table expressions
-      var firstTableRef = ctx.from_clause().table_ref_list().table_ref().get(0);
-      String tableRefText = firstTableRef.getText();
-      
-      // Simple parsing: check if it contains a dot (schema.table)
-      if (tableRefText.contains(".")) {
-        String[] parts = tableRefText.split("\\.", 2);
-        schemaName = parts[0];
-        tableName = parts[1];
-      } else {
-        tableName = tableRefText;
-      }
-    }
-    
-    // Parse WHERE clause if present
-    Expression whereClause = null;
-    if (ctx.where_clause() != null && ctx.where_clause().condition() != null) {
-      whereClause = (Expression) visit(ctx.where_clause().condition());
-    }
-    
-    // Return appropriate statement type based on BULK COLLECT detection
-    if (isBulkCollect) {
-      return new BulkCollectStatement(selectedColumns, intoVariables, schemaName, tableName, whereClause);
-    } else {
-      return new SelectIntoStatement(selectedColumns, intoVariables, schemaName, tableName, whereClause, withClause);
-    }
+    return VisitSelectStatement.visit(ctx, this);
   }
 
   @Override
   public PlSqlAst visitSubquery(PlSqlParser.SubqueryContext ctx) {
-    SelectSubQueryBasicElement subQueryBasicElement =
-            (SelectSubQueryBasicElement) visit(ctx.subquery_basic_elements());
-    List<SelectSubQueryBasicElement> unionList = new ArrayList<>();
-    List<SelectSubQueryBasicElement> unionAllList = new ArrayList<>();
-    List<SelectSubQueryBasicElement> minusList = new ArrayList<>();
-    List<SelectSubQueryBasicElement> intersectList = new ArrayList<>();
-    for (PlSqlParser.Subquery_operation_partContext s1 : ctx.subquery_operation_part()) {
-      if (s1.UNION() != null) {
-        unionList.add((SelectSubQueryBasicElement) visit(s1.subquery_basic_elements()));
-      }
-      if (s1.ALL() != null) {
-        unionAllList.add((SelectSubQueryBasicElement) visit(s1.subquery_basic_elements()));
-      }
-      if (s1.MINUS() != null) {
-        minusList.add((SelectSubQueryBasicElement) visit(s1.subquery_basic_elements()));
-      }
-      if (s1.INTERSECT() != null) {
-        intersectList.add((SelectSubQueryBasicElement) visit(s1.subquery_basic_elements()));
-      }
-    }
-
-    return new SelectSubQuery(
-            schema,
-            subQueryBasicElement,
-            unionList,
-            unionAllList,
-            minusList,
-            intersectList
-    );
+    return VisitSubquery.visit(ctx, this);
   }
 
   @Override
@@ -444,40 +311,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
    */
   @Override
   public PlSqlAst visitWith_clause(PlSqlParser.With_clauseContext ctx) {
-    List<CommonTableExpression> cteList = new ArrayList<>();
-    List<Function> functions = new ArrayList<>();
-    List<Procedure> procedures = new ArrayList<>();
-    
-    // Process function and procedure bodies (Oracle-specific feature)
-    if (ctx.function_body() != null) {
-      for (PlSqlParser.Function_bodyContext funcCtx : ctx.function_body()) {
-        Function function = (Function) visit(funcCtx);
-        if (function != null) {
-          functions.add(function);
-        }
-      }
-    }
-    
-    if (ctx.procedure_body() != null) {
-      for (PlSqlParser.Procedure_bodyContext procCtx : ctx.procedure_body()) {
-        Procedure procedure = (Procedure) visit(procCtx);
-        if (procedure != null) {
-          procedures.add(procedure);
-        }
-      }
-    }
-    
-    // Process WITH factoring clauses (CTE definitions)
-    if (ctx.with_factoring_clause() != null) {
-      for (PlSqlParser.With_factoring_clauseContext factoringCtx : ctx.with_factoring_clause()) {
-        CommonTableExpression cte = (CommonTableExpression) visit(factoringCtx);
-        if (cte != null) {
-          cteList.add(cte);
-        }
-      }
-    }
-    
-    return new SelectWithClause(cteList, functions, procedures);
+    return VisitWithClause.visit(ctx, this);
   }
   
   /**
@@ -530,30 +364,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
 
   @Override
   public PlSqlAst visitSelect_list_elements(PlSqlParser.Select_list_elementsContext ctx) {
-
-    //String columnName = null;
-    //String columnPrefix = null;
-    String tableNameB4asterisk = null;
-    String schemaNameB4asterisk = null;
-    if (ctx.tableview_name() != null) {
-      if (ctx.tableview_name().id_expression() != null) {
-        tableNameB4asterisk = ctx.tableview_name().id_expression().getText();
-        schemaNameB4asterisk = ctx.tableview_name().identifier().getText();
-      }
-    }
-
-    // TODO expression is INSANELY complicated .. do this later
-
-    // expression can either be a cursor expression or an arbitrary logical expression
-    // infering the datatype from table is done in the toJava or toPostgre step!
-    return new SelectListElement(
-                        schema,
-            ctx.column_alias() != null ? ctx.column_alias().getText() : null,
-            ctx.expression() != null ? (Expression) visit(ctx.expression()) : null,
-            ctx.ASTERISK() != null,
-            tableNameB4asterisk,
-            schemaNameB4asterisk
-    );
+    return VisitSelectListElements.visit(ctx, this);
   }
   // LOOP and SELECT END
 
@@ -659,53 +470,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
 
   @Override
   public PlSqlAst visitIf_statement(PlSqlParser.If_statementContext ctx) {
-    // Parse the main IF condition
-    Expression condition = (Expression) visit(ctx.condition());
-    
-    // Parse THEN statements
-    List<Statement> thenStatements = new ArrayList<>();
-    if (ctx.seq_of_statements() != null && ctx.seq_of_statements().statement() != null) {
-      for (PlSqlParser.StatementContext stmt : ctx.seq_of_statements().statement()) {
-        Statement statement = (Statement) visit(stmt);
-        if (statement != null) {
-          thenStatements.add(statement);
-        }
-      }
-    }
-    
-    // Parse ELSIF parts
-    List<IfStatement.ElsifPart> elsifParts = null;
-    if (ctx.elsif_part() != null && !ctx.elsif_part().isEmpty()) {
-      elsifParts = new ArrayList<>();
-      for (PlSqlParser.Elsif_partContext elsif : ctx.elsif_part()) {
-        Expression elsifCondition = (Expression) visit(elsif.condition());
-        List<Statement> elsifStatements = new ArrayList<>();
-        if (elsif.seq_of_statements() != null && elsif.seq_of_statements().statement() != null) {
-          for (PlSqlParser.StatementContext stmt : elsif.seq_of_statements().statement()) {
-            Statement statement = (Statement) visit(stmt);
-            if (statement != null) {
-              elsifStatements.add(statement);
-            }
-          }
-        }
-        elsifParts.add(new IfStatement.ElsifPart(elsifCondition, elsifStatements));
-      }
-    }
-    
-    // Parse ELSE statements
-    List<Statement> elseStatements = null;
-    if (ctx.else_part() != null && ctx.else_part().seq_of_statements() != null && 
-        ctx.else_part().seq_of_statements().statement() != null) {
-      elseStatements = new ArrayList<>();
-      for (PlSqlParser.StatementContext stmt : ctx.else_part().seq_of_statements().statement()) {
-        Statement statement = (Statement) visit(stmt);
-        if (statement != null) {
-          elseStatements.add(statement);
-        }
-      }
-    }
-    
-    return new IfStatement(condition, thenStatements, elsifParts, elseStatements);
+    return VisitIfStatement.visit(ctx, this);
   }
 
   @Override
