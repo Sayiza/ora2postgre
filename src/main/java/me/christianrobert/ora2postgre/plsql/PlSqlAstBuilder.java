@@ -37,6 +37,11 @@ import me.christianrobert.ora2postgre.plsql.builderfncs.VisitTableRefAuxInternal
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitDmlTableExpressionClause;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitUnaryExpression;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitOtherFunction;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitFunctionBody;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitProcedureBody;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitCreateFunctionBody;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitCreatePackageBody;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitCreateProcedureBody;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -55,6 +60,10 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
 
   public String getCurrentPackageName() {
     return currentPackageName;
+  }
+
+  public void setCurrentPackageName(String currentPackageName) {
+    this.currentPackageName = currentPackageName;
   }
 
   @Override
@@ -623,89 +632,12 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
 
   @Override
   public PlSqlAst visitProcedure_body(PlSqlParser.Procedure_bodyContext ctx) {
-    List<Parameter> parameters = new ArrayList<>();
-    String procedureName = ctx.identifier().getText();
-
-    for (PlSqlParser.ParameterContext e : ctx.parameter()) {
-      parameters.add((Parameter) visit(e));
-    }
-
-    // Extract declarations from DECLARE section
-    List<Variable> variables = new ArrayList<>();
-    List<CursorDeclaration> cursorDeclarations = new ArrayList<>();
-    List<RecordType> recordTypes = new ArrayList<>();
-    List<VarrayType> varrayTypes = new ArrayList<>();
-    List<NestedTableType> nestedTableTypes = new ArrayList<>();
-    if (ctx.seq_of_declare_specs() != null) {
-      variables = DeclarationParsingUtils.extractVariablesFromDeclareSpecs(
-              ctx.seq_of_declare_specs(), this);
-      cursorDeclarations = DeclarationParsingUtils.extractCursorDeclarationsFromDeclareSpecs(
-              ctx.seq_of_declare_specs(), this);
-      recordTypes = extractRecordTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
-      varrayTypes = extractVarrayTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
-      nestedTableTypes = extractNestedTableTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
-    }
-
-    List<Statement> statements = new ArrayList<>();
-    if (ctx.body() != null
-            && ctx.body().seq_of_statements() != null
-            && ctx.body().seq_of_statements().statement() != null) {
-      for (PlSqlParser.StatementContext stmt : ctx.body().seq_of_statements().statement()) {
-        statements.add((Statement) visit(stmt));
-      }
-    }
-
-    // Parse exception handling if present
-    ExceptionBlock exceptionBlock = null;
-    if (ctx.body() != null && ctx.body().exception_handler() != null && !ctx.body().exception_handler().isEmpty()) {
-      exceptionBlock = parseExceptionBlock(ctx.body().exception_handler());
-    }
-
-    return new Procedure(procedureName, parameters, variables, cursorDeclarations, recordTypes, statements, exceptionBlock);
+    return VisitProcedureBody.visit(ctx, this);
   }
 
   @Override
   public PlSqlAst visitFunction_body(PlSqlParser.Function_bodyContext ctx) {
-    List<Parameter> parameters = new ArrayList<>();
-    String procedureName = ctx.identifier().getText();
-    String returnType = ctx.type_spec().getText(); //TODO?
-
-    for (PlSqlParser.ParameterContext e : ctx.parameter()) {
-      parameters.add((Parameter) visit(e));
-    }
-
-    List<Statement> statements = new ArrayList<>();
-    if (ctx.body() != null
-            && ctx.body().seq_of_statements() != null
-            && ctx.body().seq_of_statements().statement() != null) {
-      for (PlSqlParser.StatementContext stmt : ctx.body().seq_of_statements().statement()) {
-        statements.add((Statement) visit(stmt));
-      }
-    }
-
-    // Extract declarations from DECLARE section
-    List<Variable> variables = new ArrayList<>();
-    List<CursorDeclaration> cursorDeclarations = new ArrayList<>();
-    List<RecordType> recordTypes = new ArrayList<>();
-    List<VarrayType> varrayTypes = new ArrayList<>();
-    List<NestedTableType> nestedTableTypes = new ArrayList<>();
-    if (ctx.seq_of_declare_specs() != null) {
-      variables = DeclarationParsingUtils.extractVariablesFromDeclareSpecs(
-              ctx.seq_of_declare_specs(), this);
-      cursorDeclarations = DeclarationParsingUtils.extractCursorDeclarationsFromDeclareSpecs(
-              ctx.seq_of_declare_specs(), this);
-      recordTypes = extractRecordTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
-      varrayTypes = extractVarrayTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
-      nestedTableTypes = extractNestedTableTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
-    }
-
-    // Parse exception block if present
-    ExceptionBlock exceptionBlock = null;
-    if (ctx.body() != null && ctx.body().exception_handler() != null && !ctx.body().exception_handler().isEmpty()) {
-      exceptionBlock = parseExceptionBlock(ctx.body().exception_handler());
-    }
-
-    return new Function(procedureName, parameters, variables, cursorDeclarations, recordTypes, varrayTypes, nestedTableTypes, returnType, statements, exceptionBlock);
+    return VisitFunctionBody.visit(ctx, this);
   }
 
   /**
@@ -777,126 +709,17 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
 
   @Override
   public PlSqlAst visitCreate_package_body(PlSqlParser.Create_package_bodyContext ctx) {
-    String packageName = "UNKNOWN";
-    if (ctx.package_name() != null && !ctx.package_name().isEmpty()) {
-      for (PlSqlParser.Package_nameContext p : ctx.package_name()) {
-        packageName = p.getText();
-      }
-    }
-    
-    // Store current package context for call resolution
-    this.currentPackageName = packageName;
-    List<Procedure> procedures = new ArrayList<>();
-    List<Function> funcs = new ArrayList<>();
-    List<Variable> variables = new ArrayList<>();
-    List<RecordType> recordTypes = new ArrayList<>();
-    List<VarrayType> varrayTypes = new ArrayList<>();
-    List<NestedTableType> nestedTableTypes = new ArrayList<>();
-    if (ctx.package_obj_body() != null) {
-      for (var member : ctx.package_obj_body()) {
-        PlSqlAst memberAst = visit(member);
-        if (memberAst instanceof Variable) {
-          variables.add((Variable) memberAst);
-        } else if (memberAst instanceof RecordType) {
-          recordTypes.add((RecordType) memberAst);
-        } else if (memberAst instanceof VarrayType) {
-          varrayTypes.add((VarrayType) memberAst);
-        } else if (memberAst instanceof NestedTableType) {
-          nestedTableTypes.add((NestedTableType) memberAst);
-        } else if (memberAst instanceof Function) {
-          funcs.add((Function) memberAst);
-        } else if (memberAst instanceof Procedure) {
-          procedures.add((Procedure) memberAst);
-        }
-      }
-    }
-    OraclePackage o = new OraclePackage(packageName, schema, variables, null, null, null, recordTypes, varrayTypes, nestedTableTypes, funcs, procedures, null);
-    o.getFunctions().forEach(e -> e.setParentPackage(o));
-    o.getProcedures().forEach(e -> e.setParentPackage(o));
-    return o;
+    return VisitCreatePackageBody.visit(ctx, this);
   }
 
   @Override
   public PlSqlAst visitCreate_function_body(PlSqlParser.Create_function_bodyContext ctx) {
-    // Parse standalone function
-    String functionName = ctx.function_name() != null ? ctx.function_name().getText() : "UNKNOWN";
-    String returnType = ctx.type_spec() != null ? ctx.type_spec().getText() : "UNKNOWN";
-    
-    List<Parameter> parameters = new ArrayList<>();
-    if (ctx.parameter() != null) {
-      for (PlSqlParser.ParameterContext param : ctx.parameter()) {
-        parameters.add((Parameter) visit(param));
-      }
-    }
-    
-    List<Statement> statements = new ArrayList<>();
-    if (ctx.body() != null && ctx.body().seq_of_statements() != null && ctx.body().seq_of_statements().statement() != null) {
-      for (PlSqlParser.StatementContext stmt : ctx.body().seq_of_statements().statement()) {
-        statements.add((Statement) visit(stmt));
-      }
-    }
-
-    // Extract declarations from DECLARE section
-    List<Variable> variables = new ArrayList<>();
-    List<CursorDeclaration> cursorDeclarations = new ArrayList<>();
-    List<RecordType> recordTypes = new ArrayList<>();
-    List<VarrayType> varrayTypes = new ArrayList<>();
-    List<NestedTableType> nestedTableTypes = new ArrayList<>();
-    if (ctx.seq_of_declare_specs() != null) {
-      variables = DeclarationParsingUtils.extractVariablesFromDeclareSpecs(
-              ctx.seq_of_declare_specs(), this);
-      cursorDeclarations = DeclarationParsingUtils.extractCursorDeclarationsFromDeclareSpecs(
-              ctx.seq_of_declare_specs(), this);
-      recordTypes = extractRecordTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
-      varrayTypes = extractVarrayTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
-      nestedTableTypes = extractNestedTableTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
-    }
-    
-    Function function = new Function(functionName, parameters, variables, cursorDeclarations, recordTypes, varrayTypes, nestedTableTypes, returnType, statements, null);
-    function.setStandalone(true);
-    function.setSchema(schema);
-    return function;
+    return VisitCreateFunctionBody.visit(ctx, this);
   }
 
   @Override
   public PlSqlAst visitCreate_procedure_body(PlSqlParser.Create_procedure_bodyContext ctx) {
-    // Parse standalone procedure
-    String procedureName = ctx.procedure_name() != null ? ctx.procedure_name().getText() : "UNKNOWN";
-    
-    List<Parameter> parameters = new ArrayList<>();
-    if (ctx.parameter() != null) {
-      for (PlSqlParser.ParameterContext param : ctx.parameter()) {
-        parameters.add((Parameter) visit(param));
-      }
-    }
-    
-    // Extract declarations from DECLARE section
-    List<Variable> variables = new ArrayList<>();
-    List<CursorDeclaration> cursorDeclarations = new ArrayList<>();
-    List<RecordType> recordTypes = new ArrayList<>();
-    List<VarrayType> varrayTypes = new ArrayList<>();
-    List<NestedTableType> nestedTableTypes = new ArrayList<>();
-    if (ctx.seq_of_declare_specs() != null) {
-      variables = DeclarationParsingUtils.extractVariablesFromDeclareSpecs(
-              ctx.seq_of_declare_specs(), this);
-      cursorDeclarations = DeclarationParsingUtils.extractCursorDeclarationsFromDeclareSpecs(
-              ctx.seq_of_declare_specs(), this);
-      recordTypes = extractRecordTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
-      varrayTypes = extractVarrayTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
-      nestedTableTypes = extractNestedTableTypesFromDeclareSpecs(ctx.seq_of_declare_specs());
-    }
-    
-    List<Statement> statements = new ArrayList<>();
-    if (ctx.body() != null && ctx.body().seq_of_statements() != null && ctx.body().seq_of_statements().statement() != null) {
-      for (PlSqlParser.StatementContext stmt : ctx.body().seq_of_statements().statement()) {
-        statements.add((Statement) visit(stmt));
-      }
-    }
-    
-    Procedure procedure = new Procedure(procedureName, parameters, variables, cursorDeclarations, recordTypes, statements, null);
-    procedure.setStandalone(true);
-    procedure.setSchema(schema);
-    return procedure;
+    return VisitCreateProcedureBody.visit(ctx, this);
   }
 
   @Override
