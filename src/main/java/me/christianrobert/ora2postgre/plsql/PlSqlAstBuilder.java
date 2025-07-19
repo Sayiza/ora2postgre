@@ -13,6 +13,13 @@ import me.christianrobert.ora2postgre.plsql.builderfncs.VisitIfStatement;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitSelectListElements;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitSelectStatement;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitSubquery;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitFetchStatement;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitFieldSpec;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitObjectMemberSpec;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitRecordTypeDef;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitTypeDeclaration;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitTypeDefinition;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitTypeElementsParameter;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitWithClause;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitSeqOfDeclareSpecs;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitSqlScript;
@@ -196,19 +203,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
 
   @Override
   public PlSqlAst visitFetch_statement(PlSqlParser.Fetch_statementContext ctx) {
-    String cursorName = ctx.cursor_name().getText();
-    
-    // Parse INTO variables
-    List<String> intoVariables = new ArrayList<>();
-    if (ctx.variable_or_collection() != null) {
-      for (PlSqlParser.Variable_or_collectionContext varCtx : ctx.variable_or_collection()) {
-        // Extract variable name from variable_or_collection context
-        String varName = varCtx.getText(); // Simple approach - could be enhanced for complex expressions
-        intoVariables.add(varName);
-      }
-    }
-    
-    return new FetchStatement(cursorName, intoVariables);
+    return VisitFetchStatement.visit(ctx, this);
   }
 
   @Override
@@ -707,64 +702,17 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
   // Start Object Types
   @Override
   public PlSqlAst visitType_definition(PlSqlParser.Type_definitionContext ctx) {
-    String typeName = NameNormalizer.normalizeObjectTypeName(ctx.type_name().getText());
-    // object types
-    List<Variable> variables = new ArrayList<>();
-    if (ctx.object_type_def() != null && ctx.object_type_def().object_member_spec() != null) {
-      for (var member : ctx.object_type_def().object_member_spec()) {
-        PlSqlAst memberAst = visit(member);
-        if (memberAst instanceof Variable) {
-          variables.add((Variable) memberAst);
-        }
-      }
-    }
-
-    // varrays
-    if (ctx.object_type_def() != null
-            && ctx.object_type_def().object_as_part() != null
-            && ctx.object_type_def().object_as_part().varray_type_def() != null
-    ) {
-      VarrayType varrayType = (VarrayType) visit(ctx.object_type_def().object_as_part().varray_type_def());
-      return new ObjectType(typeName, schema, null, null, null, null,
-              varrayType, null);
-    }
-
-    if (ctx.object_type_def() != null
-            && ctx.object_type_def().object_as_part() != null
-            && ctx.object_type_def().object_as_part().nested_table_type_def() != null) {
-      NestedTableType nestedTableType = (NestedTableType) visit(ctx.object_type_def().object_as_part().nested_table_type_def());
-      return new ObjectType(typeName, schema, null, null, null, null, null, nestedTableType);
-    }
-
-    // TODO do something about the under clause?!
-    return new ObjectType(typeName, schema, variables, null, null, null, null, null);
+    return VisitTypeDefinition.visit(ctx, this);
   }
 
   @Override
   public PlSqlAst visitObject_member_spec(PlSqlParser.Object_member_specContext ctx) {
-    if (ctx.identifier() != null &&
-            ctx.identifier().id_expression() != null &&
-            ctx.type_spec() != null) {
-      String name = ctx.identifier().id_expression().getText();
-      DataTypeSpec dataType = (DataTypeSpec) visit(ctx.type_spec());
-      return new Variable(name, dataType, null);
-    }
-    if (ctx.element_spec() != null) {
-      return visit(ctx.element_spec());
-    }
-    // element_spec not implemented
-    return null;
+    return VisitObjectMemberSpec.visit(ctx, this);
   }
 
   @Override
   public PlSqlAst visitType_elements_parameter(PlSqlParser.Type_elements_parameterContext ctx) {
-    return new Parameter(
-      ctx.parameter_name().getText(),
-      (DataTypeSpec) visit(ctx.type_spec()),
-      ctx.default_value_part() != null ? (Expression) visit(ctx.default_value_part()) : null,
-      ctx.IN() != null && ctx.IN().getText() != null,
-      ctx.OUT() != null  && ctx.OUT().getText() != null
-    );
+    return VisitTypeElementsParameter.visit(ctx, this);
   }
 
   @Override
@@ -1924,83 +1872,17 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
 
   @Override
   public PlSqlAst visitType_declaration(PlSqlParser.Type_declarationContext ctx) {
-    if (ctx.identifier() != null && ctx.record_type_def() != null) {
-      String typeName = ctx.identifier().getText();
-      RecordType recordType = (RecordType) visit(ctx.record_type_def());
-      // Set the name from the declaration
-      return new RecordType(typeName, recordType.getFields());
-    }
-    
-    // Handle VARRAY type declarations: TYPE name IS VARRAY(size) OF type_spec
-    if (ctx.identifier() != null && ctx.varray_type_def() != null) {
-      String typeName = ctx.identifier().getText();
-      VarrayType varrayType = (VarrayType) visit(ctx.varray_type_def());
-      // Return a named VarrayType (similar to RecordType pattern)
-      return new VarrayType(typeName, varrayType.getSize(), varrayType.getSizeExpression(), varrayType.getDataType());
-    }
-    
-    // Handle TABLE OF type declarations: TYPE name IS TABLE OF type_spec
-    if (ctx.identifier() != null && ctx.table_type_def() != null) {
-      String typeName = ctx.identifier().getText();
-      NestedTableType nestedTableType = (NestedTableType) visit(ctx.table_type_def());
-      // Return a named NestedTableType (similar to RecordType pattern)
-      return new NestedTableType(typeName, nestedTableType.getDataType());
-    }
-    
-    // Handle simple type alias declarations: TYPE name IS type_spec (e.g., TYPE user_id IS NUMBER(10))
-    if (ctx.identifier() != null && ctx.type_spec() != null) {
-      String typeName = ctx.identifier().getText();
-      DataTypeSpec dataTypeSpec = (DataTypeSpec) visit(ctx.type_spec());
-      // Return a PackageType for simple type aliases
-      return new PackageType(typeName, dataTypeSpec);
-    }
-    
-    // TODO: Handle ref_cursor_type_def
-    return new Comment("type_declaration not fully implemented");
+    return VisitTypeDeclaration.visit(ctx, this);
   }
 
   @Override
   public PlSqlAst visitRecord_type_def(PlSqlParser.Record_type_defContext ctx) {
-    List<RecordType.RecordField> fields = new ArrayList<>();
-    
-    if (ctx.field_spec() != null) {
-      for (PlSqlParser.Field_specContext fieldCtx : ctx.field_spec()) {
-        RecordType.RecordField field = (RecordType.RecordField) visit(fieldCtx);
-        if (field != null) {
-          fields.add(field);
-        }
-      }
-    }
-    
-    return new RecordType("", fields); // Name will be set by type_declaration
+    return VisitRecordTypeDef.visit(ctx, this);
   }
 
   @Override
   public PlSqlAst visitField_spec(PlSqlParser.Field_specContext ctx) {
-    String fieldName = ctx.column_name().getText();
-    
-    // Parse data type
-    DataTypeSpec dataType = null;
-    if (ctx.type_spec() != null) {
-      dataType = (DataTypeSpec) visit(ctx.type_spec());
-    } else {
-      // Default to VARCHAR if no type specified
-      dataType = new DataTypeSpec("VARCHAR2", null, null, null);
-    }
-    
-    // Parse NULL/NOT NULL constraint
-    boolean notNull = false;
-    if (ctx.NULL_() != null && ctx.NOT() != null) {
-      notNull = true;
-    }
-    
-    // Parse default value
-    Expression defaultValue = null;
-    if (ctx.default_value_part() != null) {
-      defaultValue = (Expression) visit(ctx.default_value_part());
-    }
-    
-    return new RecordType.RecordField(fieldName, dataType, notNull, defaultValue);
+    return VisitFieldSpec.visit(ctx, this);
   }
 
 }
