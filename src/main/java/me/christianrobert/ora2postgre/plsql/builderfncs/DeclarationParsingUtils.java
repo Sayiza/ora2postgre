@@ -3,8 +3,11 @@ package me.christianrobert.ora2postgre.plsql.builderfncs;
 import me.christianrobert.ora2postgre.antlr.PlSqlParser;
 import me.christianrobert.ora2postgre.plsql.PlSqlAstBuilder;
 import me.christianrobert.ora2postgre.plsql.ast.CursorDeclaration;
+import me.christianrobert.ora2postgre.plsql.ast.ExceptionBlock;
+import me.christianrobert.ora2postgre.plsql.ast.ExceptionHandler;
 import me.christianrobert.ora2postgre.plsql.ast.NestedTableType;
 import me.christianrobert.ora2postgre.plsql.ast.Parameter;
+import me.christianrobert.ora2postgre.plsql.ast.PlSqlAst;
 import me.christianrobert.ora2postgre.plsql.ast.RecordType;
 import me.christianrobert.ora2postgre.plsql.ast.Statement;
 import me.christianrobert.ora2postgre.plsql.ast.Variable;
@@ -46,9 +49,9 @@ public class DeclarationParsingUtils {
     if (declareSpecs != null) {
       variables = extractVariablesFromDeclareSpecs(declareSpecs, astBuilder);
       cursorDeclarations = extractCursorDeclarationsFromDeclareSpecs(declareSpecs, astBuilder);
-      recordTypes = astBuilder.extractRecordTypesFromDeclareSpecs(declareSpecs);
-      varrayTypes = astBuilder.extractVarrayTypesFromDeclareSpecs(declareSpecs);
-      nestedTableTypes = astBuilder.extractNestedTableTypesFromDeclareSpecs(declareSpecs);
+      recordTypes = extractRecordTypesFromDeclareSpecs(declareSpecs, astBuilder);
+      varrayTypes = extractVarrayTypesFromDeclareSpecs(declareSpecs, astBuilder);
+      nestedTableTypes = extractNestedTableTypesFromDeclareSpecs(declareSpecs, astBuilder);
     }
 
     return new DeclarationBundle(variables, cursorDeclarations, recordTypes, varrayTypes, nestedTableTypes);
@@ -144,5 +147,106 @@ public class DeclarationParsingUtils {
     }
 
     return cursors;
+  }
+
+  /**
+   * Extracts record type declarations from seq_of_declare_specs context.
+   * Returns a list of RecordType objects found in the DECLARE section.
+   */
+  public static List<RecordType> extractRecordTypesFromDeclareSpecs(
+          PlSqlParser.Seq_of_declare_specsContext ctx,
+          PlSqlAstBuilder astBuilder) {
+    List<RecordType> recordTypes = new ArrayList<>();
+    
+    if (ctx != null && ctx.declare_spec() != null) {
+      for (PlSqlParser.Declare_specContext declareSpec : ctx.declare_spec()) {
+        if (declareSpec.type_declaration() != null) {
+          PlSqlAst typeDeclaration = astBuilder.visit(declareSpec.type_declaration());
+          if (typeDeclaration instanceof RecordType) {
+            recordTypes.add((RecordType) typeDeclaration);
+          }
+        }
+      }
+    }
+    
+    return recordTypes;
+  }
+
+  /**
+   * Extracts VARRAY type declarations from seq_of_declare_specs context.
+   * Returns a list of VarrayType objects found in the DECLARE section.
+   */
+  public static List<VarrayType> extractVarrayTypesFromDeclareSpecs(
+          PlSqlParser.Seq_of_declare_specsContext ctx,
+          PlSqlAstBuilder astBuilder) {
+    List<VarrayType> varrayTypes = new ArrayList<>();
+    
+    if (ctx != null && ctx.declare_spec() != null) {
+      for (PlSqlParser.Declare_specContext declareSpec : ctx.declare_spec()) {
+        if (declareSpec.type_declaration() != null) {
+          PlSqlAst typeDeclaration = astBuilder.visit(declareSpec.type_declaration());
+          if (typeDeclaration instanceof VarrayType) {
+            varrayTypes.add((VarrayType) typeDeclaration);
+          }
+        }
+      }
+    }
+    
+    return varrayTypes;
+  }
+
+  /**
+   * Extracts TABLE OF type declarations from seq_of_declare_specs context.
+   * Returns a list of NestedTableType objects found in the DECLARE section.
+   */
+  public static List<NestedTableType> extractNestedTableTypesFromDeclareSpecs(
+          PlSqlParser.Seq_of_declare_specsContext ctx,
+          PlSqlAstBuilder astBuilder) {
+    List<NestedTableType> nestedTableTypes = new ArrayList<>();
+    
+    if (ctx != null && ctx.declare_spec() != null) {
+      for (PlSqlParser.Declare_specContext declareSpec : ctx.declare_spec()) {
+        if (declareSpec.type_declaration() != null) {
+          PlSqlAst typeDeclaration = astBuilder.visit(declareSpec.type_declaration());
+          if (typeDeclaration instanceof NestedTableType) {
+            nestedTableTypes.add((NestedTableType) typeDeclaration);
+          }
+        }
+      }
+    }
+    
+    return nestedTableTypes;
+  }
+
+  /**
+   * Helper method to parse exception handlers into an ExceptionBlock
+   */
+  public static ExceptionBlock parseExceptionBlock(List<PlSqlParser.Exception_handlerContext> handlerContexts, PlSqlAstBuilder astBuilder) {
+    List<ExceptionHandler> handlers = new ArrayList<>();
+    
+    for (PlSqlParser.Exception_handlerContext handlerCtx : handlerContexts) {
+      // Parse exception names (can be multiple with OR)
+      List<String> exceptionNames = new ArrayList<>();
+      if (handlerCtx.exception_name() != null) {
+        for (var exceptionNameCtx : handlerCtx.exception_name()) {
+          exceptionNames.add(exceptionNameCtx.getText());
+        }
+      }
+      
+      // Parse THEN statements
+      List<Statement> statements = new ArrayList<>();
+      if (handlerCtx.seq_of_statements() != null && handlerCtx.seq_of_statements().statement() != null) {
+        for (PlSqlParser.StatementContext stmtCtx : handlerCtx.seq_of_statements().statement()) {
+          Statement statement = (Statement) astBuilder.visit(stmtCtx);
+          if (statement != null) {
+            statements.add(statement);
+          }
+        }
+      }
+      
+      handlers.add(new ExceptionHandler(exceptionNames, statements));
+    }
+    
+    return new ExceptionBlock(handlers);
   }
 }

@@ -51,7 +51,7 @@ public class VisitFunctionBody {
     // Parse exception block if present
     ExceptionBlock exceptionBlock = null;
     if (ctx.body() != null && ctx.body().exception_handler() != null && !ctx.body().exception_handler().isEmpty()) {
-      exceptionBlock = astBuilder.parseExceptionBlock(ctx.body().exception_handler());
+      exceptionBlock = DeclarationParsingUtils.parseExceptionBlock(ctx.body().exception_handler(), astBuilder);
     }
 
     return new Function(procedureName, parameters, variables, cursorDeclarations, recordTypes, varrayTypes, nestedTableTypes, returnType, statements, exceptionBlock);

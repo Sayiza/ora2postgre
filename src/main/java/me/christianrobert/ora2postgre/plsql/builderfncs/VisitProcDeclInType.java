@@ -32,7 +32,7 @@ public class VisitProcDeclInType {
     // Parse exception handling if present (procedure-specific functionality)
     ExceptionBlock exceptionBlock = null;
     if (ctx.body() != null && ctx.body().exception_handler() != null && !ctx.body().exception_handler().isEmpty()) {
-      exceptionBlock = astBuilder.parseExceptionBlock(ctx.body().exception_handler());
+      exceptionBlock = DeclarationParsingUtils.parseExceptionBlock(ctx.body().exception_handler(), astBuilder);
     }
 
     return new Procedure(

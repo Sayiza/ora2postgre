@@ -49,9 +49,15 @@ import me.christianrobert.ora2postgre.plsql.builderfncs.VisitConcatenation;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitTypeBody;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitRelationalExpression;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitOverClause;
-
-import java.util.ArrayList;
-import java.util.List;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitOpenStatement;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitExitStatement;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitExpression;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitMultisetExpression;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitModelExpression;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitCompoundExpression;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitVarrayTypeDef;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitWhereClause;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitCondition;
 
 public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
   public final String schema;
@@ -88,68 +94,6 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     return VisitCursorDeclaration.visit(ctx, this);
   }
 
-  /**
-   * Extracts record type declarations from seq_of_declare_specs context.
-   * Returns a list of RecordType objects found in the DECLARE section.
-   */
-  public List<RecordType> extractRecordTypesFromDeclareSpecs(PlSqlParser.Seq_of_declare_specsContext ctx) {
-    List<RecordType> recordTypes = new ArrayList<>();
-    
-    if (ctx != null && ctx.declare_spec() != null) {
-      for (PlSqlParser.Declare_specContext declareSpec : ctx.declare_spec()) {
-        if (declareSpec.type_declaration() != null) {
-          PlSqlAst typeDeclaration = visit(declareSpec.type_declaration());
-          if (typeDeclaration instanceof RecordType) {
-            recordTypes.add((RecordType) typeDeclaration);
-          }
-        }
-      }
-    }
-    
-    return recordTypes;
-  }
-
-  /**
-   * Extracts VARRAY type declarations from seq_of_declare_specs context.
-   * Returns a list of VarrayType objects found in the DECLARE section.
-   */
-  public List<VarrayType> extractVarrayTypesFromDeclareSpecs(PlSqlParser.Seq_of_declare_specsContext ctx) {
-    List<VarrayType> varrayTypes = new ArrayList<>();
-    
-    if (ctx != null && ctx.declare_spec() != null) {
-      for (PlSqlParser.Declare_specContext declareSpec : ctx.declare_spec()) {
-        if (declareSpec.type_declaration() != null) {
-          PlSqlAst typeDeclaration = visit(declareSpec.type_declaration());
-          if (typeDeclaration instanceof VarrayType) {
-            varrayTypes.add((VarrayType) typeDeclaration);
-          }
-        }
-      }
-    }
-    
-    return varrayTypes;
-  }
-
-  /**
-   * Extracts TABLE OF type declarations from seq_of_declare_specs context.
-   * Returns a list of NestedTableType objects found in the DECLARE section.
-   */
-  public List<NestedTableType> extractNestedTableTypesFromDeclareSpecs(PlSqlParser.Seq_of_declare_specsContext ctx) {
-    List<NestedTableType> nestedTableTypes = new ArrayList<>();
-    
-    if (ctx != null && ctx.declare_spec() != null) {
-      for (PlSqlParser.Declare_specContext declareSpec : ctx.declare_spec()) {
-        if (declareSpec.type_declaration() != null) {
-          PlSqlAst typeDeclaration = visit(declareSpec.type_declaration());
-          if (typeDeclaration instanceof NestedTableType) {
-            nestedTableTypes.add((NestedTableType) typeDeclaration);
-          }
-        }
-      }
-    }
-    
-    return nestedTableTypes;
-  }
 
   @Override
   public PlSqlAst visitSeq_of_declare_specs(PlSqlParser.Seq_of_declare_specsContext ctx) {
@@ -191,20 +135,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
 
   @Override
   public PlSqlAst visitOpen_statement(PlSqlParser.Open_statementContext ctx) {
-    String cursorName = ctx.cursor_name().getText();
-    
-    // Parse parameters if present
-    List<Expression> parameters = new ArrayList<>();
-    if (ctx.expressions_() != null && ctx.expressions_().expression() != null) {
-      for (PlSqlParser.ExpressionContext exprCtx : ctx.expressions_().expression()) {
-        Expression expr = (Expression) visit(exprCtx);
-        if (expr != null) {
-          parameters.add(expr);
-        }
-      }
-    }
-    
-    return new OpenStatement(cursorName, parameters);
+    return VisitOpenStatement.visit(ctx, this);
   }
 
   @Override
@@ -234,20 +165,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
 
   @Override
   public PlSqlAst visitExit_statement(PlSqlParser.Exit_statementContext ctx) {
-    String labelName = null;
-    Expression condition = null;
-    
-    // Check for optional label name
-    if (ctx.label_name() != null) {
-      labelName = ctx.label_name().getText();
-    }
-    
-    // Check for optional WHEN condition
-    if (ctx.condition() != null) {
-      condition = (Expression) visit(ctx.condition());
-    }
-    
-    return new ExitStatement(labelName, condition);
+    return VisitExitStatement.visit(ctx, this);
   }
 
   // LOOP and SELECT START
@@ -280,19 +198,11 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     return VisitQueryBlock.visit(ctx, this);
   }
 
-  /**
-   * Visits Oracle WITH clause and creates SelectWithClause AST node.
-   * Grammar: WITH (function_body | procedure_body)* with_factoring_clause (',' with_factoring_clause)*
-   */
   @Override
   public PlSqlAst visitWith_clause(PlSqlParser.With_clauseContext ctx) {
     return VisitWithClause.visit(ctx, this);
   }
-  
-  /**
-   * Visits Oracle WITH factoring clause and delegates to appropriate handler.
-   * Grammar: subquery_factoring_clause | subav_factoring_clause
-   */
+
   @Override
   public PlSqlAst visitWith_factoring_clause(PlSqlParser.With_factoring_clauseContext ctx) {
     if (ctx.subquery_factoring_clause() != null) {
@@ -421,24 +331,11 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     String exceptionName = ctx.exception_name().getText();
     return new RaiseStatement(exceptionName);
   }
-  
   // Statement END
 
   @Override
   public PlSqlAst visitExpression(PlSqlParser.ExpressionContext ctx) {
-    if (ctx.cursor_expression() != null) {
-      CursorExpression cursorExpr = (CursorExpression) visit(ctx.cursor_expression());
-      return new Expression(cursorExpr);
-    }
-    if (ctx.logical_expression() != null) {
-      LogicalExpression logicalExpr = (LogicalExpression) visit(ctx.logical_expression());
-      return new Expression(logicalExpr);
-    }
-    
-    // If neither cursor nor logical expression is found, we need to handle this case
-    // According to the grammar, this should not happen, but create a simple logical expression as fallback
-    LogicalExpression fallbackLogical = new LogicalExpression(new UnaryLogicalExpression(ctx.getText()));
-    return new Expression(fallbackLogical);
+    return VisitExpression.visit(ctx, this);
   }
 
   @Override
@@ -463,17 +360,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
   // Start CollectionTypes, other than Object Types:
   @Override
   public PlSqlAst visitVarray_type_def(PlSqlParser.Varray_type_defContext ctx) {
-    Long sizeNumeric = null;
-    Expression expression = null;
-    if (ctx.expression() != null
-            && ctx.expression().getText() != null
-            && ctx.expression().getText().matches("-?\\d+")) {
-      sizeNumeric = Long.parseLong(ctx.expression().getText());
-    } else {
-      expression = (Expression) visit(ctx.expression());
-    }
-
-    return new VarrayType(sizeNumeric, expression, (DataTypeSpec) visit(ctx.type_spec()));
+    return VisitVarrayTypeDef.visit(ctx, this);
   }
   @Override
   public PlSqlAst visitNested_table_type_def(PlSqlParser.Nested_table_type_defContext ctx) {
@@ -544,7 +431,6 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
   }
 
   // PACKAGE
-
   @Override
   public PlSqlAst visitParameter(PlSqlParser.ParameterContext ctx) {
     return new Parameter(
@@ -572,38 +458,6 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     return VisitFunctionBody.visit(ctx, this);
   }
 
-  /**
-   * Helper method to parse exception handlers into an ExceptionBlock
-   */
-  public ExceptionBlock parseExceptionBlock(List<PlSqlParser.Exception_handlerContext> handlerContexts) {
-    List<ExceptionHandler> handlers = new ArrayList<>();
-    
-    for (PlSqlParser.Exception_handlerContext handlerCtx : handlerContexts) {
-      // Parse exception names (can be multiple with OR)
-      List<String> exceptionNames = new ArrayList<>();
-      if (handlerCtx.exception_name() != null) {
-        for (var exceptionNameCtx : handlerCtx.exception_name()) {
-          exceptionNames.add(exceptionNameCtx.getText());
-        }
-      }
-      
-      // Parse THEN statements
-      List<Statement> statements = new ArrayList<>();
-      if (handlerCtx.seq_of_statements() != null && handlerCtx.seq_of_statements().statement() != null) {
-        for (PlSqlParser.StatementContext stmtCtx : handlerCtx.seq_of_statements().statement()) {
-          Statement statement = (Statement) visit(stmtCtx);
-          if (statement != null) {
-            statements.add(statement);
-          }
-        }
-      }
-      
-      handlers.add(new ExceptionHandler(exceptionNames, statements));
-    }
-    
-    return new ExceptionBlock(handlers);
-  }
-
   @Override
   public PlSqlAst visitCreate_package(PlSqlParser.Create_packageContext ctx) {
     return VisitCreatePackage.visit(ctx, this);
@@ -626,86 +480,32 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
 
   @Override
   public PlSqlAst visitWhere_clause(PlSqlParser.Where_clauseContext ctx) {
-    if (ctx.cursor_name() != null) {
-      // CURRENT OF cursor_name variant
-      String cursorName = ctx.cursor_name().getText();
-      return new WhereClause(cursorName);
-    } else if (ctx.condition() != null) {
-      // condition variant
-      Expression condition = (Expression) visit(ctx.condition());
-      return new WhereClause(condition);
-    }
-    return null;
+    return VisitWhereClause.visit(ctx, this);
   }
 
   @Override
   public PlSqlAst visitCondition(PlSqlParser.ConditionContext ctx) {
-    if (ctx.expression() != null) {
-      return visit(ctx.expression());
-    } else if (ctx.JSON_EQUAL() != null && ctx.expressions_() != null) {
-      // Handle JSON_EQUAL function - for now, convert to raw text
-      String jsonEqualText = "JSON_EQUAL(" + ctx.expressions_().getText() + ")";
-      // Convert JSON_EQUAL to logical expression
-      LogicalExpression logicalExpr = new LogicalExpression(new UnaryLogicalExpression(jsonEqualText));
-      return new Expression(logicalExpr);
-    }
-    return null;
+    return VisitCondition.visit(ctx, this);
   }
 
-  /**
-   * Visitor method for unary_expression rule.
-   * This is the key method that handles standard_function calls including cursor attributes.
-   */
   @Override
   public PlSqlAst visitUnary_expression(PlSqlParser.Unary_expressionContext ctx) {
     return VisitUnaryExpression.visit(ctx, this);
   }
 
-
-  /**
-   * Visitor method for multiset_expression rule.
-   */
   @Override
   public PlSqlAst visitMultiset_expression(PlSqlParser.Multiset_expressionContext ctx) {
-    if (ctx.relational_expression() != null) {
-      // Visit the relational expression
-      PlSqlAst relationalAst = visit(ctx.relational_expression());
-      if (relationalAst instanceof RelationalExpression) {
-        return new MultisetExpression((RelationalExpression) relationalAst);
-      }
-      // Fallback
-      return visitChildren(ctx);
-    }
-    
-    // For other types of multiset expressions, fall back to default behavior
-    return visitChildren(ctx);
+    return VisitMultisetExpression.visit(ctx, this);
   }
 
-  /**
-   * Visitor method for relational_expression rule.
-   */
   @Override
   public PlSqlAst visitRelational_expression(PlSqlParser.Relational_expressionContext ctx) {
     return VisitRelationalExpression.visit(ctx, this);
   }
 
-  /**
-   * Visitor method for compound_expression rule.
-   */
   @Override
   public PlSqlAst visitCompound_expression(PlSqlParser.Compound_expressionContext ctx) {
-    if (ctx.concatenation() != null && !ctx.concatenation().isEmpty()) {
-      // Visit the first concatenation
-      PlSqlAst concatenationAst = visit(ctx.concatenation(0));
-      if (concatenationAst instanceof Concatenation) {
-        return new CompoundExpression((Concatenation) concatenationAst);
-      }
-      // Fallback
-      return visitChildren(ctx);
-    }
-    
-    // For other compound expressions, fall back to default behavior
-    return visitChildren(ctx);
+    return VisitCompoundExpression.visit(ctx, this);
   }
 
   /**
@@ -716,10 +516,6 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     return VisitConcatenation.visit(ctx, this);
   }
 
-  /**
-   * Visitor method for standard_function rule.
-   * This delegates to the appropriate sub-function visitor.
-   */
   @Override
   public PlSqlAst visitStandard_function(PlSqlParser.Standard_functionContext ctx) {
     if (ctx.other_function() != null) {
@@ -730,86 +526,19 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
     return visitChildren(ctx);
   }
 
-  /**
-   * Visitor method for other_function rule.
-   * This handles cursor attributes and other Oracle functions.
-   */
   @Override
   public PlSqlAst visitOther_function(PlSqlParser.Other_functionContext ctx) {
     return VisitOtherFunction.visit(ctx, this);
   }
 
-
-  /**
-   * Visitor method for over_clause rule.
-   */
   @Override
   public PlSqlAst visitOver_clause(PlSqlParser.Over_clauseContext ctx) {
     return VisitOverClause.visit(ctx, this);
   }
 
-  /**
-   * Parse PARTITION BY clause.
-   */
-  public java.util.List<Expression> parsePartitionByClause(PlSqlParser.Query_partition_clauseContext ctx) {
-    java.util.List<Expression> partitionByColumns = new java.util.ArrayList<>();
-    
-    // Create simple text-based expressions for now
-    // A more complete implementation would parse the actual expressions
-    if (ctx != null && ctx.getText() != null) {
-      String text = ctx.getText();
-      if (text.contains("PARTITION")) {
-        // Simple text-based expression as placeholder
-        LogicalExpression logicalExpr = new LogicalExpression(new UnaryLogicalExpression(text));
-        Expression expr = new Expression(logicalExpr);
-        partitionByColumns.add(expr);
-      }
-    }
-    
-    return partitionByColumns;
-  }
-
-  /**
-   * Parse ORDER BY clause for OVER clause.
-   */
-  public java.util.List<OrderByElement> parseOrderByClause(PlSqlParser.Order_by_clauseContext ctx) {
-    java.util.List<OrderByElement> orderByElements = new java.util.ArrayList<>();
-    
-    // Create simple text-based order by elements for now
-    // A more complete implementation would parse the actual order by elements
-    if (ctx != null && ctx.getText() != null) {
-      String text = ctx.getText();
-      if (text.contains("ORDER")) {
-        // Simple text-based expression as placeholder
-        LogicalExpression logicalExpr = new LogicalExpression(new UnaryLogicalExpression(text));
-        Expression expr = new Expression(logicalExpr);
-        OrderByElement.SortDirection direction = text.contains("DESC") ? 
-            OrderByElement.SortDirection.DESC : OrderByElement.SortDirection.ASC;
-        OrderByElement orderByElement = new OrderByElement(expr, direction);
-        orderByElements.add(orderByElement);
-      }
-    }
-    
-    return orderByElements;
-  }
-
-  /**
-   * Visitor method for model_expression rule.
-   */
   @Override
   public PlSqlAst visitModel_expression(PlSqlParser.Model_expressionContext ctx) {
-    if (ctx.unary_expression() != null) {
-      PlSqlAst unaryAst = visit(ctx.unary_expression());
-      if (unaryAst instanceof UnaryExpression) {
-        return new ModelExpression((UnaryExpression) unaryAst);
-      }
-      // Fallback - create a simple UnaryExpression from text
-      UnaryExpression unaryExpr = UnaryExpression.forAtom(new Expression(new LogicalExpression(new UnaryLogicalExpression(ctx.unary_expression().getText()))));
-      return new ModelExpression(unaryExpr);
-    }
-    
-    // For other model expressions, fall back to default behavior
-    return visitChildren(ctx);
+    return VisitModelExpression.visit(ctx, this);
   }
 
   @Override
@@ -826,5 +555,4 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
   public PlSqlAst visitField_spec(PlSqlParser.Field_specContext ctx) {
     return VisitFieldSpec.visit(ctx, this);
   }
-
 }

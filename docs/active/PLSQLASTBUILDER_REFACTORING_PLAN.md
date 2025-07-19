@@ -83,6 +83,8 @@ This document outlines the systematic refactoring of the `PlSqlAstBuilder` class
 
 ## 🎉 **TIER 2 COMPLETE!** All 7 medium complexity methods (20-40 lines) have been successfully refactored! 🎉
 
+## 🎉 **TIER 3 COMPLETE!** All 9 smaller methods (5-20 lines) have been successfully refactored! 🎉
+
 ### ✅ 8. **visitCreate_package** → VisitCreatePackage **COMPLETED** ✅
 - **Lines Removed**: ~33 lines
 - **Complexity**: Medium - package spec parsing with multiple member types
@@ -120,15 +122,50 @@ This document outlines the systematic refactoring of the `PlSqlAstBuilder` class
 
 ## Tier 3: Lower Priority - Smaller Methods (5-20 lines)
 
-15. visitOpen_statement (16 lines) → VisitOpenStatement
-16. visitExit_statement (16 lines) → VisitExitStatement  
-17. visitExpression (15 lines) → VisitExpression
-18. visitMultiset_expression (14 lines) → VisitMultisetExpression
-19. visitModel_expression (14 lines) → VisitModelExpression
-20. visitCompound_expression (14 lines) → VisitCompoundExpression
-21. visitVarray_type_def (13 lines) → VisitVarrayTypeDef
-22. visitWhere_clause (12 lines) → VisitWhereClause
-23. visitCondition (12 lines) → VisitCondition
+### ✅ 15. **visitOpen_statement** → VisitOpenStatement **COMPLETED** ✅
+- **Lines Removed**: ~16 lines
+- **Complexity**: Medium - cursor opening with parameter parsing
+- **Status**: Fully refactored with parameter extraction and cursor name handling
+
+### ✅ 16. **visitExit_statement** → VisitExitStatement **COMPLETED** ✅  
+- **Lines Removed**: ~16 lines
+- **Complexity**: Medium - EXIT statement with optional label and WHEN condition
+- **Status**: Fully refactored with label name and condition parsing
+
+### ✅ 17. **visitExpression** → VisitExpression **COMPLETED** ✅
+- **Lines Removed**: ~15 lines
+- **Complexity**: Medium - Expression parsing with cursor and logical expression handling
+- **Status**: Fully refactored with fallback logical expression creation
+
+### ✅ 18. **visitMultiset_expression** → VisitMultisetExpression **COMPLETED** ✅
+- **Lines Removed**: ~14 lines
+- **Complexity**: Medium - Multiset expression with relational expression handling
+- **Status**: Fully refactored with relational expression parsing and fallback behavior
+
+### ✅ 19. **visitModel_expression** → VisitModelExpression **COMPLETED** ✅
+- **Lines Removed**: ~14 lines
+- **Complexity**: Medium - Model expression with unary expression handling
+- **Status**: Fully refactored with UnaryExpression creation and fallback logic
+
+### ✅ 20. **visitCompound_expression** → VisitCompoundExpression **COMPLETED** ✅
+- **Lines Removed**: ~14 lines
+- **Complexity**: Medium - Compound expression with concatenation handling
+- **Status**: Fully refactored with concatenation parsing and fallback behavior
+
+### ✅ 21. **visitVarray_type_def** → VisitVarrayTypeDef **COMPLETED** ✅
+- **Lines Removed**: ~13 lines
+- **Complexity**: Medium - VARRAY type definition with size and type spec parsing
+- **Status**: Fully refactored with numeric size detection and expression handling
+
+### ✅ 22. **visitWhere_clause** → VisitWhereClause **COMPLETED** ✅
+- **Lines Removed**: ~12 lines
+- **Complexity**: Medium - WHERE clause with cursor name and condition variants
+- **Status**: Fully refactored with CURRENT OF cursor and condition expression parsing
+
+### ✅ 23. **visitCondition** → VisitCondition **COMPLETED** ✅
+- **Lines Removed**: ~12 lines
+- **Complexity**: Medium - Condition parsing with JSON_EQUAL function handling
+- **Status**: Fully refactored with expression and JSON_EQUAL special case handling
 
 ## Tier 4: Simple Methods (2-10 lines)
 
@@ -212,10 +249,11 @@ public class VisitMethodName {
   - ✅ All methods: visitUnary_expression, visitOther_function, visitFunction_body, visitProcedure_body, visitCreate_function_body, visitCreate_package_body, visitCreate_procedure_body
 - [x] **Tier 2: 7/7 medium methods completed** ✅ 🎉 **COMPLETE!** 🎉
   - ✅ All methods: visitCreate_package, visitDelete_statement, visitConstructor_declaration, visitConcatenation, visitType_body, visitRelational_expression, visitOver_clause  
-- [ ] Tier 3: 9 smaller methods (5-20 lines each)
+- [x] **Tier 3: 9/9 smaller methods completed** ✅ 🎉 **COMPLETE!** 🎉
+  - ✅ All methods: visitOpen_statement, visitExit_statement, visitExpression, visitMultiset_expression, visitModel_expression, visitCompound_expression, visitVarray_type_def, visitWhere_clause, visitCondition
 - [ ] Tier 4: 22 simple methods (2-10 lines each)
 
-**Total**: 22 methods remaining (516 lines removed so far)
+**Total**: 22 methods remaining (643 lines removed so far)
 
 ## Success Criteria
 
@@ -236,6 +274,6 @@ public class VisitMethodName {
 ---
 
 **Last Updated**: 2025-07-19  
-**Status**: Tier 2 COMPLETE! 🎉 Both Tier 1 and Tier 2 are done!
-**Current Progress**: 516 lines removed from PlSqlAstBuilder
-**Next Priority**: Continue with Tier 3 smaller methods (5-20 lines each)
+**Status**: Tier 3 COMPLETE! 🎉 Tiers 1, 2, and 3 are all done!
+**Current Progress**: 643 lines removed from PlSqlAstBuilder across 23 refactored methods
+**Next Priority**: Continue with Tier 4 simple methods (2-10 lines each)

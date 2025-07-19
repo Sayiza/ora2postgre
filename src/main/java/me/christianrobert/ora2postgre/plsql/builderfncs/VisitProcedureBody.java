@@ -50,7 +50,7 @@ public class VisitProcedureBody {
     // Parse exception handling if present
     ExceptionBlock exceptionBlock = null;
     if (ctx.body() != null && ctx.body().exception_handler() != null && !ctx.body().exception_handler().isEmpty()) {
-      exceptionBlock = astBuilder.parseExceptionBlock(ctx.body().exception_handler());
+      exceptionBlock = DeclarationParsingUtils.parseExceptionBlock(ctx.body().exception_handler(), astBuilder);
     }
 
     return new Procedure(procedureName, parameters, variables, cursorDeclarations, recordTypes, statements, exceptionBlock);
