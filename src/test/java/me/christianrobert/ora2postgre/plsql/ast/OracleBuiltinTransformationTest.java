@@ -3,7 +3,7 @@ package me.christianrobert.ora2postgre.plsql.ast;
 import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.global.PlsqlCode;
 import me.christianrobert.ora2postgre.plsql.PlSqlAstMain;
-import me.christianrobert.ora2postgre.plsql.ast.tools.OracleBuiltinRegistry;
+import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.OracleBuiltinRegistry;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;

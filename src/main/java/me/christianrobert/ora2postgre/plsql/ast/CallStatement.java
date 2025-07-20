@@ -1,8 +1,7 @@
 package me.christianrobert.ora2postgre.plsql.ast;
 
 import me.christianrobert.ora2postgre.global.Everything;
-import me.christianrobert.ora2postgre.plsql.ast.tools.transformers.PackageVariableReferenceTransformer;
-import me.christianrobert.ora2postgre.plsql.ast.tools.OracleBuiltinRegistry;
+import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.OracleBuiltinRegistry;
 
 import java.util.List;
 import java.util.ArrayList;

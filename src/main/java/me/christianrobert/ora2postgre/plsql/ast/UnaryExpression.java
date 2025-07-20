@@ -1,6 +1,7 @@
 package me.christianrobert.ora2postgre.plsql.ast;
 
 import me.christianrobert.ora2postgre.global.Everything;
+import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.CollectionTypeInfo;
 import me.christianrobert.ora2postgre.plsql.ast.tools.transformers.PackageVariableReferenceTransformer;
 
 import java.util.List;
@@ -37,9 +38,6 @@ public class UnaryExpression extends PlSqlAst {
   private final boolean isArrayIndexing; // True if this represents array indexing: arr(i) -> arr[i]
   private final String arrayVariable; // Variable name for array indexing
   private final Expression indexExpression; // Index expression for array indexing
-  private final boolean isCollectionConstructor; // True if this represents collection constructor: type_name(args)
-  private final String collectionTypeName; // Type name for collection constructor
-  private final List<Expression> constructorArguments; // Arguments for collection constructor
 
   // Constructor for unary operations (-, +, PRIOR, etc.)
   public UnaryExpression(String unaryOperator, UnaryExpression childExpression) {
@@ -55,9 +53,6 @@ public class UnaryExpression extends PlSqlAst {
     this.isArrayIndexing = false;
     this.arrayVariable = null;
     this.indexExpression = null;
-    this.isCollectionConstructor = false;
-    this.collectionTypeName = null;
-    this.constructorArguments = null;
   }
 
   // Constructor for case expressions
@@ -74,9 +69,6 @@ public class UnaryExpression extends PlSqlAst {
     this.isArrayIndexing = false;
     this.arrayVariable = null;
     this.indexExpression = null;
-    this.isCollectionConstructor = false;
-    this.collectionTypeName = null;
-    this.constructorArguments = null;
   }
 
   // Private constructor for specific types
@@ -93,9 +85,6 @@ public class UnaryExpression extends PlSqlAst {
     this.isArrayIndexing = false;
     this.arrayVariable = null;
     this.indexExpression = null;
-    this.isCollectionConstructor = false;
-    this.collectionTypeName = null;
-    this.constructorArguments = null;
   }
 
   // Constructor for standard functions
@@ -122,9 +111,6 @@ public class UnaryExpression extends PlSqlAst {
     this.isArrayIndexing = false;
     this.arrayVariable = null;
     this.indexExpression = null;
-    this.isCollectionConstructor = false;
-    this.collectionTypeName = null;
-    this.constructorArguments = null;
   }
 
   // Constructor for array indexing calls
@@ -141,29 +127,8 @@ public class UnaryExpression extends PlSqlAst {
     this.isArrayIndexing = true;
     this.arrayVariable = arrayVariable;
     this.indexExpression = indexExpression;
-    this.isCollectionConstructor = false;
-    this.collectionTypeName = null;
-    this.constructorArguments = null;
   }
 
-  // Constructor for collection constructor calls
-  public UnaryExpression(String collectionTypeName, List<Expression> constructorArguments) {
-    this.unaryOperator = null;
-    this.childExpression = null;
-    this.caseExpression = null;
-    this.quantifiedExpression = null;
-    this.standardFunction = null;
-    this.atom = null;
-    this.implicitCursorExpression = null;
-    this.collectionMethod = null;
-    this.methodArguments = null;
-    this.isArrayIndexing = false;
-    this.arrayVariable = null;
-    this.indexExpression = null;
-    this.isCollectionConstructor = true;
-    this.collectionTypeName = collectionTypeName;
-    this.constructorArguments = constructorArguments;
-  }
 
   public String getUnaryOperator() {
     return unaryOperator;
@@ -229,9 +194,6 @@ public class UnaryExpression extends PlSqlAst {
     return collectionMethod != null;
   }
 
-  public boolean isCollectionConstructor() {
-    return isCollectionConstructor;
-  }
 
   public boolean isArrayIndexing() {
     return isArrayIndexing;
@@ -295,17 +257,32 @@ public class UnaryExpression extends PlSqlAst {
     } else if (isQuantifiedExpression()) {
       return quantifiedExpression.toPostgre(data);
     } else if (isStandardFunction()) {
+      // NEW: Check for collection constructor before standard function processing  
+      String functionName = extractFunctionNameFromExpression(standardFunction);
+      if (functionName != null) {
+        CollectionTypeInfo typeInfo = lookupCollectionTypeDefinition(functionName, data);
+        if (typeInfo != null) {
+          return transformTypeAwareCollectionConstructor(typeInfo, data);
+        }
+      }
+      // Continue with normal function processing if not a collection constructor
       return standardFunction.toPostgre(data);
     } else if (isAtom()) {
+      // NEW: Check if atom represents a collection constructor
+      String functionName = extractFunctionNameFromExpression(atom);
+      if (functionName != null) {
+        CollectionTypeInfo typeInfo = lookupCollectionTypeDefinition(functionName, data);
+        if (typeInfo != null) {
+          return transformAtomCollectionConstructor(typeInfo, atom, data);
+        }
+      }
+      
       return atom.toPostgre(data);
     } else if (isImplicitCursorExpression()) {
       return implicitCursorExpression.toPostgre(data);
     } else if (isCollectionMethodCall()) {
       // Transform Oracle collection methods to PostgreSQL function calls
       return transformCollectionMethodToPostgreSQL(data);
-    } else if (isCollectionConstructor()) {
-      // Transform Oracle collection constructors to PostgreSQL ARRAY syntax
-      return transformCollectionConstructorToPostgreSQL(data);
     } else if (isArrayIndexing()) {
       // Transform Oracle array indexing to PostgreSQL array indexing
       return transformArrayIndexingToPostgreSQL(data);
@@ -515,59 +492,6 @@ public class UnaryExpression extends PlSqlAst {
     return "text"; // Default fallback
   }
 
-  /**
-   * Transform Oracle collection constructors to PostgreSQL ARRAY syntax.
-   * Oracle: string_array('a', 'b', 'c') → PostgreSQL: ARRAY['a', 'b', 'c']
-   * Oracle: number_table(1, 2, 3) → PostgreSQL: ARRAY[1, 2, 3]
-   * Oracle: string_array() → PostgreSQL: ARRAY[]::TEXT[]
-   */
-  private String transformCollectionConstructorToPostgreSQL(Everything data) {
-    if (collectionTypeName == null) {
-      return "/* INVALID COLLECTION CONSTRUCTOR */";
-    }
-    
-    // Handle empty constructor: type_name() → ARRAY[]::type[]
-    if (constructorArguments == null || constructorArguments.isEmpty()) {
-      String baseType = inferPostgreSQLTypeFromCollectionName(collectionTypeName);
-      return "ARRAY[]::" + baseType + "[]";
-    }
-    
-    // Handle constructor with arguments: type_name(arg1, arg2, ...) → ARRAY[arg1, arg2, ...]
-    StringBuilder sb = new StringBuilder();
-    sb.append("ARRAY[");
-    
-    for (int i = 0; i < constructorArguments.size(); i++) {
-      if (i > 0) {
-        sb.append(", ");
-      }
-      sb.append(constructorArguments.get(i).toPostgre(data));
-    }
-    
-    sb.append("]");
-    return sb.toString();
-  }
-
-  /**
-   * Infer PostgreSQL base type from Oracle collection type name.
-   * This is a heuristic approach that can be enhanced with full type context.
-   */
-  private String inferPostgreSQLTypeFromCollectionName(String typeName) {
-    if (typeName == null) return "TEXT";
-    
-    String lowerTypeName = typeName.toLowerCase();
-    
-    // Common Oracle collection type name patterns
-    if (lowerTypeName.contains("string") || lowerTypeName.contains("varchar") || lowerTypeName.contains("char")) {
-      return "TEXT";
-    } else if (lowerTypeName.contains("number") || lowerTypeName.contains("numeric") || lowerTypeName.contains("int")) {
-      return "NUMERIC";
-    } else if (lowerTypeName.contains("date") || lowerTypeName.contains("timestamp")) {
-      return "TIMESTAMP";
-    } else {
-      // Default to TEXT for unknown types
-      return "TEXT";
-    }
-  }
   
   /**
    * Extract the base variable name from a PostgreSQL expression.
@@ -618,5 +542,178 @@ public class UnaryExpression extends PlSqlAst {
     }
     
     return null;
+  }
+
+  /**
+   * Extract function name from an Expression that represents a function call.
+   * This is a helper method to work with the generic Expression type.
+   */
+  private String extractFunctionNameFromExpression(Expression expr) {
+    if (expr == null) {
+      return null;
+    }
+    
+    // Use toString() and extract the function name part
+    String exprString = expr.toString();
+    if (exprString == null || exprString.trim().isEmpty()) {
+      return null;
+    }
+    
+    // For simple function calls like "t_numbers", "string_array", etc.
+    // Extract identifier before parentheses or whitespace
+    String trimmed = exprString.trim();
+    int parenIndex = trimmed.indexOf('(');
+    if (parenIndex > 0) {
+      String candidate = trimmed.substring(0, parenIndex).trim();
+      if (isValidIdentifier(candidate)) {
+        return candidate;
+      }
+    } else {
+      // No parentheses - might be just an identifier
+      if (isValidIdentifier(trimmed)) {
+        return trimmed;
+      }
+    }
+    
+    return null;
+  }
+  
+  /**
+   * Check if a string is a valid Oracle identifier.
+   */
+  private boolean isValidIdentifier(String str) {
+    if (str == null || str.isEmpty()) {
+      return false;
+    }
+    return str.matches("[a-zA-Z_][a-zA-Z0-9_]*");
+  }
+
+  /**
+   * Check if the argument list is simple enough to be a collection constructor.
+   * Collection constructors should have simple expressions, not complex nested calls.
+   */
+  private boolean isSimpleArgumentList(List<Expression> arguments) {
+    if (arguments == null || arguments.isEmpty()) {
+      return true;
+    }
+    
+    // For now, accept any argument list - we can add more sophisticated checks later
+    // if needed to distinguish between function calls and collection constructors
+    return arguments.size() <= 10; // Reasonable limit for collection constructors
+  }
+
+  /**
+   * Look up a collection type definition in the Everything context.
+   * Returns the collection type information if found, null otherwise.
+   */
+  private CollectionTypeInfo lookupCollectionTypeDefinition(String typeName, Everything data) {
+    if (typeName == null || data == null) {
+      return null;
+    }
+    
+    // Search in current package context for VARRAY and TABLE OF types
+    
+    // 1. Search in package specs
+    for (OraclePackage pkg : data.getPackageSpecAst()) {
+      CollectionTypeInfo info = searchPackageForCollectionType(pkg, typeName);
+      if (info != null) return info;
+    }
+    
+    // 2. Search in package bodies  
+    for (OraclePackage pkg : data.getPackageBodyAst()) {
+      CollectionTypeInfo info = searchPackageForCollectionType(pkg, typeName);
+      if (info != null) return info;
+    }
+    
+    // 3. Search in standalone functions (for local collection types)
+    // TODO: Add function-local type lookup when needed
+    
+    return null;
+  }
+
+  /**
+   * Search a specific package for collection type definitions.
+   */
+  private CollectionTypeInfo searchPackageForCollectionType(OraclePackage pkg, String typeName) {
+    if (pkg == null || typeName == null) {
+      return null;
+    }
+    
+    // Search VARRAY types
+    for (VarrayType varray : pkg.getVarrayTypes()) {
+      if (typeName.equalsIgnoreCase(varray.getName())) {
+        return new CollectionTypeInfo(
+          typeName, 
+          "VARRAY", 
+          varray.getDataType(),
+          pkg.getSchema(), 
+          pkg.getName()
+        );
+      }
+    }
+    
+    // Search nested table types
+    for (NestedTableType nestedTable : pkg.getNestedTableTypes()) {
+      if (typeName.equalsIgnoreCase(nestedTable.getName())) {
+        return new CollectionTypeInfo(
+          typeName, 
+          "TABLE", 
+          nestedTable.getDataType(),
+          pkg.getSchema(), 
+          pkg.getName()
+        );
+      }
+    }
+    
+    return null;
+  }
+
+  /**
+   * Transform a collection constructor to PostgreSQL array syntax using type information.
+   * This replaces the old heuristic-based transformation with proper type-aware logic.
+   */
+  private String transformTypeAwareCollectionConstructor(CollectionTypeInfo typeInfo, Everything data) {
+    // For now, check if the expression string indicates an empty constructor
+    String exprString = standardFunction.toString();
+    return transformCollectionConstructorFromExpression(typeInfo, exprString, data);
+  }
+  
+  /**
+   * Transform a collection constructor from an atom expression.
+   */
+  private String transformAtomCollectionConstructor(CollectionTypeInfo typeInfo, Expression atomExpr, Everything data) {
+    String exprString = atomExpr.toString();
+    return transformCollectionConstructorFromExpression(typeInfo, exprString, data);
+  }
+  
+  /**
+   * Common logic to transform collection constructor from expression string.
+   */
+  private String transformCollectionConstructorFromExpression(CollectionTypeInfo typeInfo, String exprString, Everything data) {
+    if (exprString != null && exprString.trim().endsWith("()")) {
+      // Handle empty constructor: t_numbers() → ARRAY[]::NUMERIC[]
+      String baseType = typeInfo.getDataType().toPostgre(data);
+      return "ARRAY[]::" + baseType + "[]";
+    }
+    
+    // For constructors with arguments, we need to parse them from the expression string
+    // This is a simplified approach - in a full implementation, we'd want to parse
+    // the arguments properly from the AST
+    if (exprString != null && exprString.contains("(") && !exprString.trim().endsWith("()")) {
+      // Extract the content between parentheses
+      int startParen = exprString.indexOf('(');
+      int endParen = exprString.lastIndexOf(')');
+      if (startParen >= 0 && endParen > startParen) {
+        String argsString = exprString.substring(startParen + 1, endParen).trim();
+        if (!argsString.isEmpty()) {
+          // Handle constructor with arguments: t_numbers(1, 2, 3) → ARRAY[1, 2, 3]
+          return "ARRAY[" + argsString + "]";
+        }
+      }
+    }
+    
+    // Fallback: empty array with proper type
+    String baseType = typeInfo.getDataType().toPostgre(data);
+    return "ARRAY[]::" + baseType + "[]";
   }
 }

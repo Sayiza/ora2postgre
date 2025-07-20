@@ -1,4 +1,4 @@
-package me.christianrobert.ora2postgre.plsql.ast.tools;
+package me.christianrobert.ora2postgre.plsql.ast.tools.helpers;
 
 import java.util.HashMap;
 import java.util.Map;

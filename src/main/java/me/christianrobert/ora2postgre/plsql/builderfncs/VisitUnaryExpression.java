@@ -95,13 +95,7 @@ public class VisitUnaryExpression {
   private static UnaryExpression checkAtomForCollectionMethod(PlSqlParser.AtomContext atomCtx, PlSqlAstBuilder astBuilder) {
     // Check if atom contains a general_element with dot notation (collection methods)
     if (atomCtx.general_element() != null) {
-      // First check for collection constructors (e.g., string_array('a', 'b'))
-      UnaryExpression collectionConstructor = checkGeneralElementForCollectionConstructor(atomCtx.general_element(), astBuilder);
-      if (collectionConstructor != null) {
-        return collectionConstructor;
-      }
-      
-      // Then check for collection methods
+      // Check for collection methods (e.g., array_var.COUNT, array_var.FIRST)
       UnaryExpression collectionMethod = checkGeneralElementForCollectionMethod(atomCtx.general_element(), astBuilder);
       if (collectionMethod != null) {
         return collectionMethod;
@@ -250,58 +244,4 @@ public class VisitUnaryExpression {
     return null;
   }
 
-  /**
-   * Check if a general_element represents a collection constructor call.
-   * Looks for patterns like: string_array('a', 'b'), number_table(1, 2, 3), etc.
-   * This needs to distinguish between function calls and collection constructors by checking
-   * if the identifier matches a known collection type name.
-   */
-  private static UnaryExpression checkGeneralElementForCollectionConstructor(PlSqlParser.General_elementContext generalElementCtx, PlSqlAstBuilder astBuilder) {
-    // Check for the pattern: general_element_part with function_argument (parentheses syntax)
-    if (generalElementCtx.general_element_part() != null && 
-        !generalElementCtx.general_element_part().isEmpty()) {
-      
-      // We need a simple identifier (not dot notation) with function arguments
-      if (generalElementCtx.general_element() == null) {
-        // This is a simple identifier with parentheses: identifier(args)
-        PlSqlParser.General_element_partContext partCtx = generalElementCtx.general_element_part().get(0);
-        
-        if (partCtx.id_expression() != null && 
-            partCtx.function_argument() != null) {
-          
-          String identifier = partCtx.id_expression().getText();
-          
-          // Check if this identifier is a collection type name
-          // We'll do this by checking if it ends with known collection type patterns
-          // and later enhance with Everything context for precise type checking
-          if (isLikelyCollectionConstructor(identifier)) {
-            // Extract constructor arguments
-            List<Expression> arguments = extractMethodArguments(partCtx, astBuilder);
-            
-            // Create a collection constructor expression
-            return new UnaryExpression(identifier, arguments);
-          }
-        }
-      }
-    }
-    return null;
-  }
-
-  /**
-   * Check if an identifier is likely a collection constructor based on naming patterns.
-   * This is a heuristic check that can be enhanced with full type context later.
-   */
-  private static boolean isLikelyCollectionConstructor(String identifier) {
-    if (identifier == null) return false;
-    
-    String lowerIdentifier = identifier.toLowerCase();
-    
-    // Common Oracle collection type naming patterns
-    return lowerIdentifier.endsWith("_array") || 
-           lowerIdentifier.endsWith("_table") ||
-           lowerIdentifier.endsWith("_list") ||
-           lowerIdentifier.endsWith("_varray") ||
-           lowerIdentifier.contains("array") ||
-           lowerIdentifier.contains("table");
-  }
 }
