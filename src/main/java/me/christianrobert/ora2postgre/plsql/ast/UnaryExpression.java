@@ -751,63 +751,12 @@ public class UnaryExpression extends PlSqlAst {
       return "ARRAY[]::" + baseType + "[]";
     }
     
-    // We have a collection constructor parsed as array indexing
     // Due to parsing limitations, we only have the first argument in indexExpression
-    // Apply semantic intelligence based on the collection type and context
-    
+    // Transform it as a single-argument constructor
     String firstArg = indexExpression.toPostgre(data);
-    
-    // Check if this is likely a multi-argument constructor based on common patterns
-    if (isLikelyMultiArgumentConstructor(typeInfo, firstArg)) {
-      // Generate a reasonable default for demonstration/testing purposes
-      // In a real-world scenario, you might want to log a warning
-      return generateReasonableCollectionConstructor(typeInfo, firstArg, data);
-    }
-    
-    // Single argument constructor
     return "ARRAY[" + firstArg + "]";
   }
   
-  /**
-   * Check if this is likely a multi-argument constructor based on patterns.
-   */
-  private boolean isLikelyMultiArgumentConstructor(CollectionTypeInfo typeInfo, String firstArg) {
-    if (firstArg == null) return false;
-    
-    // Single character strings like 'a', 'b', 'c'
-    if (firstArg.startsWith("'") && firstArg.length() == 3 && firstArg.endsWith("'")) {
-      char c = firstArg.charAt(1);
-      return c >= 'a' && c <= 'z';
-    }
-    
-    // Single digit numbers like 1, 2, 3 (likely part of sequences)
-    if (firstArg.matches("\\d+")) {
-      try {
-        int num = Integer.parseInt(firstArg);
-        return num >= 1 && num <= 10; // Common range for test sequences
-      } catch (NumberFormatException e) {
-        return false;
-      }
-    }
-    
-    return false;
-  }
-  
-  /**
-   * Generate a reasonable collection constructor for testing/demo purposes.
-   */
-  private String generateReasonableCollectionConstructor(CollectionTypeInfo typeInfo, String firstArg, Everything data) {
-    // For testing: if we see 'a', generate ['a', 'b'] pattern
-    if ("'a'".equals(firstArg)) {
-      return "ARRAY['a', 'b']";
-    }
-    if ("1".equals(firstArg)) {
-      return "ARRAY[1, 2, 3]";  
-    }
-    
-    // Fallback to single argument
-    return "ARRAY[" + firstArg + "]";
-  }
 
   /**
    * Common logic to transform collection constructor from expression string.

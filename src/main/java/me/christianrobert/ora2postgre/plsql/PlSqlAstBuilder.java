@@ -2,17 +2,16 @@ package me.christianrobert.ora2postgre.plsql;
 
 import me.christianrobert.ora2postgre.antlr.PlSqlParser;
 import me.christianrobert.ora2postgre.antlr.PlSqlParserBaseVisitor;
-import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.plsql.ast.*;
-import me.christianrobert.ora2postgre.oracledb.tools.NameNormalizer;
-import me.christianrobert.ora2postgre.plsql.builderfncs.DeclarationParsingUtils;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitCallStatement;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitCursorDeclaration;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitLogicalExpression;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitLoopStatement;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitIfStatement;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitSelectListElements;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitReturnStatement;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitSelectStatement;
+import me.christianrobert.ora2postgre.plsql.builderfncs.VisitStatement;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitSubquery;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitFetchStatement;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitFieldSpec;
@@ -108,15 +107,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
   // Statement START
   @Override
   public PlSqlAst visitStatement(PlSqlParser.StatementContext ctx) {
-    if (ctx.getChildCount() == 1) {
-      PlSqlAst visitedStatement = visit(ctx.getChild(0));
-      if (visitedStatement != null) {
-        return visitedStatement;
-      }
-      return new Comment("type of statement not found"+ this.getClass());
-    }
-
-    return new Comment("unclear statement structure: " + this.getClass()); //TODO
+    return VisitStatement.visit(ctx, this);
   }
 
   @Override
@@ -156,11 +147,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
 
   @Override
   public PlSqlAst visitReturn_statement(PlSqlParser.Return_statementContext ctx) {
-    Expression expression = (Expression) visit(ctx.expression());
-    if (expression != null) {
-      return new ReturnStatement(expression);
-    }
-    return new ReturnStatement(null);
+    return VisitReturnStatement.visit(ctx, this);
   }
 
   @Override
