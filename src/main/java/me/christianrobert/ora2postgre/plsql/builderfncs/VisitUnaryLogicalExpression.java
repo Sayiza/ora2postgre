@@ -13,30 +13,21 @@ public class VisitUnaryLogicalExpression {
           PlSqlParser.Unary_logical_expressionContext ctx,
           PlSqlAstBuilder astBuilder) {
     boolean hasNot = ctx.NOT() != null;
-    Expression multisetExpr = null;
+    MultisetExpression multisetExpr = null;
     String logicalOperation = null;
 
     if (ctx.multiset_expression() != null) {
-      // Visit the multiset_expression to properly handle cursor attributes and other expressions
+      // Visit the multiset_expression to get the proper MultisetExpression
       PlSqlAst multisetAst = astBuilder.visit(ctx.multiset_expression());
       if (multisetAst instanceof MultisetExpression) {
-        // Create expression from the multiset expression
-        LogicalExpression logicalExpr = new LogicalExpression(new UnaryLogicalExpression("MULTISET_EXPR_PLACEHOLDER"));
-        multisetExpr = new Expression(logicalExpr) {
-          @Override
-          public String toPostgre(me.christianrobert.ora2postgre.global.Everything data) {
-            return ((MultisetExpression) multisetAst).toPostgre(data);
-          }
-
-          @Override
-          public String toString() {
-            return multisetAst.toString();
-          }
-        };
+        multisetExpr = (MultisetExpression) multisetAst;
       } else {
-        // Fallback to text if visit returns something else
-        LogicalExpression logicalExpr = new LogicalExpression(new UnaryLogicalExpression(ctx.multiset_expression().getText()));
-        multisetExpr = new Expression(logicalExpr);
+        // Fallback: For now, create null MultisetExpression and preserve text in logicalOperation
+        // This will be handled by the text-based constructor
+        multisetExpr = null;
+        if (logicalOperation == null) {
+          logicalOperation = ctx.multiset_expression().getText();
+        }
       }
     }
 

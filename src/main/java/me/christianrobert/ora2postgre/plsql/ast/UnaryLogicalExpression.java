@@ -7,17 +7,17 @@ import me.christianrobert.ora2postgre.plsql.ast.tools.transformers.PackageVariab
 public class UnaryLogicalExpression extends PlSqlAst {
     
     private boolean hasNot;
-    private Expression multisetExpression;
+    private MultisetExpression multisetExpression;
     private String logicalOperation; // IS NULL, IS NOT NULL, etc.
 
-    public UnaryLogicalExpression(boolean hasNot, Expression multisetExpression, String logicalOperation) {
+    public UnaryLogicalExpression(boolean hasNot, MultisetExpression multisetExpression, String logicalOperation) {
         this.hasNot = hasNot;
         this.multisetExpression = multisetExpression;
         this.logicalOperation = logicalOperation;
     }
 
     // Constructor for simple expression without NOT or logical operation
-    public UnaryLogicalExpression(Expression multisetExpression) {
+    public UnaryLogicalExpression(MultisetExpression multisetExpression) {
         this.hasNot = false;
         this.multisetExpression = multisetExpression;
         this.logicalOperation = null;
@@ -30,7 +30,7 @@ public class UnaryLogicalExpression extends PlSqlAst {
         this.logicalOperation = text;
     }
 
-    private static String buildRawText(boolean hasNot, Expression multisetExpression, String logicalOperation) {
+    private static String buildRawText(boolean hasNot, MultisetExpression multisetExpression, String logicalOperation) {
         StringBuilder sb = new StringBuilder();
         if (hasNot) {
             sb.append("NOT ");
@@ -52,7 +52,7 @@ public class UnaryLogicalExpression extends PlSqlAst {
         return hasNot;
     }
 
-    public Expression getMultisetExpression() {
+    public MultisetExpression getMultisetExpression() {
         return multisetExpression;
     }
 
