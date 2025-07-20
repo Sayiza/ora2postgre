@@ -227,16 +227,18 @@ public class VisitUnaryExpression {
           // For now, we'll need access to Everything and current function context
           // This will be passed from the calling context
           
-          // Extract the first argument as the index expression
+          // Extract ALL arguments for proper collection constructor handling
           List<Expression> arguments = extractMethodArguments(partCtx, astBuilder);
           if (arguments != null && !arguments.isEmpty()) {
-            Expression indexExpression = arguments.get(0);
-            
             // TODO: We need to check Everything.isKnownFunction here
-            // For now, assume it's array indexing if we can't determine otherwise
-            // This check will be enhanced when we have the full context
+            // For now, create collection constructor with ALL arguments
+            // This will be enhanced with semantic detection when we have the full context
             
-            return new UnaryExpression(identifier, indexExpression);
+            // Create collection constructor with ALL arguments instead of just the first one
+            return new UnaryExpression(identifier, arguments);
+          } else {
+            // Handle empty constructor: t_numbers() -> ARRAY[]
+            return new UnaryExpression(identifier, new ArrayList<>());
           }
         }
       }

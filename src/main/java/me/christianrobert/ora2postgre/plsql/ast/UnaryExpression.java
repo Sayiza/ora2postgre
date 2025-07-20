@@ -39,6 +39,9 @@ public class UnaryExpression extends PlSqlAst {
   private final boolean isArrayIndexing; // True if this represents array indexing: arr(i) -> arr[i]
   private final String arrayVariable; // Variable name for array indexing
   private final Expression indexExpression; // Index expression for array indexing
+  private final boolean isCollectionConstructor; // True if this represents collection constructor: t_numbers(1,2,3)
+  private final String constructorName; // Constructor name for collection constructors
+  private final List<Expression> constructorArguments; // Arguments for collection constructors
 
   // Constructor for unary operations (-, +, PRIOR, etc.)
   public UnaryExpression(String unaryOperator, UnaryExpression childExpression) {
@@ -54,6 +57,9 @@ public class UnaryExpression extends PlSqlAst {
     this.isArrayIndexing = false;
     this.arrayVariable = null;
     this.indexExpression = null;
+    this.isCollectionConstructor = false;
+    this.constructorName = null;
+    this.constructorArguments = null;
   }
 
   // Constructor for case expressions
@@ -70,6 +76,9 @@ public class UnaryExpression extends PlSqlAst {
     this.isArrayIndexing = false;
     this.arrayVariable = null;
     this.indexExpression = null;
+    this.isCollectionConstructor = false;
+    this.constructorName = null;
+    this.constructorArguments = null;
   }
 
   // Private constructor for specific types
@@ -86,6 +95,9 @@ public class UnaryExpression extends PlSqlAst {
     this.isArrayIndexing = false;
     this.arrayVariable = null;
     this.indexExpression = null;
+    this.isCollectionConstructor = false;
+    this.constructorName = null;
+    this.constructorArguments = null;
   }
 
   // Constructor for standard functions
@@ -112,6 +124,9 @@ public class UnaryExpression extends PlSqlAst {
     this.isArrayIndexing = false;
     this.arrayVariable = null;
     this.indexExpression = null;
+    this.isCollectionConstructor = false;
+    this.constructorName = null;
+    this.constructorArguments = null;
   }
 
   // Constructor for array indexing calls
@@ -128,6 +143,28 @@ public class UnaryExpression extends PlSqlAst {
     this.isArrayIndexing = true;
     this.arrayVariable = arrayVariable;
     this.indexExpression = indexExpression;
+    this.isCollectionConstructor = false;
+    this.constructorName = null;
+    this.constructorArguments = null;
+  }
+
+  // Constructor for collection constructors (NEW)
+  public UnaryExpression(String constructorName, List<Expression> constructorArguments) {
+    this.unaryOperator = null;
+    this.childExpression = null;
+    this.caseExpression = null;
+    this.quantifiedExpression = null;
+    this.standardFunction = null;
+    this.atom = null;
+    this.implicitCursorExpression = null;
+    this.collectionMethod = null;
+    this.methodArguments = null;
+    this.isArrayIndexing = false;
+    this.arrayVariable = null;
+    this.indexExpression = null;
+    this.isCollectionConstructor = true;
+    this.constructorName = constructorName;
+    this.constructorArguments = constructorArguments != null ? new ArrayList<>(constructorArguments) : new ArrayList<>();
   }
 
 
@@ -208,6 +245,18 @@ public class UnaryExpression extends PlSqlAst {
     return indexExpression;
   }
 
+  public boolean isCollectionConstructor() {
+    return isCollectionConstructor;
+  }
+
+  public String getConstructorName() {
+    return constructorName;
+  }
+
+  public List<Expression> getConstructorArguments() {
+    return constructorArguments != null ? new ArrayList<>(constructorArguments) : new ArrayList<>();
+  }
+
   @Override
   public <T> T accept(PlSqlAstVisitor<T> visitor) {
     return visitor.visit(this);
@@ -244,6 +293,17 @@ public class UnaryExpression extends PlSqlAst {
       return sb.toString();
     } else if (isArrayIndexing()) {
       return arrayVariable + "(" + indexExpression.toString() + ")";
+    } else if (isCollectionConstructor()) {
+      StringBuilder sb = new StringBuilder();
+      sb.append(constructorName).append("(");
+      if (constructorArguments != null) {
+        for (int i = 0; i < constructorArguments.size(); i++) {
+          if (i > 0) sb.append(", ");
+          sb.append(constructorArguments.get(i).toString());
+        }
+      }
+      sb.append(")");
+      return sb.toString();
     } else {
       return "/* INVALID UNARY EXPRESSION */";
     }
@@ -296,6 +356,9 @@ public class UnaryExpression extends PlSqlAst {
       
       // Transform Oracle array indexing to PostgreSQL array indexing
       return transformArrayIndexingToPostgreSQL(data);
+    } else if (isCollectionConstructor()) {
+      // Transform collection constructor to PostgreSQL array syntax
+      return transformCollectionConstructorToPostgreSQL(data);
     } else {
       return "/* INVALID UNARY EXPRESSION */";
     }
@@ -443,6 +506,43 @@ public class UnaryExpression extends PlSqlAst {
         
       default:
         return "/* Unknown collection method: " + collectionMethod + " */";
+    }
+  }
+
+  /**
+   * Transform collection constructor to PostgreSQL array syntax.
+   * Oracle: t_numbers(1, 2, 3) → PostgreSQL: ARRAY[1, 2, 3]
+   * Falls back to array indexing if not actually a collection constructor.
+   */
+  private String transformCollectionConstructorToPostgreSQL(Everything data) {
+    if (constructorName == null) {
+      return "/* INVALID COLLECTION CONSTRUCTOR */";
+    }
+    
+    // First check if this is actually a collection type constructor
+    if (data.isCollectionTypeConstructor(constructorName, data.getCurrentFunction())) {
+      // Use the Everything.transformCollectionConstructor method for proper transformation
+      return data.transformCollectionConstructor(constructorName, constructorArguments, data.getCurrentFunction());
+    } else {
+      // This is not a collection constructor - it's probably array indexing
+      // Fall back to array indexing transformation: v_arr(i) → v_arr[i]
+      if (constructorArguments != null && constructorArguments.size() == 1) {
+        // Single argument - treat as array indexing
+        String indexString = constructorArguments.get(0).toPostgre(data);
+        return constructorName + "[" + indexString + "]";
+      } else {
+        // Multiple arguments but not a collection constructor - this might be a function call
+        StringBuilder sb = new StringBuilder();
+        sb.append(constructorName).append("(");
+        if (constructorArguments != null) {
+          for (int i = 0; i < constructorArguments.size(); i++) {
+            if (i > 0) sb.append(", ");
+            sb.append(constructorArguments.get(i).toPostgre(data));
+          }
+        }
+        sb.append(")");
+        return sb.toString();
+      }
     }
   }
 

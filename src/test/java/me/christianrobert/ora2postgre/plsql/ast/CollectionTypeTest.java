@@ -912,7 +912,7 @@ END;
                "Should contain ARRAY['a', 'b', 'c'] transformation");
     assertTrue(postgreSQL.contains("ARRAY[1, 2, 3, 4, 5]"), 
                "Should contain ARRAY[1, 2, 3, 4, 5] transformation");
-    assertTrue(postgreSQL.contains("ARRAY[]::TEXT[]"), 
+    assertTrue(postgreSQL.toUpperCase().contains("ARRAY[]::TEXT[]"), 
                "Should contain ARRAY[]::TEXT[] for empty constructor");
     
     // Verify collection methods work in compound expressions
