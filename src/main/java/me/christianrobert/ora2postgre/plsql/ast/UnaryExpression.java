@@ -4,6 +4,7 @@ import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.CollectionTypeInfo;
 import me.christianrobert.ora2postgre.plsql.ast.tools.transformers.PackageVariableReferenceTransformer;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -257,24 +258,22 @@ public class UnaryExpression extends PlSqlAst {
     } else if (isQuantifiedExpression()) {
       return quantifiedExpression.toPostgre(data);
     } else if (isStandardFunction()) {
-      // NEW: Check for collection constructor before standard function processing  
+      // Check for collection constructor before standard function processing  
       String functionName = extractFunctionNameFromExpression(standardFunction);
-      if (functionName != null) {
-        CollectionTypeInfo typeInfo = lookupCollectionTypeDefinition(functionName, data);
-        if (typeInfo != null) {
-          return transformTypeAwareCollectionConstructor(typeInfo, data);
-        }
+      if (functionName != null && data.isCollectionTypeConstructor(functionName, data.getCurrentFunction())) {
+        // Extract arguments from the function expression (simplified approach)
+        List<Expression> arguments = extractArgumentsFromExpression(standardFunction);
+        return data.transformCollectionConstructor(functionName, arguments, data.getCurrentFunction());
       }
       // Continue with normal function processing if not a collection constructor
       return standardFunction.toPostgre(data);
     } else if (isAtom()) {
-      // NEW: Check if atom represents a collection constructor
+      // Check if atom represents a collection constructor
       String functionName = extractFunctionNameFromExpression(atom);
-      if (functionName != null) {
-        CollectionTypeInfo typeInfo = lookupCollectionTypeDefinition(functionName, data);
-        if (typeInfo != null) {
-          return transformAtomCollectionConstructor(typeInfo, atom, data);
-        }
+      if (functionName != null && data.isCollectionTypeConstructor(functionName, data.getCurrentFunction())) {
+        // Extract arguments from the atom expression
+        List<Expression> arguments = extractArgumentsFromExpression(atom);
+        return data.transformCollectionConstructor(functionName, arguments, data.getCurrentFunction());
       }
       
       return atom.toPostgre(data);
@@ -285,12 +284,14 @@ public class UnaryExpression extends PlSqlAst {
       return transformCollectionMethodToPostgreSQL(data);
     } else if (isArrayIndexing()) {
       // SEMANTIC LAYER: Check if this is actually a collection constructor parsed as array indexing
-      if (arrayVariable != null) {
-        CollectionTypeInfo typeInfo = lookupCollectionTypeDefinition(arrayVariable, data);
-        if (typeInfo != null) {
-          // This is a collection constructor, not array indexing
-          return transformCollectionConstructorFromArrayIndexing(typeInfo, data);
+      if (arrayVariable != null && data.isCollectionTypeConstructor(arrayVariable, data.getCurrentFunction())) {
+        // This is a collection constructor, not array indexing
+        // Create argument list from the index expression (parsing limitation workaround)
+        List<Expression> arguments = new ArrayList<>();
+        if (indexExpression != null) {
+          arguments.add(indexExpression);
         }
+        return data.transformCollectionConstructor(arrayVariable, arguments, data.getCurrentFunction());
       }
       
       // Transform Oracle array indexing to PostgreSQL array indexing
@@ -723,21 +724,25 @@ public class UnaryExpression extends PlSqlAst {
   }
 
   /**
-   * Transform a collection constructor to PostgreSQL array syntax using type information.
-   * This replaces the old heuristic-based transformation with proper type-aware logic.
+   * Extract arguments from an expression that represents a function call.
+   * This is a simplified approach to handle parsing limitations.
+   * Returns empty list for empty constructors, single-element list for parsed expressions.
    */
-  private String transformTypeAwareCollectionConstructor(CollectionTypeInfo typeInfo, Everything data) {
-    // For now, check if the expression string indicates an empty constructor
-    String exprString = standardFunction.toString();
-    return transformCollectionConstructorFromExpression(typeInfo, exprString, data);
-  }
-  
-  /**
-   * Transform a collection constructor from an atom expression.
-   */
-  private String transformAtomCollectionConstructor(CollectionTypeInfo typeInfo, Expression atomExpr, Everything data) {
-    String exprString = atomExpr.toString();
-    return transformCollectionConstructorFromExpression(typeInfo, exprString, data);
+  private List<Expression> extractArgumentsFromExpression(Expression expr) {
+    List<Expression> arguments = new ArrayList<>();
+    
+    // For now, this is a simplified approach
+    // In a proper implementation, we would parse the AST structure properly
+    // This method exists to interface with the new Everything-based architecture
+    
+    String exprString = expr.toString();
+    if (exprString != null && !exprString.trim().endsWith("()")) {
+      // For non-empty constructors, we'll create a simple wrapper for the expression
+      // This is a transitional approach until proper AST parsing is implemented
+      arguments.add(expr);
+    }
+    
+    return arguments;
   }
   
   /**

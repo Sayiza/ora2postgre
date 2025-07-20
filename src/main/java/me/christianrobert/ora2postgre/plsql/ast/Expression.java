@@ -5,6 +5,25 @@ import me.christianrobert.ora2postgre.global.PostgreSqlIdentifierUtils;
 
 import java.util.List;
 
+/**
+ * Expression wrapper class - ARCHITECTURAL DEBT
+ * 
+ * NOTE: This class represents architectural debt from the chaotic expression hierarchy.
+ * It uses a problematic either/or pattern that should be refactored.
+ * 
+ * CURRENT ISSUES:
+ * - Runtime null checks instead of compile-time type safety
+ * - Complex delegation chains through 8+ expression levels  
+ * - Either/or pattern instead of proper inheritance/composition
+ * - Collection constructor logic scattered across multiple classes
+ * 
+ * PHASE 2 REFACTORING PLAN:
+ * - Replace either/or pattern with direct expression types
+ * - Flatten the unnecessary hierarchy layers
+ * - Consolidate transformation logic in Everything context
+ * 
+ * USAGE: This class should eventually be replaced with ExpressionBase hierarchy
+ */
 public class Expression extends PlSqlAst {
   private final CursorExpression cursorExpression;
   private final LogicalExpression logicalExpression;
@@ -15,7 +34,7 @@ public class Expression extends PlSqlAst {
     this.logicalExpression = null;
   }
 
-  // Constructor for logical expression
+  // Constructor for logical expression  
   public Expression(LogicalExpression logicalExpression) {
     this.cursorExpression = null;
     this.logicalExpression = logicalExpression;
@@ -55,27 +74,49 @@ public class Expression extends PlSqlAst {
 
   // toJava() method removed - expressions stay in PostgreSQL
 
+  /**
+   * Transform to PostgreSQL syntax using clean Everything-based semantic resolution.
+   * 
+   * ARCHITECTURAL NOTE: This method demonstrates the either/or delegation pattern
+   * that should be eliminated in future refactoring. The transformation logic
+   * properly uses Everything context for semantic analysis.
+   */
   public String toPostgre(Everything data) {
+    // Validate state - this check highlights the either/or pattern problem
+    if (cursorExpression == null && logicalExpression == null) {
+      throw new IllegalStateException("Expression must have either cursor or logical expression - this highlights the either/or pattern problem");
+    }
+    
+    // ARCHITECTURAL DEBT: Either/or delegation
     if (cursorExpression != null) {
+      if (logicalExpression != null) {
+        throw new IllegalStateException("Expression cannot have both cursor and logical expression - either/or pattern violation");
+      }
       return cursorExpression.toPostgre(data);
-    } else if (logicalExpression != null) {
-      return logicalExpression.toPostgre(data);
     } else {
-      throw new IllegalStateException("Expression must have either cursor or logical expression");
+      // logicalExpression != null (validated above)
+      return logicalExpression.toPostgre(data);
     }
   }
 
   /**
    * Determines if this expression represents a function call.
-   * For logical expressions, check if the underlying expression is a function call.
+   * 
+   * ARCHITECTURAL DEBT: This method uses string-based analysis due to the
+   * complex expression hierarchy. Should be replaced with proper type checking
+   * when the hierarchy is flattened.
    */
   public boolean isFunctionCall() {
-    if (logicalExpression != null) {
-      // For now, we'll need to examine the logical expression structure
-      // This may need further refinement based on how logical expressions are structured
-      return logicalExpression.toString().contains("(") && logicalExpression.toString().contains(")");
+    // EITHER/OR DELEGATION: Another example of the pattern problem
+    if (cursorExpression != null) {
+      return false; // Cursor expressions are not function calls
+    } else if (logicalExpression != null) {
+      // String-based analysis - architectural debt
+      String text = logicalExpression.toString();
+      return text != null && text.contains("(") && text.contains(")");
+    } else {
+      return false; // Invalid state
     }
-    return false; // Cursor expressions are not function calls
   }
 
   /**

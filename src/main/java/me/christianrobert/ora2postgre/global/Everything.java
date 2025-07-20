@@ -5,6 +5,7 @@ import me.christianrobert.ora2postgre.oracledb.IndexMetadata;
 import me.christianrobert.ora2postgre.oracledb.SynonymMetadata;
 import me.christianrobert.ora2postgre.oracledb.TableMetadata;
 import me.christianrobert.ora2postgre.oracledb.ViewMetadata;
+import me.christianrobert.ora2postgre.plsql.ast.DataTypeSpec;
 import me.christianrobert.ora2postgre.plsql.ast.Expression;
 import me.christianrobert.ora2postgre.plsql.ast.Function;
 import me.christianrobert.ora2postgre.plsql.ast.NestedTableType;
@@ -1204,5 +1205,188 @@ public class Everything {
     }
     
     return allFunctions;
+  }
+  
+  /**
+   * Determines if an identifier represents a collection type constructor.
+   * This is the central semantic analysis point for collection constructors,
+   * following the architectural principle of keeping semantic logic in Everything.
+   * 
+   * @param identifier The identifier to check (e.g., "local_array", "t_numbers")
+   * @param currentFunction The function context (null if not in function)
+   * @return true if this is a collection type constructor
+   */
+  public boolean isCollectionTypeConstructor(String identifier, Function currentFunction) {
+    if (identifier == null || identifier.trim().isEmpty()) {
+      return false;
+    }
+    
+    String cleanIdentifier = identifier.trim();
+    
+    // 1. Check function-local collection types first (highest priority)
+    if (currentFunction != null) {
+      if (hasCollectionType(currentFunction, cleanIdentifier)) {
+        return true;
+      }
+    }
+    
+    // 2. Check all functions for function-local collection types
+    for (Function func : getAllFunctions()) {
+      if (hasCollectionType(func, cleanIdentifier)) {
+        return true;
+      }
+    }
+    
+    // 3. Check package-level collection types
+    for (OraclePackage pkg : packageSpecAst) {
+      if (hasCollectionType(pkg, cleanIdentifier)) {
+        return true;
+      }
+    }
+    
+    for (OraclePackage pkg : packageBodyAst) {
+      if (hasCollectionType(pkg, cleanIdentifier)) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+  
+  /**
+   * Transforms a collection constructor to PostgreSQL array syntax.
+   * This centralizes all collection constructor transformation logic.
+   * 
+   * @param identifier The collection type name
+   * @param arguments The constructor arguments (may be truncated due to parsing limitations)
+   * @param currentFunction The function context
+   * @return PostgreSQL array syntax
+   */
+  public String transformCollectionConstructor(String identifier, List<Expression> arguments, Function currentFunction) {
+    // Get the collection type information
+    DataTypeSpec dataType = getCollectionElementType(identifier, currentFunction);
+    
+    if (arguments == null || arguments.isEmpty()) {
+      // Empty constructor
+      String postgresType = dataType != null ? dataType.toPostgre(this) : "TEXT";
+      return "ARRAY[]::" + postgresType + "[]";
+    }
+    
+    // Transform arguments
+    StringBuilder argList = new StringBuilder();
+    for (int i = 0; i < arguments.size(); i++) {
+      if (i > 0) argList.append(", ");
+      argList.append(arguments.get(i).toPostgre(this));
+    }
+    
+    return "ARRAY[" + argList.toString() + "]";
+  }
+  
+  /**
+   * Helper: Check if a function has a collection type with the given name.
+   */
+  private boolean hasCollectionType(Function func, String typeName) {
+    if (func == null || typeName == null) return false;
+    
+    // Check VARRAY types
+    for (VarrayType varray : func.getVarrayTypes()) {
+      if (typeName.equalsIgnoreCase(varray.getName())) {
+        return true;
+      }
+    }
+    
+    // Check nested table types
+    for (NestedTableType nestedTable : func.getNestedTableTypes()) {
+      if (typeName.equalsIgnoreCase(nestedTable.getName())) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+  
+  /**
+   * Helper: Check if a package has a collection type with the given name.
+   */
+  private boolean hasCollectionType(OraclePackage pkg, String typeName) {
+    if (pkg == null || typeName == null) return false;
+    
+    // Check VARRAY types
+    for (VarrayType varray : pkg.getVarrayTypes()) {
+      if (typeName.equalsIgnoreCase(varray.getName())) {
+        return true;
+      }
+    }
+    
+    // Check nested table types
+    for (NestedTableType nestedTable : pkg.getNestedTableTypes()) {
+      if (typeName.equalsIgnoreCase(nestedTable.getName())) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+  
+  /**
+   * Helper: Get the element data type for a collection type.
+   */
+  private DataTypeSpec getCollectionElementType(String typeName, Function currentFunction) {
+    // Check current function first
+    if (currentFunction != null) {
+      DataTypeSpec type = getCollectionElementTypeFromFunction(currentFunction, typeName);
+      if (type != null) return type;
+    }
+    
+    // Check all functions
+    for (Function func : getAllFunctions()) {
+      DataTypeSpec type = getCollectionElementTypeFromFunction(func, typeName);
+      if (type != null) return type;
+    }
+    
+    // Check packages
+    for (OraclePackage pkg : packageSpecAst) {
+      DataTypeSpec type = getCollectionElementTypeFromPackage(pkg, typeName);
+      if (type != null) return type;
+    }
+    
+    for (OraclePackage pkg : packageBodyAst) {
+      DataTypeSpec type = getCollectionElementTypeFromPackage(pkg, typeName);
+      if (type != null) return type;
+    }
+    
+    return null; // Will default to TEXT in caller
+  }
+  
+  private DataTypeSpec getCollectionElementTypeFromFunction(Function func, String typeName) {
+    for (VarrayType varray : func.getVarrayTypes()) {
+      if (typeName.equalsIgnoreCase(varray.getName())) {
+        return varray.getDataType();
+      }
+    }
+    
+    for (NestedTableType nestedTable : func.getNestedTableTypes()) {
+      if (typeName.equalsIgnoreCase(nestedTable.getName())) {
+        return nestedTable.getDataType();
+      }
+    }
+    
+    return null;
+  }
+  
+  private DataTypeSpec getCollectionElementTypeFromPackage(OraclePackage pkg, String typeName) {
+    for (VarrayType varray : pkg.getVarrayTypes()) {
+      if (typeName.equalsIgnoreCase(varray.getName())) {
+        return varray.getDataType();
+      }
+    }
+    
+    for (NestedTableType nestedTable : pkg.getNestedTableTypes()) {
+      if (typeName.equalsIgnoreCase(nestedTable.getName())) {
+        return nestedTable.getDataType();
+      }
+    }
+    
+    return null;
   }
 }
