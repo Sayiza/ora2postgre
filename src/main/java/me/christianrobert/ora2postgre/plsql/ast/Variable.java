@@ -57,7 +57,15 @@ public class Variable extends PlSqlAst {
     
     // Add default value if present
     if (defaultValue != null) {
-      b.append(" := ").append(defaultValue.toPostgre(data));
+      // Set function context for collection constructor resolution
+      Function previousFunction = data.getCurrentFunction();
+      data.setCurrentFunction(function);
+      try {
+        b.append(" := ").append(defaultValue.toPostgre(data));
+      } finally {
+        // Restore previous function context
+        data.setCurrentFunction(previousFunction);
+      }
     }
     
     return b.toString();

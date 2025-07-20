@@ -31,6 +31,9 @@ public class Everything {
   
   // CTE (Common Table Expression) scope tracking
   private Set<String> activeCTENames = new HashSet<>();
+  
+  // Function context tracking for semantic resolution
+  private Function currentFunction = null;
   private List<ViewMetadata> viewDefinition = new ArrayList<>();
   private List<SynonymMetadata> synonyms = new ArrayList<>();
   private List<IndexMetadata> indexes = new ArrayList<>();
@@ -1155,5 +1158,51 @@ public class Everything {
    */
   public Set<String> getActiveCTENames() {
     return new HashSet<>(activeCTENames);
+  }
+  
+  /**
+   * Gets the current function context for semantic resolution.
+   * @return The current function context, or null if none set
+   */
+  public Function getCurrentFunction() {
+    return currentFunction;
+  }
+  
+  /**
+   * Sets the current function context for semantic resolution.
+   * @param function The function context to set
+   */
+  public void setCurrentFunction(Function function) {
+    this.currentFunction = function;
+  }
+  
+  /**
+   * Gets all functions from all parsed packages and standalone functions.
+   * This enables comprehensive search for function-local collection types.
+   * @return List of all parsed functions
+   */
+  public List<Function> getAllFunctions() {
+    List<Function> allFunctions = new ArrayList<>();
+    
+    // Add functions from package specs
+    for (OraclePackage pkg : packageSpecAst) {
+      if (pkg.getFunctions() != null) {
+        allFunctions.addAll(pkg.getFunctions());
+      }
+    }
+    
+    // Add functions from package bodies
+    for (OraclePackage pkg : packageBodyAst) {
+      if (pkg.getFunctions() != null) {
+        allFunctions.addAll(pkg.getFunctions());
+      }
+    }
+    
+    // Add standalone functions
+    for (Function func : standaloneFunctionAst) {
+      allFunctions.add(func);
+    }
+    
+    return allFunctions;
   }
 }
