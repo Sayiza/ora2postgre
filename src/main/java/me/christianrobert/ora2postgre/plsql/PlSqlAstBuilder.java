@@ -438,7 +438,7 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
             (DataTypeSpec) visit(ctx.type_spec()),
             ctx.default_value_part() != null ? (Expression) visit(ctx.default_value_part()) : null,
             ctx.IN() != null && !ctx.IN().isEmpty(),
-            ctx.OUT() != null && !ctx.IN().isEmpty()
+            ctx.OUT() != null && !ctx.OUT().isEmpty()
     );
   }
 

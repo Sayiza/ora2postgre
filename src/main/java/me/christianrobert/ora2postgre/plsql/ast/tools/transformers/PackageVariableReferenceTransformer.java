@@ -267,14 +267,15 @@ public class PackageVariableReferenceTransformer {
     
     String upperType = oracleType.toUpperCase();
     
+    // Handle collection types (Oracle and PostgreSQL syntax)
+    if (upperType.contains("VARRAY") || upperType.contains("TABLE OF") || 
+        upperType.contains("NESTED TABLE") || upperType.endsWith("[]")) {
+      return "collection";
+    }
+    
     // Handle parameterized types (e.g., VARCHAR2(100), NUMBER(10,2))
     if (upperType.contains("(")) {
       upperType = upperType.substring(0, upperType.indexOf("("));
-    }
-    
-    // Handle array types
-    if (upperType.contains("VARRAY") || upperType.contains("TABLE")) {
-      return "collection";
     }
     
     return DATA_TYPE_TO_ACCESSOR.getOrDefault(upperType, "text");
@@ -350,10 +351,60 @@ public class PackageVariableReferenceTransformer {
     
     Variable var = findVariable(pkg, varName);
     if (var != null) {
-      return var.getDataType().toPostgre(new Everything()); // Convert DataTypeSpec to string
+      // For collection types, preserve Oracle type information for mapping
+      String oracleType = getOracleDataTypeString(var.getDataType());
+      if (oracleType != null && isOracleCollectionType(oracleType)) {
+        return oracleType; // Return Oracle type for proper collection detection
+      }
+      
+      // For non-collection types, convert to PostgreSQL syntax
+      return var.getDataType().toPostgre(new Everything(), pkg.getSchema(), pkg.getName());
     }
     
     return "text";
+  }
+
+  /**
+   * Get the original Oracle data type string from DataTypeSpec.
+   * This preserves Oracle keywords like VARRAY and TABLE for proper type mapping.
+   * 
+   * @param dataTypeSpec DataTypeSpec object
+   * @return Oracle data type string
+   */
+  private static String getOracleDataTypeString(me.christianrobert.ora2postgre.plsql.ast.DataTypeSpec dataTypeSpec) {
+    if (dataTypeSpec == null) {
+      return null;
+    }
+    
+    // Use the toString() method which should preserve Oracle syntax
+    String typeString = dataTypeSpec.toString();
+    
+    // Also check the native and custom data type fields
+    if (typeString == null || typeString.trim().isEmpty()) {
+      if (dataTypeSpec.getNativeDataType() != null) {
+        typeString = dataTypeSpec.getNativeDataType();
+      } else if (dataTypeSpec.getCustumDataType() != null) {
+        typeString = dataTypeSpec.getCustumDataType();
+      }
+    }
+    
+    return typeString;
+  }
+
+  /**
+   * Check if an Oracle data type string represents a collection type.
+   * 
+   * @param oracleType Oracle data type string
+   * @return true if this is a collection type
+   */
+  private static boolean isOracleCollectionType(String oracleType) {
+    if (oracleType == null) {
+      return false;
+    }
+    
+    String upperType = oracleType.toUpperCase();
+    return upperType.contains("VARRAY") || upperType.contains("TABLE OF") || 
+           upperType.contains("NESTED TABLE");
   }
 
   /**

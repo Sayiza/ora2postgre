@@ -20,6 +20,7 @@ public class VarrayPackageParsingTest {
     String oracleSql = """
 -- Package body
 CREATE OR REPLACE PACKAGE BODY user_robert.pkg_varray_example AS
+  
   PROCEDURE add_number(p_number IN NUMBER) IS
   BEGIN
     IF g_numbers IS NULL THEN
@@ -48,22 +49,42 @@ END pkg_varray_example;
 /
 """;
 
+    String oracleSqlSpec = """
+-- Package body
+CREATE OR REPLACE PACKAGE user_robert.pkg_varray_example AS
+  TYPE t_numbers IS VARRAY(10) OF NUMBER; -- Varray type definition
+  g_numbers t_numbers; -- Package variable
+END pkg_varray_example;
+/
+""";
+
     // Create test data
     Everything data = new Everything();
     data.getUserNames().add("user_robert");
 
+    PlsqlCode plsqlCodeSpec = new PlsqlCode("user_robert", oracleSqlSpec);
     PlsqlCode plsqlCode = new PlsqlCode("user_robert", oracleSql);
 
     // Parse the Oracle package - this should not get stuck or fail
+
+    PlSqlAst astSpec = PlSqlAstMain.processPlsqlCode(plsqlCodeSpec);
     PlSqlAst ast = PlSqlAstMain.processPlsqlCode(plsqlCode);
 
     // Basic assertion: parsing should succeed and return a non-null result
     assertNotNull(ast, "AST parsing should not return null");
     
     System.out.println("Parsed AST: " + ast.getClass().getSimpleName());
-    
-    if (ast instanceof OraclePackage) {
+
+    if (ast instanceof OraclePackage && astSpec instanceof OraclePackage) {
+      OraclePackage oracleSpec = (OraclePackage) astSpec;
       OraclePackage pkg = (OraclePackage) ast;
+
+      pkg.getVariables().addAll(oracleSpec.getVariables());
+      pkg.getVarrayTypes().addAll(oracleSpec.getVarrayTypes());
+
+      data.getPackageSpecAst().add(oracleSpec);
+      data.getPackageSpecAst().add(pkg);
+
       System.out.println("Package name: " + pkg.getName());
       
       // Test that toPostgre() call does not return null and doesn't get stuck
