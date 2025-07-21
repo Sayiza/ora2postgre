@@ -24,7 +24,7 @@ CREATE OR REPLACE PACKAGE BODY user_robert.pkg_varray_example AS
   PROCEDURE add_number(p_number IN NUMBER) IS
   BEGIN
     IF g_numbers IS NULL THEN
-      g_numbers := t_numbers(); -- Initialize varray
+      g_numbers := t_numbers(4,5,6); -- Initialize varray
     END IF;
     
     IF g_numbers.COUNT < g_numbers.LIMIT THEN
@@ -83,7 +83,7 @@ END pkg_varray_example;
       pkg.getVarrayTypes().addAll(oracleSpec.getVarrayTypes());
 
       data.getPackageSpecAst().add(oracleSpec);
-      data.getPackageSpecAst().add(pkg);
+      data.getPackageBodyAst().add(pkg);
 
       System.out.println("Package name: " + pkg.getName());
       

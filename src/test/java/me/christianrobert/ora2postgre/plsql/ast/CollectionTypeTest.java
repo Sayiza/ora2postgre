@@ -949,6 +949,9 @@ END testpackage;
     assertTrue(ast instanceof OraclePackage);
     
     OraclePackage pkg = (OraclePackage) ast;
+
+    data.getPackageSpecAst().add(pkg);
+
     assertEquals("testpackage", pkg.getName());
     
     // Check that the package has the collection type and variable

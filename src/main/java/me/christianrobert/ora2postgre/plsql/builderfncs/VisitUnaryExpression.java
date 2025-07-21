@@ -230,7 +230,6 @@ public class VisitUnaryExpression {
           // Extract ALL arguments for proper collection constructor handling
           List<Expression> arguments = extractMethodArguments(partCtx, astBuilder);
           if (arguments != null && !arguments.isEmpty()) {
-            // TODO: We need to check Everything.isKnownFunction here
             // For now, create collection constructor with ALL arguments
             // This will be enhanced with semantic detection when we have the full context
             
