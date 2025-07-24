@@ -3,6 +3,8 @@ package me.christianrobert.ora2postgre.plsql;
 import me.christianrobert.ora2postgre.antlr.PlSqlParser;
 import me.christianrobert.ora2postgre.antlr.PlSqlParserBaseVisitor;
 import me.christianrobert.ora2postgre.plsql.ast.*;
+import java.util.ArrayList;
+import java.util.List;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitCallStatement;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitCursorDeclaration;
 import me.christianrobert.ora2postgre.plsql.builderfncs.VisitLogicalExpression;
@@ -268,11 +270,97 @@ public class PlSqlAstBuilder extends PlSqlParserBaseVisitor<PlSqlAst> {
   // Table-From END
 
   @Override
-  public PlSqlAst visitAssignment_statement(PlSqlParser.Assignment_statementContext ctx) {
+  public PlSqlAst visitGeneral_element(PlSqlParser.General_elementContext ctx) {
+    // Handle different general_element patterns according to grammar:
+    // general_element: general_element_part | general_element ('.' general_element_part)+ | '(' general_element ')'
+    
+    // Pattern 1: general_element_part (single part)
+    if (ctx.general_element_part() != null && !ctx.general_element_part().isEmpty() && ctx.general_element() == null) {
+      PlSqlParser.General_element_partContext partCtx = ctx.general_element_part(0);
+      
+      // Check for function call or collection indexing: name(args)
+      if (partCtx.function_argument() != null && !partCtx.function_argument().isEmpty()) {
+        String name = partCtx.id_expression() != null ? partCtx.id_expression().getText() : "";
+        
+        // Parse function arguments properly through the AST visitor
+        List<Expression> args = new ArrayList<>();
+        for (PlSqlParser.Function_argumentContext argCtx : partCtx.function_argument()) {
+          if (argCtx.argument() != null) {
+            for (PlSqlParser.ArgumentContext arg : argCtx.argument()) {
+              if (arg.expression() != null) {
+                PlSqlAst argAst = visit(arg.expression());
+                if (argAst instanceof Expression) {
+                  args.add((Expression) argAst);
+                }
+              }
+            }
+          }
+        }
+        
+        GeneralElementPart part = new GeneralElementPart(name, args);
+        return new GeneralElement(part);
+      } else {
+        // Simple identifier
+        String name = partCtx.id_expression() != null ? partCtx.id_expression().getText() : partCtx.getText();
+        GeneralElementPart part = new GeneralElementPart(name);
+        return new GeneralElement(part);
+      }
+    }
+    
+    // Pattern 2: general_element ('.' general_element_part)+ (chained access)
+    if (ctx.general_element() != null && ctx.general_element_part() != null && !ctx.general_element_part().isEmpty()) {
+      GeneralElement baseElement = (GeneralElement) visit(ctx.general_element());
+      List<GeneralElementPart> chainedParts = new ArrayList<>();
+      
+      for (PlSqlParser.General_element_partContext partCtx : ctx.general_element_part()) {
+        String name = partCtx.id_expression() != null ? partCtx.id_expression().getText() : partCtx.getText();
+        
+        // Parse function arguments if present
+        List<Expression> args = new ArrayList<>();
+        if (partCtx.function_argument() != null && !partCtx.function_argument().isEmpty()) {
+          for (PlSqlParser.Function_argumentContext argCtx : partCtx.function_argument()) {
+            if (argCtx.argument() != null) {
+              for (PlSqlParser.ArgumentContext arg : argCtx.argument()) {
+                if (arg.expression() != null) {
+                  PlSqlAst argAst = visit(arg.expression());
+                  if (argAst instanceof Expression) {
+                    args.add((Expression) argAst);
+                  }
+                }
+              }
+            }
+          }
+        }
+        
+        GeneralElementPart part = args.isEmpty() ? new GeneralElementPart(name) : new GeneralElementPart(name, args);
+        chainedParts.add(part);
+      }
+      
+      return new GeneralElement(baseElement, chainedParts);
+    }
+    
+    // Pattern 3: '(' general_element ')' (parenthesized)
+    if (ctx.general_element() != null && (ctx.general_element_part() == null || ctx.general_element_part().isEmpty())) {
+      GeneralElement innerElement = (GeneralElement) visit(ctx.general_element());
+      return GeneralElement.parenthesized(innerElement);
+    }
+    
+    // Fallback - should not reach here in proper parsing
+    String text = ctx.getText();
+    return new GeneralElement(new GeneralElementPart(text));
+  }
 
-    String target = ctx.general_element().getText();
+  @Override
+  public PlSqlAst visitGeneral_element_part(PlSqlParser.General_element_partContext ctx) {
+    // Simple implementation for now
+    String text = ctx.getText();
+    return new GeneralElementPart(text);
+  }
+  
+  @Override
+  public PlSqlAst visitAssignment_statement(PlSqlParser.Assignment_statementContext ctx) {
+    GeneralElement target = (GeneralElement) visit(ctx.general_element());
     Expression expressionVisited = (Expression) visit(ctx.expression());
-    //Expression expression = new Expression(ctx.expression().getText());
     return new AssignmentStatement(target, expressionVisited);
   }
 

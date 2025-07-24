@@ -4,15 +4,15 @@ import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.plsql.ast.tools.transformers.PackageVariableReferenceTransformer;
 
 public class AssignmentStatement extends Statement {
-  private final String target; // e.g., "vVariable"
+  private final GeneralElement target; // e.g., GeneralElement for "vVariable" or "arr(index)"
   private final Expression expression; // e.g., Expression{rawText="0"}
 
-  public AssignmentStatement(String target, Expression expression) {
+  public AssignmentStatement(GeneralElement target, Expression expression) {
     this.target = target;
     this.expression = expression;
   }
 
-  public String getTarget() { return target; }
+  public GeneralElement getTarget() { return target; }
   public Expression getExpression() { return expression; }
 
   @Override
@@ -22,7 +22,7 @@ public class AssignmentStatement extends Statement {
 
   @Override
   public String toString() {
-    return "AssignmentStatement{target=" + target + ", expression=" + expression + "}";
+    return "AssignmentStatement{target=" + target.toString() + ", expression=" + expression + "}";
   }
 
   // toJava() method removed - assignments stay in PostgreSQL
@@ -30,24 +30,20 @@ public class AssignmentStatement extends Statement {
   public String toPostgre(Everything data) {
     StringBuilder b = new StringBuilder();
     
-    // Check if target is a collection indexing operation (e.g., arr(1))
-    if (target.contains("(") && target.contains(")")) {
-      // Extract collection name and index
-      int parenIndex = target.indexOf("(");
-      String collectionName = target.substring(0, parenIndex).trim();
-      String indexPart = target.substring(parenIndex + 1, target.lastIndexOf(")")).trim();
+    // Check if target is a collection indexing operation (e.g., arr(index))
+    if (target.isCollectionIndexing()) {
+      String collectionName = target.getVariableName();
+      Expression indexExpr = target.getIndexExpression();
       
       // Check if this is a package collection variable
       if (PackageVariableReferenceTransformer.isPackageVariableReference(collectionName, data)) {
         OraclePackage pkg = PackageVariableReferenceTransformer.findContainingPackage(collectionName, data);
         if (pkg != null) {
-          String dataType = PackageVariableReferenceTransformer.getPackageVariableDataType(collectionName, pkg);
-          
-          // Extract element type for collections - get directly from varray/table definition
+          // Get element type from the collection definition
           String elementType = getOriginalOracleDataType(collectionName, pkg);
           
-          // Transform the index expression (may contain collection methods like .COUNT)
-          String transformedIndex = transformIndexExpression(indexPart, data);
+          // Transform the index expression - this handles collection methods in the index!
+          String transformedIndex = indexExpr.toPostgre(data);
           
           // Transform package collection element assignment to direct table access
           String writeCall = PackageVariableReferenceTransformer.transformCollectionElementWrite(
@@ -60,37 +56,45 @@ public class AssignmentStatement extends Statement {
           return b.toString();
         }
       }
+      
+      // Regular array indexing assignment: arr[index] := value
+      String transformedIndex = indexExpr.toPostgre(data);
+      b.append(data.getIntendation())
+          .append(collectionName)
+          .append("[")
+          .append(transformedIndex)
+          .append("] := ")
+          .append(expression.toPostgre(data))
+          .append(";");
+      
+      return b.toString();
     }
     
-    // Check if target is a regular package variable
-    if (PackageVariableReferenceTransformer.isPackageVariableReference(target, data)) {
-      OraclePackage pkg = PackageVariableReferenceTransformer.findContainingPackage(target, data);
+    // Check if target is a regular package variable (simple identifier)
+    String targetVariableName = target.getVariableName();
+    if (targetVariableName != null && PackageVariableReferenceTransformer.isPackageVariableReference(targetVariableName, data)) {
+      OraclePackage pkg = PackageVariableReferenceTransformer.findContainingPackage(targetVariableName, data);
       if (pkg != null) {
-        String dataType = PackageVariableReferenceTransformer.getPackageVariableDataType(target, pkg);
+        String dataType = PackageVariableReferenceTransformer.getPackageVariableDataType(targetVariableName, pkg);
         
         // Transform package variable assignment to direct table access
         String writeCall = PackageVariableReferenceTransformer.transformWrite(
-            pkg.getSchema(), pkg.getName(), target, dataType, expression.toPostgre(data));
+            pkg.getSchema(), pkg.getName(), targetVariableName, dataType, expression.toPostgre(data));
         
         b.append(data.getIntendation())
             .append(writeCall)
             .append(";");
-      } else {
-        // Fallback to regular assignment if package not found
-        b.append(data.getIntendation())
-            .append(target)
-            .append(" := ")
-            .append(expression.toPostgre(data))
-            .append(";");
+        
+        return b.toString();
       }
-    } else {
-      // Regular local variable assignment
-      b.append(data.getIntendation())
-          .append(target)
-          .append(" := ")
-          .append(expression.toPostgre(data))
-          .append(";");
     }
+    
+    // Regular assignment - let GeneralElement handle its own transformation
+    b.append(data.getIntendation())
+        .append(target.toPostgre(data))
+        .append(" := ")
+        .append(expression.toPostgre(data))
+        .append(";");
     
     return b.toString();
   }
@@ -178,91 +182,4 @@ public class AssignmentStatement extends Statement {
     return typeString;
   }
 
-  /**
-   * Transform an index expression that may contain collection methods.
-   * This handles cases like "g_numbers.COUNT" which need to be converted to array_length calls.
-   */
-  private String transformIndexExpression(String indexExpression, Everything data) {
-    if (indexExpression == null || indexExpression.trim().isEmpty()) {
-      return indexExpression;
-    }
-    
-    String trimmed = indexExpression.trim();
-    
-    // Check if this is a collection method call like "g_numbers.COUNT"
-    if (trimmed.contains(".")) {
-      int dotIndex = trimmed.lastIndexOf(".");
-      String variablePart = trimmed.substring(0, dotIndex).trim();
-      String methodPart = trimmed.substring(dotIndex + 1).trim();
-      
-      // Handle collection methods
-      switch (methodPart.toUpperCase()) {
-        case "COUNT":
-          // Check if this is a package collection variable
-          if (PackageVariableReferenceTransformer.isPackageVariableReference(variablePart, data)) {
-            OraclePackage pkg = PackageVariableReferenceTransformer.findContainingPackage(variablePart, data);
-            if (pkg != null) {
-              // Transform to package collection count
-              return PackageVariableReferenceTransformer.transformCollectionMethod(
-                  pkg.getSchema(), pkg.getName(), variablePart, "COUNT");
-            }
-          } else {
-            // Transform to regular array_length call
-            return "array_length(" + variablePart + ", 1)";
-          }
-          break;
-          
-        case "FIRST":
-          // FIRST is always 1 in PostgreSQL arrays (1-indexed)
-          return "1";
-          
-        case "LAST":
-          // Check if this is a package collection variable
-          if (PackageVariableReferenceTransformer.isPackageVariableReference(variablePart, data)) {
-            OraclePackage pkg = PackageVariableReferenceTransformer.findContainingPackage(variablePart, data);
-            if (pkg != null) {
-              // Transform to package collection last
-              return PackageVariableReferenceTransformer.transformCollectionMethod(
-                  pkg.getSchema(), pkg.getName(), variablePart, "LAST");
-            }
-          } else {
-            // Transform to regular array_length call
-            return "array_length(" + variablePart + ", 1)";
-          }
-          break;
-          
-        default:
-          // Unknown method, return as-is
-          return trimmed;
-      }
-    }
-    
-    // No special transformation needed, return as-is
-    return trimmed;
-  }
-
-  /**
-   * Extract the element data type from a collection data type.
-   */
-  private String extractElementDataType(String collectionType) {
-    if (collectionType == null) {
-      return "text";
-    }
-    
-    // Handle VARRAY and TABLE OF types
-    if (collectionType.toUpperCase().contains("VARRAY") || collectionType.toUpperCase().contains("TABLE")) {
-      // Look for "OF type" pattern
-      int ofIndex = collectionType.toUpperCase().indexOf(" OF ");
-      if (ofIndex != -1) {
-        String elementType = collectionType.substring(ofIndex + 4).trim();
-        // Remove any trailing size specifications
-        if (elementType.contains("(")) {
-          elementType = elementType.substring(0, elementType.indexOf("(")).trim();
-        }
-        return elementType;
-      }
-    }
-    
-    return "text"; // Default fallback
-  }
 }

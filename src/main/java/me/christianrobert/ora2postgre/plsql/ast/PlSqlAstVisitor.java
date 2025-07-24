@@ -65,4 +65,8 @@ public interface PlSqlAstVisitor<T> {
   T visit(OverClause overClause);
   T visit(WindowingClause windowingClause);
   T visit(OrderByElement orderByElement);
+  
+  // General element support (grammar compliant AST classes)
+  T visit(GeneralElement generalElement);
+  T visit(GeneralElementPart generalElementPart);
 }

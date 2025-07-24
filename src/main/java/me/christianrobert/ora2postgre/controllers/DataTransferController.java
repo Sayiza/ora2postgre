@@ -115,9 +115,9 @@ public class DataTransferController {
         // Log detailed results
         for (var result : results.getTableResults()) {
           if (result.isSuccessful()) {
-            log.info("SUCCESS: {}", result.toString());
+            log.info("SUCCESS: {}", result);
           } else {
-            log.error("FAILED: {}", result.toString());
+            log.error("FAILED: {}", result);
           }
         }
 
