@@ -1,11 +1,24 @@
 package me.christianrobert.ora2postgre.plsql.ast;
 
 import me.christianrobert.ora2postgre.global.Everything;
+import me.christianrobert.ora2postgre.services.CTETrackingService;
+import jakarta.inject.Inject;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class TableReferenceAuxInternal extends PlSqlAst {
+
+  @Inject
+  CTETrackingService cteTrackingService;
+
+  /**
+   * For testing purposes - allows manual injection of CTETrackingService
+   * when CDI container is not available.
+   */
+  public void setCteTrackingService(CTETrackingService cteTrackingService) {
+    this.cteTrackingService = cteTrackingService;
+  }
 
   private String schema;
 
@@ -48,7 +61,8 @@ public class TableReferenceAuxInternal extends PlSqlAst {
       String tableName = tableExpressionClause.getTableName();
       
       // Check if this is a CTE name - if so, return it as-is without schema resolution
-      if (data.isActiveCTE(tableName)) {
+      CTETrackingService service = cteTrackingService != null ? cteTrackingService : CTETrackingService.getTestInstance();
+      if (service != null && service.isActiveCTE(tableName)) {
         b.append(tableName);
       } else {
         // Regular table - perform schema resolution

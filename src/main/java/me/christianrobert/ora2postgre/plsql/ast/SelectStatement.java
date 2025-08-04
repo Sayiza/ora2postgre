@@ -2,9 +2,23 @@ package me.christianrobert.ora2postgre.plsql.ast;
 
 import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.global.StringAux;
+import me.christianrobert.ora2postgre.services.CTETrackingService;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import java.util.List;
 
 public class SelectStatement extends Statement {
+
+  @Inject
+  CTETrackingService cteTrackingService;
+
+  /**
+   * For testing purposes - allows manual injection of CTETrackingService
+   * when CDI container is not available.
+   */
+  public void setCteTrackingService(CTETrackingService cteTrackingService) {
+    this.cteTrackingService = cteTrackingService;
+  }
 
   String schema;
   SelectSubQuery subQuery;
@@ -80,7 +94,10 @@ public class SelectStatement extends Statement {
     if (withClause != null) {
       // Register CTE names in the scope before processing main query
       for (CommonTableExpression cte : withClause.getCteList()) {
-        data.addActiveCTE(cte.getQueryName());
+        CTETrackingService service = cteTrackingService != null ? cteTrackingService : CTETrackingService.getTestInstance();
+        if (service != null) {
+          service.addActiveCTE(cte.getQueryName());
+        }
       }
       
       String withClauseSQL = withClause.toPostgre(data);
@@ -96,7 +113,10 @@ public class SelectStatement extends Statement {
     // Clean up CTE names from scope after processing
     if (withClause != null) {
       for (CommonTableExpression cte : withClause.getCteList()) {
-        data.removeActiveCTE(cte.getQueryName());
+        CTETrackingService service = cteTrackingService != null ? cteTrackingService : CTETrackingService.getTestInstance();
+        if (service != null) {
+          service.removeActiveCTE(cte.getQueryName());
+        }
       }
     }
     

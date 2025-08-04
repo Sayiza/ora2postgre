@@ -3,9 +3,24 @@ package me.christianrobert.ora2postgre.plsql.ast;
 import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.global.PlsqlCode;
 import me.christianrobert.ora2postgre.plsql.PlSqlAstMain;
+import me.christianrobert.ora2postgre.services.CTETrackingService;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 
 public class CommonTableExpressionTest {
+
+  private Everything data;
+  private CTETrackingService cteTrackingService;
+
+  @BeforeEach
+  public void setUp() {
+    data = CTETestHelper.createTestEverything();
+    cteTrackingService = new CTETrackingService();
+    
+    // Set the test instance so it can be used as fallback when CDI injection is not available
+    CTETrackingService.setTestInstance(cteTrackingService);
+  }
+
 
   @Test
   public void testSimpleCommonTableExpression() {
@@ -28,8 +43,7 @@ BEGIN
 END;
 """;
 
-    // Create test data with proper table metadata
-    Everything data = CTETestHelper.createTestEverything();
+    // Test data is already set up in @BeforeEach
 
     PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
 
@@ -81,8 +95,7 @@ BEGIN
 END;
 """;
 
-    // Create test data with proper table metadata
-    Everything data = CTETestHelper.createTestEverything();
+    // Test data is already set up in @BeforeEach
 
     PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
 
@@ -130,8 +143,7 @@ BEGIN
 END;
 """;
 
-    // Create test data with proper table metadata
-    Everything data = CTETestHelper.createTestEverything();
+    // Test data is already set up in @BeforeEach
 
     PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
 
@@ -168,7 +180,6 @@ END;
         false
     );
     
-    Everything data = new Everything();
     String result = cte.toPostgre(data);
     
     System.out.println("Direct CTE transformation:");

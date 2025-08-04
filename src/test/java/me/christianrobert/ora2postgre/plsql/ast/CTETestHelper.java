@@ -21,6 +21,20 @@ public class CTETestHelper {
    */
   public static Everything createTestEverything() {
     Everything data = new Everything();
+    setupTestData(data);
+    return data;
+  }
+
+  /**
+   * Sets up test data in an existing Everything object with common test tables.
+   * This method is used when working with injected Everything instances in Quarkus tests.
+   */
+  public static void setupTestData(Everything data) {
+    // Clear existing data first
+    data.getUserNames().clear();
+    data.getTableSql().clear();
+    data.getSynonyms().clear();
+    
     data.getUserNames().add("TEST_SCHEMA");
     
     // Add employees table metadata
@@ -28,8 +42,6 @@ public class CTETestHelper {
     
     // Add config_table metadata for other CTE tests
     addConfigTable(data);
-    
-    return data;
   }
   
   /**

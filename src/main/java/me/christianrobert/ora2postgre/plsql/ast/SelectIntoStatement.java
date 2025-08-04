@@ -1,10 +1,24 @@
 package me.christianrobert.ora2postgre.plsql.ast;
 
 import me.christianrobert.ora2postgre.global.Everything;
+import me.christianrobert.ora2postgre.services.CTETrackingService;
+import jakarta.inject.Inject;
 
 import java.util.List;
 
 public class SelectIntoStatement extends Statement {
+
+  @Inject
+  CTETrackingService cteTrackingService;
+
+  /**
+   * For testing purposes - allows manual injection of CTETrackingService
+   * when CDI container is not available.
+   */
+  public void setCteTrackingService(CTETrackingService cteTrackingService) {
+    this.cteTrackingService = cteTrackingService;
+  }
+
   private final List<String> selectedColumns; // SELECT column list
   private final List<String> intoVariables; // INTO variable list
   private final String tableName;
@@ -89,7 +103,10 @@ public class SelectIntoStatement extends Statement {
     if (hasWithClause()) {
       // Register CTE names in the scope before processing main query
       for (CommonTableExpression cte : withClause.getCteList()) {
-        data.addActiveCTE(cte.getQueryName());
+        CTETrackingService service = cteTrackingService != null ? cteTrackingService : CTETrackingService.getTestInstance();
+        if (service != null) {
+          service.addActiveCTE(cte.getQueryName());
+        }
       }
       
       String withClauseSQL = withClause.toPostgre(data);
@@ -127,7 +144,8 @@ public class SelectIntoStatement extends Statement {
     b.append(" FROM ");
     
     // Check if this is a CTE name - if so, use it as-is without schema resolution
-    if (data.isActiveCTE(tableName)) {
+    CTETrackingService service = cteTrackingService != null ? cteTrackingService : CTETrackingService.getTestInstance();
+    if (service != null && service.isActiveCTE(tableName)) {
       b.append(tableName.toUpperCase());
     } else {
       // Regular table - perform schema resolution
@@ -173,7 +191,10 @@ public class SelectIntoStatement extends Statement {
     // Clean up CTE names from scope after processing
     if (hasWithClause()) {
       for (CommonTableExpression cte : withClause.getCteList()) {
-        data.removeActiveCTE(cte.getQueryName());
+        CTETrackingService cleanupService = cteTrackingService != null ? cteTrackingService : CTETrackingService.getTestInstance();
+        if (cleanupService != null) {
+          cleanupService.removeActiveCTE(cte.getQueryName());
+        }
       }
     }
 
