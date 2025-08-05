@@ -49,24 +49,18 @@ public class ForLoopStatement extends Statement {
     // This is handled by the containing function's variable declaration logic
     
     // Generate the FOR loop statement
-    b.append(data.getIntendation()).append("FOR ").append(nameRef).append(" IN (");
+    b.append("FOR ").append(nameRef).append(" IN (");
     b.append(query.toPostgre(data));
     b.append(")\n");
-    b.append(data.getIntendation()).append("LOOP\n");
-    
-    // Increase indentation for loop body
-    data.intendMore();
+    b.append("LOOP\n");
     
     // Generate statements inside the loop
     for (Statement stmt : statements) {
       b.append(stmt.toPostgre(data));
     }
     
-    // Decrease indentation
-    data.intendLess();
-    
     // Close the loop
-    b.append(data.getIntendation()).append("END LOOP;\n");
+    b.append("END LOOP;\n");
     
     return b.toString();
   }

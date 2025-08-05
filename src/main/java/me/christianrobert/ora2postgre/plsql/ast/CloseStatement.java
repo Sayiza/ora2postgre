@@ -38,7 +38,7 @@ public class CloseStatement extends Statement {
   public String toPostgre(Everything data) {
     StringBuilder b = new StringBuilder();
     
-    b.append(data.getIntendation()).append("CLOSE ").append(cursorName).append(";");
+    b.append("CLOSE ").append(cursorName).append(";");
     
     return b.toString();
   }

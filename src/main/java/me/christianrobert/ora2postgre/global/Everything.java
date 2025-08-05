@@ -54,7 +54,6 @@ public class Everything {
   private List<Trigger> triggerAst = new ArrayList<>();
 
   private long totalRowCount = 0;
-  private int intendations = 0;
 
   public List<String> getUserNames() {
     return userNames;
@@ -157,24 +156,6 @@ public class Everything {
     return standaloneProcedurePlsql.size();
   }
 
-  public void intendMore() {
-    intendations += 2;
-  }
-
-  public void intendLess() {
-    intendations -= 2;
-  }
-
-  public void resetIntendation() {
-    intendations = 0;
-  }
-
-  public String getIntendation() {
-    if (intendations <= 0) {
-      return "";
-    }
-    return " ".repeat(intendations);
-  }
 
   public String lookupSchema4ObjectType(String objectTypeName, String schemaWhereTheAskingCodeResides) {
     for (ObjectType objectType : objectTypeSpecAst) {

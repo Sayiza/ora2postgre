@@ -51,39 +51,33 @@ public class IfStatement extends Statement {
     StringBuilder b = new StringBuilder();
 
     // IF condition THEN
-    b.append(data.getIntendation()).append("IF ").append(condition.toPostgre(data)).append(" THEN\n");
+    b.append("IF ").append(condition.toPostgre(data)).append(" THEN\n");
 
     // THEN statements
-    data.intendMore();
     for (Statement stmt : thenStatements) {
       b.append(stmt.toPostgre(data)).append("\n");
     }
-    data.intendLess();
 
     // ELSIF parts
     if (elsifParts != null) {
       for (ElsifPart elsif : elsifParts) {
-        b.append(data.getIntendation()).append("ELSIF ").append(elsif.getCondition().toPostgre(data)).append(" THEN\n");
-        data.intendMore();
+        b.append("ELSIF ").append(elsif.getCondition().toPostgre(data)).append(" THEN\n");
         for (Statement stmt : elsif.getStatements()) {
           b.append(stmt.toPostgre(data)).append("\n");
         }
-        data.intendLess();
       }
     }
 
     // ELSE part
     if (elseStatements != null && !elseStatements.isEmpty()) {
-      b.append(data.getIntendation()).append("ELSE\n");
-      data.intendMore();
+      b.append("ELSE\n");
       for (Statement stmt : elseStatements) {
         b.append(stmt.toPostgre(data)).append("\n");
       }
-      data.intendLess();
     }
 
     // END IF
-    b.append(data.getIntendation()).append("END IF;");
+    b.append("END IF;");
 
     return b.toString();
   }

@@ -51,7 +51,7 @@ public class OpenStatement extends Statement {
   public String toPostgre(Everything data) {
     StringBuilder b = new StringBuilder();
     
-    b.append(data.getIntendation()).append("OPEN ").append(cursorName);
+    b.append("OPEN ").append(cursorName);
     
     // Add parameter values if present
     if (hasParameters()) {

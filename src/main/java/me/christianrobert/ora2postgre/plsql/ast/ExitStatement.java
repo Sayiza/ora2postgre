@@ -83,7 +83,7 @@ public class ExitStatement extends Statement {
   public String toPostgre(Everything data) {
     StringBuilder b = new StringBuilder();
     
-    b.append(data.getIntendation()).append("EXIT");
+    b.append("EXIT");
     
     // Add label name if present
     if (hasLabel()) {

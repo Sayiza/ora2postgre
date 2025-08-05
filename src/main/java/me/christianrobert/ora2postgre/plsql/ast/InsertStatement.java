@@ -76,7 +76,7 @@ public class InsertStatement extends Statement {
   public String toPostgre(Everything data) {
     StringBuilder b = new StringBuilder();
 
-    b.append(data.getIntendation()).append("INSERT INTO ");
+    b.append("INSERT INTO ");
 
     // Resolve schema using Everything's schema resolution logic
     String resolvedSchema = null;

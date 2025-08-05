@@ -112,7 +112,6 @@ end;
   public void testPostgreSQLGeneration() {
     // Test direct AST creation and PostgreSQL generation
     Everything data = new Everything();
-    data.intendMore(); // Add some indentation
     
     // Test specific exception RAISE
     RaiseStatement raiseSpecific = new RaiseStatement("NO_DATA_FOUND");

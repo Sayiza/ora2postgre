@@ -38,17 +38,15 @@ public class LoopStatement extends Statement {
     StringBuilder b = new StringBuilder();
 
     // LOOP
-    b.append(data.getIntendation()).append("LOOP\n");
+    b.append("LOOP\n");
 
     // Loop body statements
-    data.intendMore();
     for (Statement stmt : statements) {
       b.append(stmt.toPostgre(data)).append("\n");
     }
-    data.intendLess();
 
     // END LOOP
-    b.append(data.getIntendation()).append("END LOOP;");
+    b.append("END LOOP;");
 
     return b.toString();
   }

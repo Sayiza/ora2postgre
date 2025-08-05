@@ -22,7 +22,6 @@ public class VariableDeclarationTest {
     @BeforeEach
     void setUp() {
         data = new Everything();
-        data.resetIntendation();
         strategy = new StandardProcedureStrategy();
     }
 

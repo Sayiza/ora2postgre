@@ -50,7 +50,7 @@ public class DeleteStatement extends Statement {
   public String toPostgre(Everything data) {
     StringBuilder b = new StringBuilder();
 
-    b.append(data.getIntendation()).append("DELETE FROM ");
+    b.append("DELETE FROM ");
 
     // Resolve schema using Everything's schema resolution logic (same as INSERT/UPDATE)
     String resolvedSchema = null;

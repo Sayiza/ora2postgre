@@ -39,7 +39,7 @@ public class ExceptionHandler extends PlSqlAst {
   public String toPostgre(Everything data) {
     StringBuilder b = new StringBuilder();
 
-    b.append(data.getIntendation()).append("WHEN ");
+    b.append("WHEN ");
 
     // Handle exception name mapping (Oracle to PostgreSQL)
     if (exceptionNames != null && !exceptionNames.isEmpty()) {
@@ -55,13 +55,11 @@ public class ExceptionHandler extends PlSqlAst {
 
     b.append(" THEN\n");
 
-    // Generate statements with increased indentation
+    // Generate statements
     if (statements != null && !statements.isEmpty()) {
-      data.intendMore();
       for (Statement stmt : statements) {
         b.append(stmt.toPostgre(data)).append("\n");
       }
-      data.intendLess();
     }
 
     return b.toString();

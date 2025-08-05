@@ -28,8 +28,7 @@ public class PackageType extends PlSqlAst {
 
   public String toJava(Everything data) {
     StringBuilder b = new StringBuilder();
-    b.append(data.getIntendation())
-            .append(dataType.toJava(data))
+    b.append(dataType.toJava(data))
             .append(" ")
             .append(name)
             .append(";") //TODO

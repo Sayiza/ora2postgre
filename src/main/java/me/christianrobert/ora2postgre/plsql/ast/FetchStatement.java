@@ -51,7 +51,7 @@ public class FetchStatement extends Statement {
   public String toPostgre(Everything data) {
     StringBuilder b = new StringBuilder();
     
-    b.append(data.getIntendation()).append("FETCH ").append(cursorName);
+    b.append("FETCH ").append(cursorName);
     
     // Add INTO clause if variables are present
     if (hasIntoVariables()) {

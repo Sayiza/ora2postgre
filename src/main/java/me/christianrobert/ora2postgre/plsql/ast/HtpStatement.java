@@ -34,8 +34,7 @@ public class HtpStatement extends Statement {
     // Transform the argument expression, which will handle package variables
     String transformedArgument = argument != null ? argument.toPostgre(data) : "''";
     
-    b.append(data.getIntendation())
-            .append("CALL SYS.HTP_p(")
+    b.append("CALL SYS.HTP_p(")
             .append(transformedArgument)
             .append(");\n");
     return b.toString();

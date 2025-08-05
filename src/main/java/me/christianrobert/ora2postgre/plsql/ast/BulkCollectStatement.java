@@ -91,7 +91,7 @@ public class BulkCollectStatement extends Statement {
         String column = selectedColumns.get(i);
         String arrayVar = intoArrays.get(i);
         
-        b.append(data.getIntendation()).append(arrayVar).append(" := ARRAY(");
+        b.append(arrayVar).append(" := ARRAY(");
         b.append("SELECT ").append(column.toLowerCase());
         
         // Handle FROM clause with schema resolution
@@ -114,8 +114,8 @@ public class BulkCollectStatement extends Statement {
                selectedColumns.get(0).equals("*") && intoArrays != null && intoArrays.size() == 1) {
       // Special case: SELECT * BULK COLLECT INTO single_array
       // This is a more complex scenario - for now, generate a comment
-      b.append(data.getIntendation()).append("-- BULK COLLECT with SELECT * requires manual conversion");
-      b.append("\n").append(data.getIntendation()).append("-- ").append(intoArrays.get(0));
+      b.append("-- BULK COLLECT with SELECT * requires manual conversion");
+      b.append("\n").append("-- ").append(intoArrays.get(0));
       b.append(" := ARRAY(SELECT ROW(*) FROM ");
       
       String resolvedSchema = resolveSchemaName(data);
@@ -131,9 +131,9 @@ public class BulkCollectStatement extends Statement {
       b.append(");");
     } else {
       // Column count mismatch or other issues - generate comment
-      b.append(data.getIntendation()).append("-- BULK COLLECT: Column/array count mismatch - requires manual conversion");
-      b.append("\n").append(data.getIntendation()).append("-- Columns: ").append(selectedColumns);
-      b.append("\n").append(data.getIntendation()).append("-- Arrays: ").append(intoArrays);
+      b.append("-- BULK COLLECT: Column/array count mismatch - requires manual conversion");
+      b.append("\n").append("-- Columns: ").append(selectedColumns);
+      b.append("\n").append("-- Arrays: ").append(intoArrays);
     }
 
     return b.toString();

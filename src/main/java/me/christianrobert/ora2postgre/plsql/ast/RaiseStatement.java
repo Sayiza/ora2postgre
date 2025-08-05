@@ -74,7 +74,7 @@ public class RaiseStatement extends Statement {
   @Override
   public String toPostgre(Everything data) {
     StringBuilder b = new StringBuilder();
-    b.append(data.getIntendation()).append("RAISE ");
+    b.append("RAISE ");
 
     if (isReRaise()) {
       // Bare RAISE - re-raise current exception

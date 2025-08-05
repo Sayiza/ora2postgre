@@ -24,8 +24,7 @@ public class ReturnStatement extends Statement {
 
   public String toPostgre(Everything data) {
     StringBuilder b = new StringBuilder();
-    b.append(data.getIntendation())
-            .append("return ")
+    b.append("return ")
             .append(expression.toPostgre(data))
             .append(";\n");
     return b.toString();

@@ -68,7 +68,7 @@ public class CursorDeclaration extends PlSqlAst {
     StringBuilder b = new StringBuilder();
     
     // PostgreSQL: cursor_name CURSOR FOR SELECT...
-    b.append(data.getIntendation()).append(cursorName).append(" CURSOR");
+    b.append(cursorName).append(" CURSOR");
     
     // Add parameters if present
     if (hasParameters()) {

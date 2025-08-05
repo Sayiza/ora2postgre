@@ -441,11 +441,9 @@ public class IfStatement extends Statement {
         StringBuilder b = new StringBuilder();
         b.append("IF ").append(condition.toPostgre(data)).append(" THEN\n");
         
-        data.intendMore();
         for (Statement stmt : thenStatements) {
             b.append(stmt.toPostgre(data)).append("\n");
         }
-        data.intendLess();
         
         return b.toString();
     }

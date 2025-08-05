@@ -41,17 +41,15 @@ public class WhileLoopStatement extends Statement {
     StringBuilder b = new StringBuilder();
 
     // WHILE condition LOOP
-    b.append(data.getIntendation()).append("WHILE ").append(condition.toPostgre(data)).append(" LOOP\n");
+    b.append("WHILE ").append(condition.toPostgre(data)).append(" LOOP\n");
 
     // Loop body statements
-    data.intendMore();
     for (Statement stmt : statements) {
       b.append(stmt.toPostgre(data)).append("\n");
     }
-    data.intendLess();
 
     // END LOOP
-    b.append(data.getIntendation()).append("END LOOP;");
+    b.append("END LOOP;");
 
     return b.toString();
   }

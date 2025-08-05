@@ -49,8 +49,7 @@ public class AssignmentStatement extends Statement {
           String writeCall = PackageVariableReferenceTransformer.transformCollectionElementWrite(
               pkg.getSchema(), pkg.getName(), collectionName, elementType, transformedIndex, expression.toPostgre(data));
           
-          b.append(data.getIntendation())
-              .append(writeCall)
+          b.append(writeCall)
               .append(";");
           
           return b.toString();
@@ -59,8 +58,7 @@ public class AssignmentStatement extends Statement {
       
       // Regular array indexing assignment: arr[index] := value
       String transformedIndex = indexExpr.toPostgre(data);
-      b.append(data.getIntendation())
-          .append(collectionName)
+      b.append(collectionName)
           .append("[")
           .append(transformedIndex)
           .append("] := ")
@@ -81,8 +79,7 @@ public class AssignmentStatement extends Statement {
         String writeCall = PackageVariableReferenceTransformer.transformWrite(
             pkg.getSchema(), pkg.getName(), targetVariableName, dataType, expression.toPostgre(data));
         
-        b.append(data.getIntendation())
-            .append(writeCall)
+        b.append(writeCall)
             .append(";");
         
         return b.toString();
@@ -90,8 +87,7 @@ public class AssignmentStatement extends Statement {
     }
     
     // Regular assignment - let GeneralElement handle its own transformation
-    b.append(data.getIntendation())
-        .append(target.toPostgre(data))
+    b.append(target.toPostgre(data))
         .append(" := ")
         .append(expression.toPostgre(data))
         .append(";");

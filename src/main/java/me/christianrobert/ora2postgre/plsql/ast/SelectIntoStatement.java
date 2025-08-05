@@ -111,11 +111,11 @@ public class SelectIntoStatement extends Statement {
       
       String withClauseSQL = withClause.toPostgre(data);
       if (withClauseSQL != null && !withClauseSQL.trim().isEmpty()) {
-        b.append(data.getIntendation()).append(withClauseSQL).append("\n");
+        b.append(withClauseSQL).append("\n");
       }
     }
 
-    b.append(data.getIntendation()).append("SELECT ");
+    b.append("SELECT ");
 
     // Handle SELECT column list
     if (selectedColumns != null && !selectedColumns.isEmpty()) {

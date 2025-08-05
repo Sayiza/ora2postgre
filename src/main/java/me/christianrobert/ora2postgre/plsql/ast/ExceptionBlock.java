@@ -40,7 +40,7 @@ public class ExceptionBlock extends PlSqlAst {
 
     StringBuilder b = new StringBuilder();
 
-    b.append(data.getIntendation()).append("EXCEPTION\n");
+    b.append("EXCEPTION\n");
 
     // Generate all exception handlers
     for (ExceptionHandler handler : handlers) {

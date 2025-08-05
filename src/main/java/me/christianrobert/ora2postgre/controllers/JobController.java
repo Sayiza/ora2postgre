@@ -202,7 +202,6 @@ public class JobController {
     data.getStandaloneProcedureAst().clear();
     data.getTriggerAst().clear();
     data.setTotalRowCount(0);
-    data.resetIntendation();
 
     // Clear completed jobs from job manager
     jobManager.clearCompletedJobs();

@@ -20,7 +20,6 @@ public class WhileLoopStatementTest {
     @BeforeEach
     void setUp() {
         data = new Everything();
-        data.resetIntendation();
     }
 
     /**
@@ -98,21 +97,20 @@ public class WhileLoopStatementTest {
 
     @Test
     void testWhileLoopIndentation() {
-        // Test that indentation works correctly
+        // Test basic structure without indentation
         Expression condition = createExpression("true");
         Statement stmt = new Comment("-- inner statement");
         
         WhileLoopStatement whileLoop = new WhileLoopStatement(condition, Arrays.asList(stmt));
         
-        // Set initial indentation
-        data.intendMore();
+        // Test with initial state
         
         String result = whileLoop.toPostgre(data);
         
         assertNotNull(result);
-        // Should have proper indentation for WHILE and END LOOP
-        assertTrue(result.contains("  WHILE"), "Expected '  WHILE' in: " + result);
-        assertTrue(result.contains("  END LOOP;"), "Expected '  END LOOP;' in: " + result);
+        // Should have basic structure for WHILE and END LOOP (no indentation now)
+        assertTrue(result.contains("WHILE"), "Expected 'WHILE' in: " + result);
+        assertTrue(result.contains("END LOOP;"), "Expected 'END LOOP;' in: " + result);
         // Comment renders as /* comment */ format, so check for that
         assertTrue(result.contains("/* -- inner statement */"), "Expected '/* -- inner statement */' in: " + result);
     }

@@ -133,7 +133,7 @@ public class CallStatement extends Statement {
     @Override
     public String toPostgre(Everything data) {
         StringBuilder b = new StringBuilder();
-        b.append(data.getIntendation());
+        // No indentation prefix needed
         
         // Transform arguments first, as they're needed for built-in checks
         List<String> transformedArgs = new ArrayList<>();

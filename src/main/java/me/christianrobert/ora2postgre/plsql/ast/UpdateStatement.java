@@ -59,7 +59,7 @@ public class UpdateStatement extends Statement {
   public String toPostgre(Everything data) {
     StringBuilder b = new StringBuilder();
 
-    b.append(data.getIntendation()).append("UPDATE ");
+    b.append("UPDATE ");
 
     // Resolve schema using Everything's schema resolution logic (same as INSERT)
     String resolvedSchema = null;
