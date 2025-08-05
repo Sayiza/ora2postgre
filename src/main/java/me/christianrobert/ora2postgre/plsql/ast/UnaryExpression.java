@@ -2,6 +2,8 @@ package me.christianrobert.ora2postgre.plsql.ast;
 
 import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.global.SchemaResolutionUtils;
+import me.christianrobert.ora2postgre.services.TransformationContext;
+import jakarta.inject.Inject;
 import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.CollectionTypeInfo;
 import me.christianrobert.ora2postgre.plsql.ast.tools.transformers.PackageVariableReferenceTransformer;
 
@@ -28,6 +30,25 @@ import java.util.List;
  *   | implicit_cursor_expression
  */
 public class UnaryExpression extends PlSqlAst {
+
+  @Inject
+  TransformationContext transformationContext;
+
+  /**
+   * For testing purposes - allows manual injection of TransformationContext
+   * when CDI container is not available.
+   */
+  public void setTransformationContext(TransformationContext transformationContext) {
+    this.transformationContext = transformationContext;
+  }
+
+  /**
+   * Helper method to get current function from TransformationContext with fallback.
+   */
+  private Function getCurrentFunctionFromContext() {
+    TransformationContext context = transformationContext != null ? transformationContext : TransformationContext.getTestInstance();
+    return context != null ? context.getCurrentFunction() : null;
+  }
   private final String unaryOperator; // -, +, PRIOR, CONNECT_BY_ROOT, NEW, DISTINCT, ALL
   private final UnaryExpression childExpression; // For unary operations
   private final Expression caseExpression;
@@ -321,20 +342,22 @@ public class UnaryExpression extends PlSqlAst {
     } else if (isStandardFunction()) {
       // Check for collection constructor before standard function processing  
       String functionName = extractFunctionNameFromExpression(standardFunction);
-      if (functionName != null && SchemaResolutionUtils.isCollectionTypeConstructor(data, functionName, data.getCurrentFunction())) {
+      Function currentFunction = getCurrentFunctionFromContext();
+      if (functionName != null && SchemaResolutionUtils.isCollectionTypeConstructor(data, functionName, currentFunction)) {
         // Extract arguments from the function expression (simplified approach)
         List<Expression> arguments = extractArgumentsFromExpression(standardFunction);
-        return SchemaResolutionUtils.transformCollectionConstructor(data, functionName, arguments, data.getCurrentFunction());
+        return SchemaResolutionUtils.transformCollectionConstructor(data, functionName, arguments, currentFunction);
       }
       // Continue with normal function processing if not a collection constructor
       return standardFunction.toPostgre(data);
     } else if (isAtom()) {
       // Check if atom represents a collection constructor
       String functionName = extractFunctionNameFromExpression(atom);
-      if (functionName != null && SchemaResolutionUtils.isCollectionTypeConstructor(data, functionName, data.getCurrentFunction())) {
+      Function currentFunction = getCurrentFunctionFromContext();
+      if (functionName != null && SchemaResolutionUtils.isCollectionTypeConstructor(data, functionName, currentFunction)) {
         // Extract arguments from the atom expression
         List<Expression> arguments = extractArgumentsFromExpression(atom);
-        return SchemaResolutionUtils.transformCollectionConstructor(data, functionName, arguments, data.getCurrentFunction());
+        return SchemaResolutionUtils.transformCollectionConstructor(data, functionName, arguments, currentFunction);
       }
       
       return atom.toPostgre(data);
@@ -345,14 +368,15 @@ public class UnaryExpression extends PlSqlAst {
       return transformCollectionMethodToPostgreSQL(data);
     } else if (isArrayIndexing()) {
       // SEMANTIC LAYER: Check if this is actually a collection constructor parsed as array indexing
-      if (arrayVariable != null && SchemaResolutionUtils.isCollectionTypeConstructor(data, arrayVariable, data.getCurrentFunction())) {
+      Function currentFunction = getCurrentFunctionFromContext();
+      if (arrayVariable != null && SchemaResolutionUtils.isCollectionTypeConstructor(data, arrayVariable, currentFunction)) {
         // This is a collection constructor, not array indexing
         // Create argument list from the index expression (parsing limitation workaround)
         List<Expression> arguments = new ArrayList<>();
         if (indexExpression != null) {
           arguments.add(indexExpression);
         }
-        return SchemaResolutionUtils.transformCollectionConstructor(data, arrayVariable, arguments, data.getCurrentFunction());
+        return SchemaResolutionUtils.transformCollectionConstructor(data, arrayVariable, arguments, currentFunction);
       }
       
       // Transform Oracle array indexing to PostgreSQL array indexing
@@ -521,9 +545,10 @@ public class UnaryExpression extends PlSqlAst {
     }
     
     // First check if this is actually a collection type constructor
-    if (SchemaResolutionUtils.isCollectionTypeConstructor(data, constructorName, data.getCurrentFunction())) {
+    Function currentFunction = getCurrentFunctionFromContext();
+    if (SchemaResolutionUtils.isCollectionTypeConstructor(data, constructorName, currentFunction)) {
       // Use the Everything.transformCollectionConstructor method for proper transformation
-      return SchemaResolutionUtils.transformCollectionConstructor(data, constructorName, constructorArguments, data.getCurrentFunction());
+      return SchemaResolutionUtils.transformCollectionConstructor(data, constructorName, constructorArguments, currentFunction);
     } else {
       // This is not a collection constructor - it's probably array indexing
       // Fall back to array indexing transformation: v_arr(i) → v_arr[i]
@@ -723,7 +748,7 @@ public class UnaryExpression extends PlSqlAst {
     }
     
     // 1. Search in current function context first (highest priority for function-local types)
-    Function currentFunction = data.getCurrentFunction();
+    Function currentFunction = getCurrentFunctionFromContext();
     if (currentFunction != null) {
       CollectionTypeInfo info = searchFunctionForCollectionType(currentFunction, typeName);
       if (info != null) return info;

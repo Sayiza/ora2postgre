@@ -1,12 +1,16 @@
 package me.christianrobert.ora2postgre.plsql.ast.tools.managers;
 
+import me.christianrobert.ora2postgre.global.Everything;
+import me.christianrobert.ora2postgre.oracledb.ConstraintMetadata;
 import me.christianrobert.ora2postgre.oracledb.IndexMetadata;
+import me.christianrobert.ora2postgre.oracledb.TableMetadata;
 import me.christianrobert.ora2postgre.plsql.ast.tools.strategies.*;
 import me.christianrobert.ora2postgre.plsql.ast.tools.transformers.PostgreSQLIndexDDL;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Manager class that orchestrates Oracle to PostgreSQL index conversion using different strategies.
@@ -90,17 +94,26 @@ public class IndexMigrationStrategyManager {
   }
 
   /**
-   * Converts a list of Oracle indexes to PostgreSQL DDL.
+   * Converts a list of Oracle indexes to PostgreSQL DDL with constraint deduplication.
    * Returns results separated by supported and unsupported indexes.
    */
-  public IndexConversionResult convertIndexes(List<IndexMetadata> indexes) {
+  public IndexConversionResult convertIndexes(List<IndexMetadata> indexes, Everything context) {
     List<PostgreSQLIndexDDL> supportedIndexes = new ArrayList<>();
     List<PostgreSQLIndexDDL> unsupportedIndexes = new ArrayList<>();
     Map<String, Integer> strategyUsageStats = new HashMap<>();
 
     log.info("Converting {} indexes to PostgreSQL", indexes.size());
 
-    for (IndexMetadata index : indexes) {
+    // Filter out indexes that conflict with constraints
+    List<IndexMetadata> filteredIndexes = filterConflictingIndexes(indexes, context);
+    int conflictingCount = indexes.size() - filteredIndexes.size();
+    
+    if (conflictingCount > 0) {
+      log.info("Filtered out {} indexes that conflict with constraints", conflictingCount);
+      strategyUsageStats.put("Constraint Conflict", conflictingCount);
+    }
+
+    for (IndexMetadata index : filteredIndexes) {
       try {
         PostgreSQLIndexDDL result = convertIndex(index);
 
@@ -131,14 +144,21 @@ public class IndexMigrationStrategyManager {
       }
     }
 
-    log.info("Index conversion completed: {} supported, {} unsupported",
-            supportedIndexes.size(), unsupportedIndexes.size());
+    log.info("Index conversion completed: {} supported, {} unsupported, {} skipped due to constraint conflicts",
+            supportedIndexes.size(), unsupportedIndexes.size(), conflictingCount);
 
     // Log strategy usage statistics
     strategyUsageStats.forEach((strategy, count) ->
             log.info("Strategy '{}': {} indexes", strategy, count));
 
     return new IndexConversionResult(supportedIndexes, unsupportedIndexes, strategyUsageStats);
+  }
+
+  /**
+   * Legacy method for backward compatibility. Uses convertIndexes with null context.
+   */
+  public IndexConversionResult convertIndexes(List<IndexMetadata> indexes) {
+    return convertIndexes(indexes, null);
   }
 
   /**
@@ -160,6 +180,91 @@ public class IndexMigrationStrategyManager {
    */
   public List<IndexMigrationStrategy> getRegisteredStrategies() {
     return new ArrayList<>(strategies);
+  }
+
+  /**
+   * Filters out indexes that would conflict with constraint-generated indexes.
+   * PostgreSQL constraints automatically create indexes, so we need to avoid duplicates.
+   */
+  private List<IndexMetadata> filterConflictingIndexes(List<IndexMetadata> indexes, Everything context) {
+    if (context == null) {
+      log.debug("No context provided - skipping constraint conflict detection");
+      return new ArrayList<>(indexes);
+    }
+
+    // Build set of constraint-generated index signatures
+    Set<String> constraintIndexSignatures = buildConstraintIndexSignatures(context);
+    
+    if (constraintIndexSignatures.isEmpty()) {
+      log.debug("No constraint-generated indexes found");
+      return new ArrayList<>(indexes);
+    }
+
+    List<IndexMetadata> filteredIndexes = new ArrayList<>();
+    
+    for (IndexMetadata index : indexes) {
+      String indexSignature = buildIndexSignature(index);
+      
+      if (constraintIndexSignatures.contains(indexSignature)) {
+        log.debug("Filtering out index {} - conflicts with constraint-generated index", index.getIndexName());
+      } else {
+        filteredIndexes.add(index);
+      }
+    }
+    
+    return filteredIndexes;
+  }
+
+  /**
+   * Builds signatures for indexes that will be automatically created by constraints.
+   */
+  private Set<String> buildConstraintIndexSignatures(Everything context) {
+    Set<String> signatures = new HashSet<>();
+    
+    for (TableMetadata table : context.getTableSql()) {
+      String schema = table.getSchema();
+      String tableName = table.getTableName();
+      
+      for (ConstraintMetadata constraint : table.getConstraints()) {
+        // Primary key and unique constraints create indexes automatically in PostgreSQL
+        if (constraint.isPrimaryKey() || constraint.isUniqueConstraint()) {
+          String signature = buildConstraintIndexSignature(schema, tableName, constraint.getColumnNames());
+          signatures.add(signature);
+          log.debug("Added constraint index signature: {}", signature);
+        }
+      }
+    }
+    
+    return signatures;
+  }
+
+  /**
+   * Builds a signature for an index based on schema, table, and column names.
+   */
+  private String buildIndexSignature(IndexMetadata index) {
+    List<String> columnNames = index.getColumns().stream()
+        .map(col -> col.getColumnName())
+        .filter(name -> name != null && !name.trim().isEmpty())
+        .collect(Collectors.toList());
+    
+    return buildConstraintIndexSignature(index.getSchemaName(), index.getTableName(), columnNames);
+  }
+
+  /**
+   * Builds a standardized signature for comparing indexes and constraints.
+   */
+  private String buildConstraintIndexSignature(String schema, String tableName, List<String> columnNames) {
+    // Normalize schema and table names to lowercase
+    String normalizedSchema = schema != null ? schema.toLowerCase() : "";
+    String normalizedTable = tableName != null ? tableName.toLowerCase() : "";
+    
+    // Sort column names to handle different ordering
+    List<String> sortedColumns = columnNames.stream()
+        .map(String::toLowerCase)
+        .sorted()
+        .collect(Collectors.toList());
+    
+    return normalizedSchema + "." + normalizedTable + ":" + String.join(",", sortedColumns);
   }
 
   /**

@@ -1,8 +1,21 @@
 package me.christianrobert.ora2postgre.plsql.ast;
 
 import me.christianrobert.ora2postgre.global.Everything;
+import me.christianrobert.ora2postgre.services.TransformationContext;
+import jakarta.inject.Inject;
 
 public class Variable extends PlSqlAst {
+
+  @Inject
+  TransformationContext transformationContext;
+
+  /**
+   * For testing purposes - allows manual injection of TransformationContext
+   * when CDI container is not available.
+   */
+  public void setTransformationContext(TransformationContext transformationContext) {
+    this.transformationContext = transformationContext;
+  }
   private String name;
   private DataTypeSpec dataType;
   private Expression defaultValue;
@@ -58,13 +71,14 @@ public class Variable extends PlSqlAst {
     // Add default value if present
     if (defaultValue != null) {
       // Set function context for collection constructor resolution
-      Function previousFunction = data.getCurrentFunction();
-      data.setCurrentFunction(function);
-      try {
+      TransformationContext context = transformationContext != null ? transformationContext : TransformationContext.getTestInstance();
+      if (context != null) {
+        context.withFunctionContext(function, () -> {
+          b.append(" := ").append(defaultValue.toPostgre(data));
+        });
+      } else {
+        // Fallback if no context available
         b.append(" := ").append(defaultValue.toPostgre(data));
-      } finally {
-        // Restore previous function context
-        data.setCurrentFunction(previousFunction);
       }
     }
     

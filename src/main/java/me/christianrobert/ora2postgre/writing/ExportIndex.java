@@ -13,31 +13,24 @@ import java.io.File;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.stream.Collectors;
 
 /**
  * Export utility for generating PostgreSQL index files.
  *
- * Implements PostgreSQL-compatible index export strategy:
- * 1. Convert Oracle indexes using strategy pattern
+ * Implements simplified PostgreSQL-compatible index export strategy:
+ * 1. Convert Oracle indexes using strategy pattern with constraint deduplication
  * 2. Generate PostgreSQL CREATE INDEX statements
  * 3. Organize indexes by schema in step6indexes/ directory
- * 4. Handle supported/unsupported indexes appropriately
+ * 4. Use standard logging like other export classes
  *
  * Indexes are created after data transfer for optimal performance.
  */
 public class ExportIndex {
 
   private static final Logger log = LoggerFactory.getLogger(ExportIndex.class);
-
-  private final IndexMigrationStrategyManager strategyManager;
-
-  /**
-   * Constructor that initializes the strategy manager.
-   */
-  public ExportIndex() {
-    this.strategyManager = new IndexMigrationStrategyManager();
-  }
+  private static final IndexMigrationStrategyManager strategyManager = new IndexMigrationStrategyManager();
 
   /**
    * Main entry point for index export. Converts Oracle indexes to PostgreSQL
@@ -49,19 +42,6 @@ public class ExportIndex {
   public static void saveIndexes(String basePath, Everything everything) {
     log.info("Starting index export to base path: {}", basePath);
 
-    ExportIndex exporter = new ExportIndex();
-    exporter.exportIndexes(basePath, everything);
-
-    log.info("Index export completed successfully");
-  }
-
-  /**
-   * Exports all indexes from the Everything context.
-   *
-   * @param basePath Base path for file generation
-   * @param everything Global context containing index data
-   */
-  public void exportIndexes(String basePath, Everything everything) {
     List<IndexMetadata> indexes = everything.getIndexes();
 
     if (indexes.isEmpty()) {
@@ -71,26 +51,19 @@ public class ExportIndex {
 
     log.info("Exporting {} indexes", indexes.size());
 
-    // Convert all indexes using strategy manager
-    IndexConversionResult conversionResult = strategyManager.convertIndexes(indexes);
+    // Convert all indexes using strategy manager with constraint deduplication
+    IndexConversionResult conversionResult = strategyManager.convertIndexes(indexes, everything);
 
     // Export supported indexes
     exportSupportedIndexes(basePath, conversionResult.getSupportedIndexes());
 
-    // Export unsupported indexes (as comments for reference)
-    exportUnsupportedIndexes(basePath, conversionResult.getUnsupportedIndexes());
-
-    // Generate detailed unsupported index report
-    if (!conversionResult.getUnsupportedIndexes().isEmpty()) {
-      UnsupportedIndexReporter.generateUnsupportedIndexReport(
-              basePath,
-              conversionResult.getUnsupportedIndexes(),
-              conversionResult.getStrategyUsageStats()
-      );
-    }
+    // Log unsupported indexes (simple logging, no complex reporting)
+    logUnsupportedIndexes(conversionResult.getUnsupportedIndexes());
 
     // Log conversion statistics
     logConversionStatistics(conversionResult);
+
+    log.info("Index export completed successfully");
   }
 
   /**
@@ -99,7 +72,7 @@ public class ExportIndex {
    * @param basePath Base path for file generation
    * @param supportedIndexes List of PostgreSQL DDL objects for supported indexes
    */
-  private void exportSupportedIndexes(String basePath, List<PostgreSQLIndexDDL> supportedIndexes) {
+  private static void exportSupportedIndexes(String basePath, List<PostgreSQLIndexDDL> supportedIndexes) {
     if (supportedIndexes.isEmpty()) {
       log.info("No supported indexes to export");
       return;
@@ -114,15 +87,23 @@ public class ExportIndex {
                     Collectors.toList()
             ));
 
+    Map<String, Integer> schemaCounts = new HashMap<>();
+
     // Export each schema's indexes to a separate file
     for (Map.Entry<String, List<PostgreSQLIndexDDL>> entry : indexesBySchema.entrySet()) {
       String schema = entry.getKey();
       List<PostgreSQLIndexDDL> schemaIndexes = entry.getValue();
 
       exportSchemaIndexes(basePath, schema, schemaIndexes);
+      schemaCounts.put(schema, schemaIndexes.size());
     }
 
-    log.info("Exported supported indexes to {} schema files", indexesBySchema.size());
+    // Log export statistics
+    int totalIndexes = schemaCounts.values().stream().mapToInt(Integer::intValue).sum();
+    log.info("Exported {} indexes across {} schemas", totalIndexes, schemaCounts.size());
+    for (Map.Entry<String, Integer> entry : schemaCounts.entrySet()) {
+      log.debug("  Schema {}: {} indexes", entry.getKey(), entry.getValue());
+    }
   }
 
   /**
@@ -132,12 +113,12 @@ public class ExportIndex {
    * @param schema Schema name
    * @param schemaIndexes List of indexes for this schema
    */
-  private void exportSchemaIndexes(String basePath, String schema, List<PostgreSQLIndexDDL> schemaIndexes) {
+  private static void exportSchemaIndexes(String basePath, String schema, List<PostgreSQLIndexDDL> schemaIndexes) {
     StringBuilder content = new StringBuilder();
 
     // Add file header
     content.append("-- PostgreSQL Index Definitions for Schema: ").append(schema.toUpperCase()).append("\n");
-    content.append("-- Generated from Oracle index migration\n");
+    content.append("-- Generated from Oracle index migration with constraint deduplication\n");
     content.append("-- Total indexes: ").append(schemaIndexes.size()).append("\n");
     content.append("-- Execution phase: POST_TRANSFER_INDEXES\n");
     content.append("\n");
@@ -159,79 +140,27 @@ public class ExportIndex {
 
     FileWriter.write(Paths.get(directoryPath), fileName, content.toString());
 
-    log.info("Exported {} indexes for schema {} to {}", schemaIndexes.size(), schema, fileName);
+    log.debug("Exported {} indexes for schema {} to {}", schemaIndexes.size(), schema, fileName);
   }
 
   /**
-   * Exports unsupported indexes as commented SQL for reference.
+   * Logs unsupported indexes using standard logging (no complex reporting).
    *
-   * @param basePath Base path for file generation
    * @param unsupportedIndexes List of unsupported index DDL objects
    */
-  private void exportUnsupportedIndexes(String basePath, List<PostgreSQLIndexDDL> unsupportedIndexes) {
+  private static void logUnsupportedIndexes(List<PostgreSQLIndexDDL> unsupportedIndexes) {
     if (unsupportedIndexes.isEmpty()) {
-      log.info("No unsupported indexes to export");
       return;
     }
 
-    log.info("Exporting {} unsupported indexes as comments", unsupportedIndexes.size());
-
-    // Group unsupported indexes by schema
-    Map<String, List<PostgreSQLIndexDDL>> indexesBySchema = unsupportedIndexes.stream()
-            .collect(Collectors.groupingBy(
-                    index -> index.getSchemaName().toLowerCase(),
-                    Collectors.toList()
-            ));
-
-    // Export each schema's unsupported indexes to a separate file
-    for (Map.Entry<String, List<PostgreSQLIndexDDL>> entry : indexesBySchema.entrySet()) {
-      String schema = entry.getKey();
-      List<PostgreSQLIndexDDL> schemaIndexes = entry.getValue();
-
-      exportSchemaUnsupportedIndexes(basePath, schema, schemaIndexes);
+    log.warn("Found {} unsupported indexes that require manual review:", unsupportedIndexes.size());
+    
+    for (PostgreSQLIndexDDL index : unsupportedIndexes) {
+      log.warn("  • {} (Table: {}) - {}", 
+          index.getOriginalIndexName(), 
+          index.getFullTableName(), 
+          index.getConversionNotes());
     }
-
-    log.info("Exported unsupported indexes to {} schema files", indexesBySchema.size());
-  }
-
-  /**
-   * Exports unsupported indexes for a specific schema to a reference file.
-   *
-   * @param basePath Base path for file generation
-   * @param schema Schema name
-   * @param schemaIndexes List of unsupported indexes for this schema
-   */
-  private void exportSchemaUnsupportedIndexes(String basePath, String schema, List<PostgreSQLIndexDDL> schemaIndexes) {
-    StringBuilder content = new StringBuilder();
-
-    // Add file header
-    content.append("-- UNSUPPORTED INDEX REFERENCE for Schema: ").append(schema.toUpperCase()).append("\n");
-    content.append("-- These indexes could not be automatically converted\n");
-    content.append("-- Manual review and implementation required\n");
-    content.append("-- Total unsupported indexes: ").append(schemaIndexes.size()).append("\n");
-    content.append("\n");
-
-    // Sort indexes by table name for better organization
-    schemaIndexes.sort((a, b) -> {
-      int tableComparison = a.getTableName().compareToIgnoreCase(b.getTableName());
-      return tableComparison != 0 ? tableComparison : a.getOriginalIndexName().compareToIgnoreCase(b.getOriginalIndexName());
-    });
-
-    // Add each unsupported index as a comment
-    for (PostgreSQLIndexDDL index : schemaIndexes) {
-      content.append("-- ").append(index.getSummary()).append("\n");
-      content.append("-- Table: ").append(index.getFullTableName()).append("\n");
-      content.append("-- Reason: ").append(index.getConversionNotes()).append("\n");
-      content.append("\n");
-    }
-
-    // Write to file
-    String fileName = schema.toLowerCase() + "_unsupported_indexes.sql";
-    String directoryPath = getIndexPath(basePath, schema);
-
-    FileWriter.write(Paths.get(directoryPath), fileName, content.toString());
-
-    log.info("Exported {} unsupported indexes for schema {} to {}", schemaIndexes.size(), schema, fileName);
   }
 
   /**
@@ -241,7 +170,7 @@ public class ExportIndex {
    * @param schema Schema name
    * @return Full directory path for index files
    */
-  private String getIndexPath(String basePath, String schema) {
+  private static String getIndexPath(String basePath, String schema) {
     return basePath + File.separator + schema.toLowerCase() + File.separator + "step6indexes";
   }
 
@@ -250,7 +179,7 @@ public class ExportIndex {
    *
    * @param conversionResult Result from index conversion process
    */
-  private void logConversionStatistics(IndexConversionResult conversionResult) {
+  private static void logConversionStatistics(IndexConversionResult conversionResult) {
     int supportedCount = conversionResult.getSupportedIndexes().size();
     int unsupportedCount = conversionResult.getUnsupportedIndexes().size();
     int totalCount = supportedCount + unsupportedCount;

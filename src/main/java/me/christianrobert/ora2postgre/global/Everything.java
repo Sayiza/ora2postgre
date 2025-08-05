@@ -29,8 +29,6 @@ public class Everything {
   private List<TableMetadata> tableSql = new ArrayList<>();
   
   
-  // Function context tracking for semantic resolution
-  private Function currentFunction = null;
   private List<ViewMetadata> viewDefinition = new ArrayList<>();
   private List<SynonymMetadata> synonyms = new ArrayList<>();
   private List<IndexMetadata> indexes = new ArrayList<>();
@@ -160,21 +158,6 @@ public class Everything {
     //TODO
   }
 
-  /**
-   * Gets the current function context for semantic resolution.
-   * @return The current function context, or null if none set
-   */
-  public Function getCurrentFunction() {
-    return currentFunction;
-  }
-  
-  /**
-   * Sets the current function context for semantic resolution.
-   * @param function The function context to set
-   */
-  public void setCurrentFunction(Function function) {
-    this.currentFunction = function;
-  }
   
   /**
    * Gets all functions from all parsed packages and standalone functions.

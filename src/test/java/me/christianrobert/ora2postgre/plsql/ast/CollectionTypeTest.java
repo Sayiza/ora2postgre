@@ -3,6 +3,8 @@ package me.christianrobert.ora2postgre.plsql.ast;
 import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.global.PlsqlCode;
 import me.christianrobert.ora2postgre.plsql.PlSqlAstMain;
+import me.christianrobert.ora2postgre.services.TransformationContext;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.*;
@@ -10,6 +12,16 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class CollectionTypeTest {
+
+  private TransformationContext transformationContext;
+
+  @BeforeEach
+  public void setUp() {
+    transformationContext = new TransformationContext();
+    
+    // Set the test instance so it can be used as fallback when CDI injection is not available
+    TransformationContext.setTestInstance(transformationContext);
+  }
 
   @Test
   public void testVarrayTypePostgreSQLGeneration() {
