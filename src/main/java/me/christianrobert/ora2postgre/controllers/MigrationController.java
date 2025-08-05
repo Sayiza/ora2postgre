@@ -28,7 +28,9 @@ import me.christianrobert.ora2postgre.plsql.ast.Trigger;
 import me.christianrobert.ora2postgre.writing.ExportObjectType;
 import me.christianrobert.ora2postgre.writing.ExportPackage;
 import me.christianrobert.ora2postgre.writing.ExportProjectPostgre;
+import me.christianrobert.ora2postgre.writing.ExportRecordType;
 import me.christianrobert.ora2postgre.writing.ExportStandaloneFunction;
+import me.christianrobert.ora2postgre.plsql.ast.tools.managers.RecordTypeCollectionManager;
 import me.christianrobert.ora2postgre.writing.ExportStandaloneProcedure;
 import me.christianrobert.ora2postgre.writing.ExportModPlsqlSimulator;
 import me.christianrobert.ora2postgre.writing.ExportSchema;
@@ -780,6 +782,9 @@ public class MigrationController {
   }
 
   private void performExport() throws Exception {
+    // Clear any previously collected record types from previous runs
+    RecordTypeCollectionManager.clear();
+    
     boolean doModPlsqlSimulator = configurationService.isDoModPlsqlSimulator();
 
     boolean doWritePostgreFiles = configurationService.isDoWritePostgreFiles();
@@ -847,6 +852,14 @@ public class MigrationController {
       if (doObjectTypeSpec) {
         ExportObjectType.saveObjectTypeSpecToPostgre(path, data.getObjectTypeSpecAst(), data.getObjectTypeBodyAst(), data);
       }
+      
+      // Export record types if any of the components that can contain them are enabled
+      if (ExportRecordType.isRecordTypeExportNeeded(configurationService)) {
+        log.info("Starting record type export to PostgreSQL composite types");
+        ExportRecordType.saveRecordTypesToPostgre(path, data);
+        log.info("Record type export completed: {}", ExportRecordType.getExportSummary());
+      }
+      
       if (doPackageSpec) {
         ExportPackage.savePackageSpecToPostgre(path, data.getPackageSpecAst(), data.getPackageBodyAst(), data);
       }

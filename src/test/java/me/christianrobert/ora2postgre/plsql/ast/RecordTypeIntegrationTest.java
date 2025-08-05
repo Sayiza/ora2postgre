@@ -163,18 +163,17 @@ end;
     
     OraclePackage pkg = (OraclePackage) ast;
     
-    // Test PostgreSQL generation for package spec (record types should be generated)
+    // Test PostgreSQL generation for package spec (record types should be collected for schema-level generation)
     String packageSpecSQL = pkg.toPostgre(data, true);
     assertNotNull(packageSpecSQL);
-    assertTrue(packageSpecSQL.contains("Record Types for TEST_SCHEMA.postgres_test_pkg"));
-    assertTrue(packageSpecSQL.contains("CREATE TYPE test_schema_postgres_test_pkg_simple_record AS"));
-    assertTrue(packageSpecSQL.contains("id numeric"));
-    assertTrue(packageSpecSQL.contains("name text"));
+    assertTrue(packageSpecSQL.contains("Package record types collected for schema-level generation"));
+    assertTrue(packageSpecSQL.contains("simple_record ->"));
+    assertTrue(packageSpecSQL.contains("test_schema_postgres_test_pkg_simple_record"));
     
-    // Test PostgreSQL generation for package body (record types should NOT be generated to avoid duplication)
+    // Test PostgreSQL generation for package body (record types should NOT be collected in body to avoid duplication)
     String packageBodySQL = pkg.toPostgre(data, false);
     assertNotNull(packageBodySQL);
-    assertFalse(packageBodySQL.contains("Record Types for TEST_SCHEMA.postgres_test_pkg"));
+    assertFalse(packageBodySQL.contains("Package record types collected"));
     
     // But function should be generated with body
     assertTrue(packageBodySQL.contains("CREATE OR REPLACE FUNCTION TEST_SCHEMA.POSTGRES_TEST_PKG_test_function"));
@@ -222,10 +221,11 @@ end;
     assertEquals(1, function.getRecordTypes().size());
     assertEquals("local_record", function.getRecordTypes().get(0).getName());
     
-    // Test function PostgreSQL generation includes record type comment
+    // Test function PostgreSQL generation includes record type references
     String functionSQL = function.toPostgre(data, false);
     assertNotNull(functionSQL);
-    assertTrue(functionSQL.contains("-- Record type local_record should be created as composite type at schema level"));
+    assertTrue(functionSQL.contains("-- Using schema-level composite type:"));
+    assertTrue(functionSQL.contains("-- Original record type: local_record"));
     assertTrue(functionSQL.contains("CREATE OR REPLACE FUNCTION TEST_SCHEMA.FUNCTION_RECORD_PKG_complex_function"));
   }
 

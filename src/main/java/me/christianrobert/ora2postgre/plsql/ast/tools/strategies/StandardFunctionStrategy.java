@@ -7,6 +7,7 @@ import me.christianrobert.ora2postgre.plsql.ast.Statement;
 import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.StatementDeclarationCollector;
 import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.ToExportPostgre;
 import me.christianrobert.ora2postgre.plsql.ast.tools.transformers.TypeConverter;
+import me.christianrobert.ora2postgre.plsql.ast.tools.managers.RecordTypeCollectionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,14 +83,15 @@ public class StandardFunctionStrategy implements FunctionTransformationStrategy 
         }
       }
 
-      // TODO:
-      // Add record type declarations from DECLARE section
+      // Collect record types for schema-level generation and add references
       if (function.getRecordTypes() != null && !function.getRecordTypes().isEmpty()) {
+        // Collect record types for schema-level composite type generation
+        RecordTypeCollectionManager.collectFromFunction(function);
+        
         for (me.christianrobert.ora2postgre.plsql.ast.RecordType recordType : function.getRecordTypes()) {
-          // Record types need to be created at the schema level, not inside functions
-          // For now, add a comment indicating the record type is needed
-          b.append("  -- Record type ").append(recordType.getName())
-                  .append(" should be created as composite type at schema level\n");
+          String qualifiedName = RecordTypeCollectionManager.getQualifiedName(function, recordType);
+          b.append("  -- Using schema-level composite type: ").append(qualifiedName).append("\n");
+          b.append("  -- Original record type: ").append(recordType.getName()).append("\n");
         }
       }
       
