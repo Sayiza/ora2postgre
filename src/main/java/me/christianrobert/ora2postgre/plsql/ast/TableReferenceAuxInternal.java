@@ -1,6 +1,7 @@
 package me.christianrobert.ora2postgre.plsql.ast;
 
 import me.christianrobert.ora2postgre.global.Everything;
+import me.christianrobert.ora2postgre.global.SchemaResolutionUtils;
 import me.christianrobert.ora2postgre.services.CTETrackingService;
 import jakarta.inject.Inject;
 
@@ -69,7 +70,7 @@ public class TableReferenceAuxInternal extends PlSqlAst {
         if (tableExpressionClause.getSchemaName() != null) {
           b.append(tableExpressionClause.getSchemaName());
         } else {
-          b.append(data.lookupSchema4Field(tableName, schema));
+          b.append(SchemaResolutionUtils.lookupSchema4Field(data, tableName, schema));
         }
         b.append(".").append(tableName);
       }

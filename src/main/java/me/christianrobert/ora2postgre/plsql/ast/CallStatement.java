@@ -1,6 +1,7 @@
 package me.christianrobert.ora2postgre.plsql.ast;
 
 import me.christianrobert.ora2postgre.global.Everything;
+import me.christianrobert.ora2postgre.global.SchemaResolutionUtils;
 import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.OracleBuiltinRegistry;
 
 import java.util.List;
@@ -245,21 +246,21 @@ public class CallStatement extends Statement {
         
         // If no explicit package specified, try calling package first
         if (packageName == null && callingPackage != null) {
-            String resolvedSchema = data.lookupProcedureSchema(routineName, callingPackage, currentSchema);
+            String resolvedSchema = SchemaResolutionUtils.lookupProcedureSchema(data, routineName, callingPackage, currentSchema);
             if (resolvedSchema != null) {
                 // Found in calling package - set the package context
                 this.packageName = callingPackage;
-                this.isFunction = data.isFunction(routineName, callingPackage, resolvedSchema);
+                this.isFunction = SchemaResolutionUtils.isFunction(data, routineName, callingPackage, resolvedSchema);
                 return resolvedSchema;
             }
         }
         
         // Use the existing lookup methods to resolve schema
-        String resolvedSchema = data.lookupProcedureSchema(routineName, packageName, currentSchema);
+        String resolvedSchema = SchemaResolutionUtils.lookupProcedureSchema(data, routineName, packageName, currentSchema);
         
         if (resolvedSchema != null) {
             // Also update the isFunction flag based on the resolved information
-            this.isFunction = data.isFunction(routineName, packageName, resolvedSchema);
+            this.isFunction = SchemaResolutionUtils.isFunction(data, routineName, packageName, resolvedSchema);
             return resolvedSchema;
         }
         

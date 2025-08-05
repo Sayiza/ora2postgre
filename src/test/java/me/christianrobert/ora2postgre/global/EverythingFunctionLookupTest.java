@@ -38,7 +38,7 @@ class EverythingFunctionLookupTest {
     Expression mockExpression = createExpression("MyObjectType.getCustomerName()");
 
     // Act: Look up the data type
-    String result = everything.lookUpDataType(mockExpression, "TestSchema", new ArrayList<>());
+    String result = SchemaResolutionUtils.lookUpDataType(everything, mockExpression, "TestSchema", new ArrayList<>());
 
     // Assert: Should return the function's return type
     assertEquals("VARCHAR2", result, "Should return the function's return type");
@@ -64,7 +64,7 @@ class EverythingFunctionLookupTest {
     Expression mockExpression = createExpression("TypeAlias.calculateTotal()");
 
     // Act: Look up the data type from schema2 context
-    String result = everything.lookUpDataType(mockExpression, "Schema2", new ArrayList<>());
+    String result = SchemaResolutionUtils.lookUpDataType(everything, mockExpression, "Schema2", new ArrayList<>());
 
     // Assert: Should resolve through synonym and return the function's return type
     assertEquals("NUMBER", result, "Should resolve through synonym and return the function's return type");
@@ -85,7 +85,7 @@ class EverythingFunctionLookupTest {
     Expression mockExpression = createExpression("UtilPackage.formatDate()");
 
     // Act: Look up the data type
-    String result = everything.lookUpDataType(mockExpression, "TestSchema", new ArrayList<>());
+    String result = SchemaResolutionUtils.lookUpDataType(everything, mockExpression, "TestSchema", new ArrayList<>());
 
     // Assert: Should return the function's return type
     assertEquals("VARCHAR2", result, "Should return the package function's return type");
@@ -110,7 +110,7 @@ class EverythingFunctionLookupTest {
     Expression mockExpression = createExpression("Customer.getAddress().getStreet()");
 
     // Act: Look up the data type
-    String result = everything.lookUpDataType(mockExpression, "TestSchema", new ArrayList<>());
+    String result = SchemaResolutionUtils.lookUpDataType(everything, mockExpression, "TestSchema", new ArrayList<>());
 
     // Assert: Should return the final function's return type
     assertEquals("VARCHAR2", result, "Should return the final function's return type in chain");
@@ -131,7 +131,7 @@ class EverythingFunctionLookupTest {
     Expression mockExpression = createExpression("MyObjectType.nonExistentFunction()");
 
     // Act: Look up the data type
-    String result = everything.lookUpDataType(mockExpression, "TestSchema", new ArrayList<>());
+    String result = SchemaResolutionUtils.lookUpDataType(everything, mockExpression, "TestSchema", new ArrayList<>());
 
     // Assert: Should fall back to default
     assertEquals("varchar2", result, "Should fall back to default when function not found");
@@ -152,7 +152,7 @@ class EverythingFunctionLookupTest {
     Expression mockExpression = createExpression("SpecificSchema.MyObjectType.getStatus()");
 
     // Act: Look up the data type from different schema context
-    String result = everything.lookUpDataType(mockExpression, "DifferentSchema", new ArrayList<>());
+    String result = SchemaResolutionUtils.lookUpDataType(everything, mockExpression, "DifferentSchema", new ArrayList<>());
 
     // Assert: Should find function in specified schema
     assertEquals("VARCHAR2", result, "Should find function in specified schema");
@@ -173,7 +173,7 @@ class EverythingFunctionLookupTest {
     Expression mockExpression = createExpression("UtilityPackage.formatDate()");
 
     // Act: Look up the data type
-    String result = everything.lookUpDataType(mockExpression, "TestSchema", new ArrayList<>());
+    String result = SchemaResolutionUtils.lookUpDataType(everything, mockExpression, "TestSchema", new ArrayList<>());
 
     // Assert: Should return the function's return type
     assertEquals("VARCHAR2", result, "Should return the package function's return type");
@@ -200,7 +200,7 @@ class EverythingFunctionLookupTest {
     Expression mockExpression = createExpression("PackageAlias.calculateTax()");
 
     // Act: Look up the data type from schema2 context
-    String result = everything.lookUpDataType(mockExpression, "Schema2", new ArrayList<>());
+    String result = SchemaResolutionUtils.lookUpDataType(everything, mockExpression, "Schema2", new ArrayList<>());
 
     // Assert: Should resolve through synonym and return the function's return type
     // Note: This might fail currently since our synonym resolution is only for object types
@@ -229,11 +229,11 @@ class EverythingFunctionLookupTest {
     Expression emailExpr = createExpression("UtilsPackage.validateEmail()");
 
     // Act & Assert
-    assertEquals("VARCHAR2", everything.lookUpDataType(dateExpr, "TestSchema", new ArrayList<>()),
+    assertEquals("VARCHAR2", SchemaResolutionUtils.lookUpDataType(everything, dateExpr, "TestSchema", new ArrayList<>()),
             "Should return correct type for formatDate function");
-    assertEquals("NUMBER", everything.lookUpDataType(ageExpr, "TestSchema", new ArrayList<>()),
+    assertEquals("NUMBER", SchemaResolutionUtils.lookUpDataType(everything, ageExpr, "TestSchema", new ArrayList<>()),
             "Should return correct type for calculateAge function");
-    assertEquals("BOOLEAN", everything.lookUpDataType(emailExpr, "TestSchema", new ArrayList<>()),
+    assertEquals("BOOLEAN", SchemaResolutionUtils.lookUpDataType(everything, emailExpr, "TestSchema", new ArrayList<>()),
             "Should return correct type for validateEmail function");
   }
 
@@ -252,7 +252,7 @@ class EverythingFunctionLookupTest {
     Expression mockExpression = createExpression("UtilsPackage.nonExistentFunction()");
 
     // Act: Look up the data type
-    String result = everything.lookUpDataType(mockExpression, "TestSchema", new ArrayList<>());
+    String result = SchemaResolutionUtils.lookUpDataType(everything, mockExpression, "TestSchema", new ArrayList<>());
 
     // Assert: Should fall back to default
     assertEquals("varchar2", result, "Should fall back to default when package function not found");
@@ -273,7 +273,7 @@ class EverythingFunctionLookupTest {
     Expression mockExpression = createExpression("NonExistentPackage.someFunction()");
 
     // Act: Look up the data type
-    String result = everything.lookUpDataType(mockExpression, "TestSchema", new ArrayList<>());
+    String result = SchemaResolutionUtils.lookUpDataType(everything, mockExpression, "TestSchema", new ArrayList<>());
 
     // Assert: Should fall back to default
     assertEquals("varchar2", result, "Should fall back to default when package not found");
@@ -294,7 +294,7 @@ class EverythingFunctionLookupTest {
     Expression mockExpression = createExpression("SpecificSchema.MyPackage.getVersion()");
 
     // Act: Look up the data type from different schema context
-    String result = everything.lookUpDataType(mockExpression, "DifferentSchema", new ArrayList<>());
+    String result = SchemaResolutionUtils.lookUpDataType(everything, mockExpression, "DifferentSchema", new ArrayList<>());
 
     // Assert: Should find function in specified schema
     assertEquals("VARCHAR2", result, "Should find package function in specified schema");
@@ -320,9 +320,9 @@ class EverythingFunctionLookupTest {
     Expression expr2 = createExpression("uniqueFunction2()");
 
     // Act & Assert
-    assertEquals("VARCHAR2", everything.lookUpDataType(expr1, "TestSchema", new ArrayList<>()),
+    assertEquals("VARCHAR2", SchemaResolutionUtils.lookUpDataType(everything, expr1, "TestSchema", new ArrayList<>()),
             "Should find uniqueFunction1 in Package1");
-    assertEquals("NUMBER", everything.lookUpDataType(expr2, "TestSchema", new ArrayList<>()),
+    assertEquals("NUMBER", SchemaResolutionUtils.lookUpDataType(everything, expr2, "TestSchema", new ArrayList<>()),
             "Should find uniqueFunction2 in Package2");
   }
 

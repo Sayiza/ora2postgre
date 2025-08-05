@@ -1,6 +1,7 @@
 package me.christianrobert.ora2postgre.transfer.strategy;
 
 import me.christianrobert.ora2postgre.global.Everything;
+import me.christianrobert.ora2postgre.global.SchemaResolutionUtils;
 import me.christianrobert.ora2postgre.global.PostgreSqlIdentifierUtils;
 import me.christianrobert.ora2postgre.oracledb.ColumnMetadata;
 import me.christianrobert.ora2postgre.oracledb.TableMetadata;
@@ -141,7 +142,7 @@ public class ObjectTypeMappingStrategy implements TransferStrategy {
       String dataType = NameNormalizer.normalizeDataType(column.getDataType());
 
       // Check if this data type is a known object type
-      String actualSchemaOfObjType = everything.lookupSchema4ObjectType(dataType, schema);
+      String actualSchemaOfObjType = SchemaResolutionUtils.lookupSchema4ObjectType(everything, dataType, schema);
       ObjectType objectTypeAst = findObjectType(actualSchemaOfObjType, dataType, everything);
       if (objectTypeAst != null) {
         objectTypeColumns.add(new ObjectTypeColumnInfo(i, column, objectTypeAst));

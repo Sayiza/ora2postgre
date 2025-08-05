@@ -1,6 +1,7 @@
 package me.christianrobert.ora2postgre.plsql.ast;
 
 import me.christianrobert.ora2postgre.global.Everything;
+import me.christianrobert.ora2postgre.global.SchemaResolutionUtils;
 
 import java.util.List;
 
@@ -90,7 +91,7 @@ public class SelectListElement extends PlSqlAst {
     b.append(getReferenceName())
             .append(" ")
             .append(TypeConverter.toPostgre(
-                    data.lookUpDataType(expression, schema, fromTables)))
+                    SchemaResolutionUtils.lookUpDataType(data, expression, schema, fromTables)))
     ;
     return b.toString();
   } */

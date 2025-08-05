@@ -1,6 +1,7 @@
 package me.christianrobert.ora2postgre.plsql.ast;
 
 import me.christianrobert.ora2postgre.global.Everything;
+import me.christianrobert.ora2postgre.global.SchemaResolutionUtils;
 import me.christianrobert.ora2postgre.services.CTETrackingService;
 import jakarta.inject.Inject;
 
@@ -154,7 +155,7 @@ public class SelectIntoStatement extends Statement {
       if (schemaName != null && !schemaName.isEmpty()) {
         // Schema was explicitly provided in Oracle code (e.g., SCHEMA.TABLE)
         try {
-          resolvedSchema = data.lookupSchema4Field(tableName, schemaName);
+          resolvedSchema = SchemaResolutionUtils.lookupSchema4Field(data, tableName, schemaName);
         } catch (Exception e) {
           // If schema resolution fails, use the provided schema as-is
           resolvedSchema = schemaName;
@@ -165,7 +166,7 @@ public class SelectIntoStatement extends Statement {
         String currentSchema = getCurrentSchema(data);
         if (currentSchema != null) {
           try {
-            resolvedSchema = data.lookupSchema4Field(tableName, currentSchema);
+            resolvedSchema = SchemaResolutionUtils.lookupSchema4Field(data, tableName, currentSchema);
           } catch (Exception e) {
             // If synonym/table lookup fails, assume it's in the current schema
             resolvedSchema = currentSchema;

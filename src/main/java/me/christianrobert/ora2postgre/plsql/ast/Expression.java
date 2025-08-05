@@ -2,6 +2,7 @@ package me.christianrobert.ora2postgre.plsql.ast;
 
 import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.global.PostgreSqlIdentifierUtils;
+import me.christianrobert.ora2postgre.global.SchemaResolutionUtils;
 
 import java.util.List;
 
@@ -126,7 +127,7 @@ public class Expression extends PlSqlAst {
    */
   public String getNameForStatementExpressionWithSchema(Everything data, String schemaWhereTheStatementIsRunning, List<TableReference> fromTables) {
     String expressionText = this.toString();
-    String schemaPrefix = data.lookupSchemaForExpression(this, schemaWhereTheStatementIsRunning, fromTables);
+    String schemaPrefix = SchemaResolutionUtils.lookupSchemaForExpression(data, this, schemaWhereTheStatementIsRunning, fromTables);
     
     if (schemaPrefix != null) {
       // A schema prefix has been found, so it is a function

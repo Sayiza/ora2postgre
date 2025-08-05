@@ -2,6 +2,7 @@ package me.christianrobert.ora2postgre.oracledb;
 
 import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.global.PostgreSqlIdentifierUtils;
+import me.christianrobert.ora2postgre.global.SchemaResolutionUtils;
 import me.christianrobert.ora2postgre.oracledb.tools.CodeCleaner;
 import me.christianrobert.ora2postgre.plsql.ast.tools.transformers.TypeConverter;
 
@@ -48,7 +49,7 @@ public class ColumnMetadata {
     String b4convert = this.getDataType();
     String afterConvert = TypeConverter.toPostgre(b4convert);
     if (afterConvert.equalsIgnoreCase(b4convert)) {
-      String schema = data.lookupSchema4ObjectType(afterConvert, schemaWhereWeAreNow);
+      String schema = SchemaResolutionUtils.lookupSchema4ObjectType(data, afterConvert, schemaWhereWeAreNow);
       if (schema != null) {
         colDef.append(schema).append(".");
       }

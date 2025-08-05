@@ -1,6 +1,7 @@
 package me.christianrobert.ora2postgre.plsql.ast;
 
 import me.christianrobert.ora2postgre.global.Everything;
+import me.christianrobert.ora2postgre.global.SchemaResolutionUtils;
 import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.CollectionTypeInfo;
 import me.christianrobert.ora2postgre.plsql.ast.tools.transformers.PackageVariableReferenceTransformer;
 
@@ -320,20 +321,20 @@ public class UnaryExpression extends PlSqlAst {
     } else if (isStandardFunction()) {
       // Check for collection constructor before standard function processing  
       String functionName = extractFunctionNameFromExpression(standardFunction);
-      if (functionName != null && data.isCollectionTypeConstructor(functionName, data.getCurrentFunction())) {
+      if (functionName != null && SchemaResolutionUtils.isCollectionTypeConstructor(data, functionName, data.getCurrentFunction())) {
         // Extract arguments from the function expression (simplified approach)
         List<Expression> arguments = extractArgumentsFromExpression(standardFunction);
-        return data.transformCollectionConstructor(functionName, arguments, data.getCurrentFunction());
+        return SchemaResolutionUtils.transformCollectionConstructor(data, functionName, arguments, data.getCurrentFunction());
       }
       // Continue with normal function processing if not a collection constructor
       return standardFunction.toPostgre(data);
     } else if (isAtom()) {
       // Check if atom represents a collection constructor
       String functionName = extractFunctionNameFromExpression(atom);
-      if (functionName != null && data.isCollectionTypeConstructor(functionName, data.getCurrentFunction())) {
+      if (functionName != null && SchemaResolutionUtils.isCollectionTypeConstructor(data, functionName, data.getCurrentFunction())) {
         // Extract arguments from the atom expression
         List<Expression> arguments = extractArgumentsFromExpression(atom);
-        return data.transformCollectionConstructor(functionName, arguments, data.getCurrentFunction());
+        return SchemaResolutionUtils.transformCollectionConstructor(data, functionName, arguments, data.getCurrentFunction());
       }
       
       return atom.toPostgre(data);
@@ -344,14 +345,14 @@ public class UnaryExpression extends PlSqlAst {
       return transformCollectionMethodToPostgreSQL(data);
     } else if (isArrayIndexing()) {
       // SEMANTIC LAYER: Check if this is actually a collection constructor parsed as array indexing
-      if (arrayVariable != null && data.isCollectionTypeConstructor(arrayVariable, data.getCurrentFunction())) {
+      if (arrayVariable != null && SchemaResolutionUtils.isCollectionTypeConstructor(data, arrayVariable, data.getCurrentFunction())) {
         // This is a collection constructor, not array indexing
         // Create argument list from the index expression (parsing limitation workaround)
         List<Expression> arguments = new ArrayList<>();
         if (indexExpression != null) {
           arguments.add(indexExpression);
         }
-        return data.transformCollectionConstructor(arrayVariable, arguments, data.getCurrentFunction());
+        return SchemaResolutionUtils.transformCollectionConstructor(data, arrayVariable, arguments, data.getCurrentFunction());
       }
       
       // Transform Oracle array indexing to PostgreSQL array indexing
@@ -520,9 +521,9 @@ public class UnaryExpression extends PlSqlAst {
     }
     
     // First check if this is actually a collection type constructor
-    if (data.isCollectionTypeConstructor(constructorName, data.getCurrentFunction())) {
+    if (SchemaResolutionUtils.isCollectionTypeConstructor(data, constructorName, data.getCurrentFunction())) {
       // Use the Everything.transformCollectionConstructor method for proper transformation
-      return data.transformCollectionConstructor(constructorName, constructorArguments, data.getCurrentFunction());
+      return SchemaResolutionUtils.transformCollectionConstructor(data, constructorName, constructorArguments, data.getCurrentFunction());
     } else {
       // This is not a collection constructor - it's probably array indexing
       // Fall back to array indexing transformation: v_arr(i) → v_arr[i]

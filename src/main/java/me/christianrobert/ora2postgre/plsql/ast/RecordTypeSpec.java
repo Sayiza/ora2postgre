@@ -1,6 +1,7 @@
 package me.christianrobert.ora2postgre.plsql.ast;
 
 import me.christianrobert.ora2postgre.global.Everything;
+import me.christianrobert.ora2postgre.global.SchemaResolutionUtils;
 import me.christianrobert.ora2postgre.oracledb.ColumnMetadata;
 import me.christianrobert.ora2postgre.oracledb.TableMetadata;
 import me.christianrobert.ora2postgre.plsql.ast.tools.transformers.TypeConverter;
@@ -122,7 +123,7 @@ public class RecordTypeSpec extends DataTypeSpec {
   private String resolveColumnType(Everything data) {
     try {
       // Use existing schema resolution infrastructure
-      String resolvedSchema = data.lookupSchema4Field(typeTableName, typeSchemaName);
+      String resolvedSchema = SchemaResolutionUtils.lookupSchema4Field(data, typeTableName, typeSchemaName);
       String dataType = findColumnDataTypePublic(data, typeColumnName, resolvedSchema, typeTableName);
       
       if (dataType != null) {
@@ -191,7 +192,7 @@ public class RecordTypeSpec extends DataTypeSpec {
    * Find table metadata for %ROWTYPE resolution
    */
   private TableMetadata findTableMetadata(Everything data) {
-    String resolvedSchema = data.lookupSchema4Field(rowtypeTableName, rowtypeSchemaName);
+    String resolvedSchema = SchemaResolutionUtils.lookupSchema4Field(data, rowtypeTableName, rowtypeSchemaName);
     
     for (TableMetadata table : data.getTableSql()) {
       if (table.getTableName().equalsIgnoreCase(rowtypeTableName) && 
