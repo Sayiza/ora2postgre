@@ -53,6 +53,6 @@ public class VisitProcedureBody {
       exceptionBlock = DeclarationParsingUtils.parseExceptionBlock(ctx.body().exception_handler(), astBuilder);
     }
 
-    return new Procedure(procedureName, parameters, variables, cursorDeclarations, recordTypes, statements, exceptionBlock);
+    return new Procedure(procedureName, parameters, variables, cursorDeclarations, recordTypes, varrayTypes, nestedTableTypes, statements, exceptionBlock);
   }
 }

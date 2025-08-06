@@ -6,19 +6,8 @@ import me.christianrobert.ora2postgre.plsql.ast.tools.managers.ProcedureTransfor
 import java.util.ArrayList;
 import java.util.List;
 
-public class Procedure extends PlSqlAst {
-  private String name;
-  private List<Parameter> parameters;
-  private List<Variable> variables; // Variable declarations from DECLARE section
-  private List<CursorDeclaration> cursorDeclarations; // Cursor declarations from DECLARE section
-  private List<RecordType> recordTypes; // Record type declarations from DECLARE section
-  private List<Statement> statements;
-  private ExceptionBlock exceptionBlock; // Exception handling
-
-  private ObjectType parentType;
-  private OraclePackage parentPackage;
-  private boolean isStandalone = false;
-  private String schema; // For standalone procedures
+public class Procedure extends ExecutableRoutine {
+  // No procedure-specific fields needed - all functionality is in base class
   
   private static final ProcedureTransformationManager transformationManager = new ProcedureTransformationManager();
 
@@ -27,13 +16,7 @@ public class Procedure extends PlSqlAst {
           List<Parameter> parameters,
           List<Variable> variables,
           List<Statement> statements) {
-    this.name = name;
-    this.parameters = parameters;
-    this.variables = variables != null ? variables : new ArrayList<>();
-    this.cursorDeclarations = new ArrayList<>(); // Initialize empty list
-    this.recordTypes = new ArrayList<>(); // Initialize empty list
-    this.statements = statements;
-    this.exceptionBlock = null; // No exception handling by default
+    super(name, parameters, variables, new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), statements, null);
   }
 
   // Constructor with exception handling
@@ -43,13 +26,7 @@ public class Procedure extends PlSqlAst {
           List<Variable> variables,
           List<Statement> statements,
           ExceptionBlock exceptionBlock) {
-    this.name = name;
-    this.parameters = parameters;
-    this.variables = variables != null ? variables : new ArrayList<>();
-    this.cursorDeclarations = new ArrayList<>(); // Initialize empty list
-    this.recordTypes = new ArrayList<>(); // Initialize empty list
-    this.statements = statements;
-    this.exceptionBlock = exceptionBlock;
+    super(name, parameters, variables, new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), statements, exceptionBlock);
   }
 
   // Constructor with record types and cursor declarations
@@ -61,91 +38,31 @@ public class Procedure extends PlSqlAst {
           List<RecordType> recordTypes,
           List<Statement> statements,
           ExceptionBlock exceptionBlock) {
-    this.name = name;
-    this.parameters = parameters;
-    this.variables = variables != null ? variables : new ArrayList<>();
-    this.cursorDeclarations = cursorDeclarations != null ? cursorDeclarations : new ArrayList<>();
-    this.recordTypes = recordTypes != null ? recordTypes : new ArrayList<>();
-    this.statements = statements;
-    this.exceptionBlock = exceptionBlock;
+    super(name, parameters, variables, cursorDeclarations, recordTypes, new ArrayList<>(), new ArrayList<>(), statements, exceptionBlock);
   }
 
-  public void setParentType(ObjectType parentType) {
-    this.parentType = parentType;
+  // Constructor with all declaration types (matching Function constructor pattern)
+  public Procedure(
+          String name,
+          List<Parameter> parameters,
+          List<Variable> variables,
+          List<CursorDeclaration> cursorDeclarations,
+          List<RecordType> recordTypes,
+          List<VarrayType> varrayTypes,
+          List<NestedTableType> nestedTableTypes,
+          List<Statement> statements,
+          ExceptionBlock exceptionBlock) {
+    super(name, parameters, variables, cursorDeclarations, recordTypes, varrayTypes, nestedTableTypes, statements, exceptionBlock);
   }
 
-  public void setParentPackage(OraclePackage parentPackage) {
-    this.parentPackage = parentPackage;
-  }
-
-  public List<Statement> getStatements() {
-    return statements;
-  }
-
-  public ExceptionBlock getExceptionBlock() {
-    return exceptionBlock;
-  }
-
-  public void setExceptionBlock(ExceptionBlock exceptionBlock) {
-    this.exceptionBlock = exceptionBlock;
-  }
-
+  // Procedure-specific methods  
   public boolean hasExceptionHandling() {
     return exceptionBlock != null && exceptionBlock.hasHandlers();
-  }
-
-  public List<Variable> getVariables() {
-    return variables;
-  }
-
-  public List<CursorDeclaration> getCursorDeclarations() {
-    return cursorDeclarations;
-  }
-
-  public void setCursorDeclarations(List<CursorDeclaration> cursorDeclarations) {
-    this.cursorDeclarations = cursorDeclarations != null ? cursorDeclarations : new ArrayList<>();
-  }
-
-  public List<RecordType> getRecordTypes() {
-    return recordTypes;
-  }
-
-  public void setRecordTypes(List<RecordType> recordTypes) {
-    this.recordTypes = recordTypes != null ? recordTypes : new ArrayList<>();
-  }
-
-  public ObjectType getParentType() {
-    return parentType;
-  }
-
-  public OraclePackage getParentPackage() {
-    return parentPackage;
-  }
-
-  public boolean isStandalone() {
-    return isStandalone;
-  }
-
-  public void setStandalone(boolean standalone) {
-    this.isStandalone = standalone;
-  }
-
-  public String getSchema() {
-    return schema;
-  }
-
-  public void setSchema(String schema) {
-    this.schema = schema;
   }
 
   @Override
   public <T> T accept(PlSqlAstVisitor<T> visitor) {
     return visitor.visit(this);
-  }
-
-  @Override
-  public String toString() {
-    return "Procedure{name=" + name + ", parameters=" + parameters + ", body=?}";
   }
 
   // toJava() method removed - business logic now stays in PostgreSQL
@@ -155,6 +72,11 @@ public class Procedure extends PlSqlAst {
    * Gets the PostgreSQL procedure name that this procedure will become.
    */
   public String getPostgreProcedureName() {
+    return getPostgreQualifiedName();
+  }
+
+  @Override
+  public String getPostgreQualifiedName() {
     if (isStandalone) {
       return schema.toUpperCase() + "." + name.toLowerCase();
     }
@@ -164,14 +86,6 @@ public class Procedure extends PlSqlAst {
                        parentPackage.getName().toUpperCase();
     return schema + "." + objectName + "_" + name.toLowerCase();
   }
-  
-  public String getName() {
-    return name;
-  }
-  
-  public List<Parameter> getParameters() {
-    return parameters;
-  }
 
   /**
    * Transforms this procedure to PostgreSQL DDL using the transformation manager.
@@ -179,6 +93,7 @@ public class Procedure extends PlSqlAst {
    * - As main object: delegates to transformation manager for complex orchestration
    * - As sub-element: enables direct toPostgre() calls in AST chains
    */
+  @Override
   public String toPostgre(Everything data, boolean specOnly) {
     return transformationManager.transform(this, data, specOnly);
   }

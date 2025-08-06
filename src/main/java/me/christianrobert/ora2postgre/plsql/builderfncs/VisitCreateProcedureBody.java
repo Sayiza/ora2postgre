@@ -47,7 +47,7 @@ public class VisitCreateProcedureBody {
       }
     }
     
-    Procedure procedure = new Procedure(procedureName, parameters, variables, cursorDeclarations, recordTypes, statements, null);
+    Procedure procedure = new Procedure(procedureName, parameters, variables, cursorDeclarations, recordTypes, varrayTypes, nestedTableTypes, statements, null);
     procedure.setStandalone(true);
     procedure.setSchema(astBuilder.schema);
     return procedure;
