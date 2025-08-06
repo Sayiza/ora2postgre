@@ -49,6 +49,14 @@ public class UnaryExpression extends PlSqlAst {
     TransformationContext context = transformationContext != null ? transformationContext : TransformationContext.getTestInstance();
     return context != null ? context.getCurrentFunction() : null;
   }
+
+  /**
+   * Helper method to get current procedure from TransformationContext with fallback.
+   */
+  private Procedure getCurrentProcedureFromContext() {
+    TransformationContext context = transformationContext != null ? transformationContext : TransformationContext.getTestInstance();
+    return context != null ? context.getCurrentProcedure() : null;
+  }
   private final String unaryOperator; // -, +, PRIOR, CONNECT_BY_ROOT, NEW, DISTINCT, ALL
   private final UnaryExpression childExpression; // For unary operations
   private final Expression caseExpression;
@@ -950,7 +958,13 @@ public class UnaryExpression extends PlSqlAst {
     }
     
     // Check procedure context as well (if available)
-    // This is a simplified approach - in a full implementation we'd have proper context tracking
+    Procedure currentProcedure = getCurrentProcedureFromContext();
+    if (currentProcedure != null) {
+      // Check if this variable is declared as a record type in the current procedure
+      if (isVariableOfRecordTypeInProcedure(currentProcedure, baseVariableName, collectionMethod)) {        
+        return true;
+      }
+    }
     
     return false;
   }
@@ -970,6 +984,34 @@ public class UnaryExpression extends PlSqlAst {
             
             // Check if this custom type is a record type in the current function
             for (me.christianrobert.ora2postgre.plsql.ast.RecordType recordType : function.getRecordTypes()) {
+              if (recordType.getName().equalsIgnoreCase(customTypeName)) {
+                // Check if the field exists in this record type
+                return recordTypeHasField(recordType, fieldName);
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Check if a variable is declared as a record type in a procedure and the field exists in that record type.
+   */
+  private boolean isVariableOfRecordTypeInProcedure(Procedure procedure, String variableName, String fieldName) {
+    // Check procedure variables for record type declarations
+    if (procedure.getVariables() != null) {
+      for (me.christianrobert.ora2postgre.plsql.ast.Variable variable : procedure.getVariables()) {
+        if (variable.getName().equalsIgnoreCase(variableName)) {
+          // Check if this variable's data type is a custom type (potential record type)
+          me.christianrobert.ora2postgre.plsql.ast.DataTypeSpec dataType = variable.getDataType();
+          if (dataType.getCustumDataType() != null) {
+            String customTypeName = dataType.getCustumDataType();
+            
+            // Check if this custom type is a record type in the current procedure
+            for (me.christianrobert.ora2postgre.plsql.ast.RecordType recordType : procedure.getRecordTypes()) {
               if (recordType.getName().equalsIgnoreCase(customTypeName)) {
                 // Check if the field exists in this record type
                 return recordTypeHasField(recordType, fieldName);

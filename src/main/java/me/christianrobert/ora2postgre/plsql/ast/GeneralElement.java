@@ -2,6 +2,7 @@ package me.christianrobert.ora2postgre.plsql.ast;
 
 import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.plsql.ast.tools.transformers.PackageVariableReferenceTransformer;
+import me.christianrobert.ora2postgre.services.TransformationContext;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -221,6 +222,11 @@ public class GeneralElement extends PlSqlAst {
       return toString(); // Fallback
     }
     
+    // FIRST: Check if this is actually record field access instead of a collection method
+    if (isRecordFieldAccess(data, variableName, methodName)) {
+      return transformRecordFieldAccess(data, variableName, methodName);
+    }
+    
     // Check if this is a package collection variable
     if (PackageVariableReferenceTransformer.isPackageVariableReference(variableName, data)) {
       OraclePackage pkg = PackageVariableReferenceTransformer.findContainingPackage(variableName, data);
@@ -319,5 +325,134 @@ public class GeneralElement extends PlSqlAst {
     }
     
     return "text";
+  }
+
+  /**
+   * Check if this expression represents record field access rather than a collection method.
+   * This distinguishes between record.field (field access) and collection.method() (collection methods).
+   */
+  private boolean isRecordFieldAccess(Everything data, String variableName, String fieldName) {
+    if (variableName == null || fieldName == null) {
+      return false;
+    }
+    
+    // Get current function context to check for record types
+    Function currentFunction = getCurrentFunctionFromContext();
+    if (currentFunction != null) {
+      // Check if this variable is declared as a record type in the current function
+      if (isVariableOfRecordType(currentFunction, variableName, fieldName)) {        
+        return true;
+      }
+    }
+    
+    // Check procedure context as well (if available)
+    Procedure currentProcedure = getCurrentProcedureFromContext();
+    if (currentProcedure != null) {
+      // Check if this variable is declared as a record type in the current procedure
+      if (isVariableOfRecordTypeInProcedure(currentProcedure, variableName, fieldName)) {        
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Transform record field access to PostgreSQL composite type field access.
+   * Oracle: record_var.field_name → PostgreSQL: (record_var).field_name
+   */
+  private String transformRecordFieldAccess(Everything data, String variableName, String fieldName) {
+    if (variableName == null || fieldName == null) {
+      return "/* INVALID RECORD FIELD ACCESS */";
+    }
+    
+    // PostgreSQL composite type field access syntax: (composite_value).field_name
+    return "(" + variableName + ")." + fieldName.toLowerCase();
+  }
+
+  /**
+   * Get current function from transformation context.
+   */
+  private Function getCurrentFunctionFromContext() {
+    TransformationContext context = TransformationContext.getTestInstance();
+    return context != null ? context.getCurrentFunction() : null;
+  }
+
+  /**
+   * Get current procedure from transformation context.
+   */
+  private Procedure getCurrentProcedureFromContext() {
+    TransformationContext context = TransformationContext.getTestInstance();
+    return context != null ? context.getCurrentProcedure() : null;
+  }
+
+  /**
+   * Check if a variable is declared as a record type and the field exists in that record type.
+   */
+  private boolean isVariableOfRecordType(Function function, String variableName, String fieldName) {
+    // Check function variables for record type declarations
+    if (function.getVariables() != null) {
+      for (Variable variable : function.getVariables()) {
+        if (variable.getName().equalsIgnoreCase(variableName)) {
+          // Check if this variable's data type is a custom type (potential record type)
+          DataTypeSpec dataType = variable.getDataType();
+          if (dataType.getCustumDataType() != null) {
+            String customTypeName = dataType.getCustumDataType();
+            
+            // Check if this custom type is a record type in the current function
+            for (RecordType recordType : function.getRecordTypes()) {
+              if (recordType.getName().equalsIgnoreCase(customTypeName)) {
+                // Check if the field exists in this record type
+                return recordTypeHasField(recordType, fieldName);
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Check if a variable is declared as a record type in a procedure and the field exists in that record type.
+   */
+  private boolean isVariableOfRecordTypeInProcedure(Procedure procedure, String variableName, String fieldName) {
+    // Check procedure variables for record type declarations
+    if (procedure.getVariables() != null) {
+      for (Variable variable : procedure.getVariables()) {
+        if (variable.getName().equalsIgnoreCase(variableName)) {
+          // Check if this variable's data type is a custom type (potential record type)
+          DataTypeSpec dataType = variable.getDataType();
+          if (dataType.getCustumDataType() != null) {
+            String customTypeName = dataType.getCustumDataType();
+            
+            // Check if this custom type is a record type in the current procedure
+            for (RecordType recordType : procedure.getRecordTypes()) {
+              if (recordType.getName().equalsIgnoreCase(customTypeName)) {
+                // Check if the field exists in this record type
+                return recordTypeHasField(recordType, fieldName);
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Check if a record type has a specific field.
+   */
+  private boolean recordTypeHasField(RecordType recordType, String fieldName) {
+    if (recordType.getFields() != null) {
+      for (RecordType.RecordField field : recordType.getFields()) {
+        if (field.getName().equalsIgnoreCase(fieldName)) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 }

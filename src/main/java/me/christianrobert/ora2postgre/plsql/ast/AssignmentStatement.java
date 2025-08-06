@@ -2,6 +2,7 @@ package me.christianrobert.ora2postgre.plsql.ast;
 
 import me.christianrobert.ora2postgre.global.Everything;
 import me.christianrobert.ora2postgre.plsql.ast.tools.transformers.PackageVariableReferenceTransformer;
+import me.christianrobert.ora2postgre.services.TransformationContext;
 
 public class AssignmentStatement extends Statement {
   private final GeneralElement target; // e.g., GeneralElement for "vVariable" or "arr(index)"
@@ -84,6 +85,16 @@ public class AssignmentStatement extends Statement {
         
         return b.toString();
       }
+    }
+    
+    // Check if target is record field access assignment
+    if (isRecordFieldAssignmentTarget(target, data)) {
+      String transformedTarget = transformRecordFieldAssignmentTarget(target, data);
+      b.append(transformedTarget)
+          .append(" := ")
+          .append(expression.toPostgre(data))
+          .append(";");
+      return b.toString();
     }
     
     // Regular assignment - let GeneralElement handle its own transformation
@@ -176,6 +187,114 @@ public class AssignmentStatement extends Statement {
     }
     
     return typeString;
+  }
+
+  /**
+   * Check if the assignment target is record field access.
+   */
+  private boolean isRecordFieldAssignmentTarget(GeneralElement target, Everything data) {
+    // Check if target is chained access (record.field pattern)
+    if (!target.isChainedAccess()) {
+      return false;
+    }
+    
+    String variableName = target.getVariableName();
+    String methodName = target.getMethodName();
+    
+    if (variableName == null || methodName == null) {
+      return false;
+    }
+    
+    // Get current procedure/function context
+    TransformationContext context = TransformationContext.getTestInstance();
+    if (context != null) {
+      Procedure currentProcedure = context.getCurrentProcedure();
+      if (currentProcedure != null) {
+        return isVariableOfRecordTypeInProcedure(currentProcedure, variableName, methodName);
+      }
+      
+      Function currentFunction = context.getCurrentFunction();
+      if (currentFunction != null) {
+        return isVariableOfRecordTypeInFunction(currentFunction, variableName, methodName);
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Transform record field assignment target.
+   */
+  private String transformRecordFieldAssignmentTarget(GeneralElement target, Everything data) {
+    String variableName = target.getVariableName();
+    String fieldName = target.getMethodName();
+    
+    if (variableName == null || fieldName == null) {
+      return target.toString();
+    }
+    
+    // PostgreSQL composite type field access syntax: (composite_value).field_name
+    return "(" + variableName + ")." + fieldName.toLowerCase();
+  }
+
+  /**
+   * Check if a variable is declared as a record type in a procedure and the field exists.
+   */
+  private boolean isVariableOfRecordTypeInProcedure(Procedure procedure, String variableName, String fieldName) {
+    if (procedure.getVariables() != null) {
+      for (Variable variable : procedure.getVariables()) {
+        if (variable.getName().equalsIgnoreCase(variableName)) {
+          DataTypeSpec dataType = variable.getDataType();
+          if (dataType.getCustumDataType() != null) {
+            String customTypeName = dataType.getCustumDataType();
+            
+            for (RecordType recordType : procedure.getRecordTypes()) {
+              if (recordType.getName().equalsIgnoreCase(customTypeName)) {
+                return recordTypeHasField(recordType, fieldName);
+              }
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Check if a variable is declared as a record type in a function and the field exists.
+   */
+  private boolean isVariableOfRecordTypeInFunction(Function function, String variableName, String fieldName) {
+    if (function.getVariables() != null) {
+      for (Variable variable : function.getVariables()) {
+        if (variable.getName().equalsIgnoreCase(variableName)) {
+          DataTypeSpec dataType = variable.getDataType();
+          if (dataType.getCustumDataType() != null) {
+            String customTypeName = dataType.getCustumDataType();
+            
+            for (RecordType recordType : function.getRecordTypes()) {
+              if (recordType.getName().equalsIgnoreCase(customTypeName)) {
+                return recordTypeHasField(recordType, fieldName);
+              }
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Check if a record type has a specific field.
+   */
+  private boolean recordTypeHasField(RecordType recordType, String fieldName) {
+    if (recordType.getFields() != null) {
+      for (RecordType.RecordField field : recordType.getFields()) {
+        if (field.getName().equalsIgnoreCase(fieldName)) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
 }

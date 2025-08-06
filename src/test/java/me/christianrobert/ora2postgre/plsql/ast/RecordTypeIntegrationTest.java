@@ -263,4 +263,132 @@ end;
     assertEquals("created_date", field3.getName());
     assertNotNull(field3.getDefaultValue());
   }
+
+  @Test
+  public void testRecordFieldAssignmentInProcedure() {
+    String oracleSql = """
+CREATE PACKAGE BODY TEST_SCHEMA.RECORD_ASSIGNMENT_PKG is  
+  
+  PROCEDURE display_employees IS
+    TYPE employee_rec IS RECORD (
+      emp_id NUMBER,
+      emp_name VARCHAR2(100)
+    );
+    
+    asingularemploee employee_rec;
+  BEGIN
+    asingularemploee.emp_id := 3;
+    asingularemploee.emp_name := 'John Doe';
+  END;
+  
+end;
+/
+""";
+
+    // Create test data
+    Everything data = new Everything();
+    data.getUserNames().add("TEST_SCHEMA");
+
+    PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
+
+    // Parse the Oracle package
+    PlSqlAst ast = PlSqlAstMain.processPlsqlCode(plsqlCode);
+    assertTrue(ast instanceof OraclePackage);
+    
+    OraclePackage pkg = (OraclePackage) ast;
+    assertEquals(1, pkg.getProcedures().size());
+    
+    Procedure procedure = pkg.getProcedures().get(0);
+    assertEquals("display_employees", procedure.getName());
+    assertEquals(1, procedure.getRecordTypes().size());
+    assertEquals(1, procedure.getVariables().size());
+    assertEquals(2, procedure.getStatements().size()); // Two assignment statements
+    
+    // Test PostgreSQL generation for the procedure
+    String procedureSQL = procedure.toPostgre(data, false);
+    System.out.println("=== PROCEDURE SQL OUTPUT ===");
+    System.out.println(procedureSQL);
+    System.out.println("=============================");
+    
+    assertNotNull(procedureSQL);
+    assertTrue(procedureSQL.contains("CREATE OR REPLACE PROCEDURE"));
+    
+    // The critical test: field assignments should NOT show "Unknown collection method"
+    assertFalse(procedureSQL.contains("Unknown collection method"), 
+                "Field assignments should not show 'Unknown collection method' but should use proper composite type syntax like (record).field");
+    
+    // Instead, should show proper PostgreSQL composite type field access syntax
+    assertTrue(procedureSQL.contains("(asingularemploee).emp_id") || 
+               procedureSQL.contains("asingularemploee.emp_id"), 
+               "Should contain proper field access syntax for emp_id");
+    assertTrue(procedureSQL.contains("(asingularemploee).emp_name") || 
+               procedureSQL.contains("asingularemploee.emp_name"), 
+               "Should contain proper field access syntax for emp_name");
+  }
+
+  @Test
+  public void testRecordFieldAssignmentInFunction() {
+    String oracleSql = """
+CREATE PACKAGE BODY TEST_SCHEMA.FUNCTION_RECORD_ASSIGNMENT_PKG is  
+  
+  FUNCTION process_employee(p_emp_id NUMBER) RETURN NUMBER IS
+    TYPE employee_rec IS RECORD (
+      emp_id NUMBER,
+      emp_name VARCHAR2(100),
+      salary NUMBER
+    );
+    
+    v_emp employee_rec;
+    v_result NUMBER;
+  BEGIN
+    v_emp.emp_id := p_emp_id;
+    v_emp.emp_name := 'Default Name';
+    v_emp.salary := 50000;
+    
+    v_result := v_emp.emp_id + v_emp.salary;
+    RETURN v_result;
+  END;
+  
+end;
+/
+""";
+
+    // Create test data
+    Everything data = new Everything();
+    data.getUserNames().add("TEST_SCHEMA");
+
+    PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
+
+    // Parse the Oracle package
+    PlSqlAst ast = PlSqlAstMain.processPlsqlCode(plsqlCode);
+    assertTrue(ast instanceof OraclePackage);
+    
+    OraclePackage pkg = (OraclePackage) ast;
+    assertEquals(1, pkg.getFunctions().size());
+    
+    Function function = pkg.getFunctions().get(0);
+    assertEquals("process_employee", function.getName());
+    assertEquals(1, function.getRecordTypes().size());
+    assertEquals(2, function.getVariables().size()); // v_emp and v_result
+    assertTrue(function.getStatements().size() >= 4); // At least three assignments + return
+    
+    // Test PostgreSQL generation for the function
+    String functionSQL = function.toPostgre(data, false);
+    System.out.println("=== FUNCTION SQL OUTPUT ===");
+    System.out.println(functionSQL);
+    System.out.println("============================");
+    
+    assertNotNull(functionSQL);
+    assertTrue(functionSQL.contains("CREATE OR REPLACE FUNCTION"));
+    
+    // The critical test: field assignments should NOT show "Unknown collection method"
+    assertFalse(functionSQL.contains("Unknown collection method"), 
+                "Field assignments should not show 'Unknown collection method' but should use proper composite type syntax");
+    
+    // Should contain proper field access for both assignments and expressions
+    assertTrue(functionSQL.contains("v_emp.emp_id") || functionSQL.contains("(v_emp).emp_id"), 
+               "Should contain proper field access syntax for emp_id assignment and expression");
+    assertTrue(functionSQL.contains("v_emp.salary") || functionSQL.contains("(v_emp).salary"), 
+               "Should contain proper field access syntax for salary assignment and expression");
+  }
 }

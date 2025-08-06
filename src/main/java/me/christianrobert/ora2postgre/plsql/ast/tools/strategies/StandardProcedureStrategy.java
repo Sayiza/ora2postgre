@@ -6,6 +6,7 @@ import me.christianrobert.ora2postgre.plsql.ast.Statement;
 import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.StatementDeclarationCollector;
 import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.ToExportPostgre;
 import me.christianrobert.ora2postgre.plsql.ast.tools.managers.RecordTypeCollectionManager;
+import me.christianrobert.ora2postgre.services.TransformationContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -101,11 +102,22 @@ public class StandardProcedureStrategy implements ProcedureTransformationStrateg
     if (specOnly) {
       b.append("null;\n");
     } else {
-      // Add procedure body statements
-      for (Statement statement : procedure.getStatements()) {
-        b.append(statement.toPostgre(context))
-                .append("\n");
+      // Set procedure context for statement processing (needed for record field access)
+      TransformationContext transformationContext = TransformationContext.getTestInstance();
+      if (transformationContext == null) {
+        // Create a new context if none exists (for integration tests and real application)
+        transformationContext = new TransformationContext();
+        TransformationContext.setTestInstance(transformationContext);
       }
+      
+      // Use procedure context during statement transformation
+      transformationContext.withProcedureContext(procedure, () -> {
+        // Add procedure body statements
+        for (Statement statement : procedure.getStatements()) {
+          b.append(statement.toPostgre(context))
+                  .append("\n");
+        }
+      });
     }
     
     // Add exception handling if present
