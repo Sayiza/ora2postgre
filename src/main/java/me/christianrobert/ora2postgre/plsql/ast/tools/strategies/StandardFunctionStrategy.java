@@ -64,7 +64,19 @@ public class StandardFunctionStrategy implements FunctionTransformationStrategy 
             .append("DECLARE\n");
 
     if (!specOnly) {
-      // Add explicit variable declarations from procedure's DECLARE section
+      // FIRST: Collect record types for schema-level generation (MUST happen before variable processing)
+      if (function.getRecordTypes() != null && !function.getRecordTypes().isEmpty()) {
+        // Collect record types for schema-level composite type generation
+        RecordTypeCollectionManager.collectFromFunction(function);
+        
+        for (me.christianrobert.ora2postgre.plsql.ast.RecordType recordType : function.getRecordTypes()) {
+          String qualifiedName = RecordTypeCollectionManager.getQualifiedName(function, recordType);
+          b.append("  -- Using schema-level composite type: ").append(qualifiedName).append("\n");
+          b.append("  -- Original record type: ").append(recordType.getName()).append("\n");
+        }
+      }
+      
+      // SECOND: Add explicit variable declarations from function's DECLARE section
       if (function.getVariables() != null && !function.getVariables().isEmpty()) {
         for (me.christianrobert.ora2postgre.plsql.ast.Variable variable : function.getVariables()) {
           b.append("  ")
@@ -80,18 +92,6 @@ public class StandardFunctionStrategy implements FunctionTransformationStrategy 
           b.append("  ")
                   .append(cursor.toPostgre(context))
                   .append("\n");
-        }
-      }
-
-      // Collect record types for schema-level generation and add references
-      if (function.getRecordTypes() != null && !function.getRecordTypes().isEmpty()) {
-        // Collect record types for schema-level composite type generation
-        RecordTypeCollectionManager.collectFromFunction(function);
-        
-        for (me.christianrobert.ora2postgre.plsql.ast.RecordType recordType : function.getRecordTypes()) {
-          String qualifiedName = RecordTypeCollectionManager.getQualifiedName(function, recordType);
-          b.append("  -- Using schema-level composite type: ").append(qualifiedName).append("\n");
-          b.append("  -- Original record type: ").append(recordType.getName()).append("\n");
         }
       }
       

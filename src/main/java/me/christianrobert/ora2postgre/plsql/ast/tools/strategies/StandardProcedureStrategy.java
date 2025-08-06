@@ -59,7 +59,19 @@ public class StandardProcedureStrategy implements ProcedureTransformationStrateg
             .append("DECLARE\n");
 
     if (!specOnly) {
-      // Add explicit variable declarations from procedure's DECLARE section
+      // FIRST: Collect record types for schema-level generation (MUST happen before variable processing)
+      if (procedure.getRecordTypes() != null && !procedure.getRecordTypes().isEmpty()) {
+        // Collect record types for schema-level composite type generation
+        RecordTypeCollectionManager.collectFromProcedure(procedure);
+        
+        for (me.christianrobert.ora2postgre.plsql.ast.RecordType recordType : procedure.getRecordTypes()) {
+          String qualifiedName = RecordTypeCollectionManager.getQualifiedName(procedure, recordType);
+          b.append("  -- Using schema-level composite type: ").append(qualifiedName).append("\n");
+          b.append("  -- Original record type: ").append(recordType.getName()).append("\n");
+        }
+      }
+      
+      // SECOND: Add explicit variable declarations from procedure's DECLARE section
       if (procedure.getVariables() != null && !procedure.getVariables().isEmpty()) {
         for (me.christianrobert.ora2postgre.plsql.ast.Variable variable : procedure.getVariables()) {
           b.append("  ")
@@ -75,18 +87,6 @@ public class StandardProcedureStrategy implements ProcedureTransformationStrateg
           b.append("  ")
                   .append(cursor.toPostgre(context))
                   .append("\n");
-        }
-      }
-      
-      // Collect record types for schema-level generation and add references
-      if (procedure.getRecordTypes() != null && !procedure.getRecordTypes().isEmpty()) {
-        // Collect record types for schema-level composite type generation
-        RecordTypeCollectionManager.collectFromProcedure(procedure);
-        
-        for (me.christianrobert.ora2postgre.plsql.ast.RecordType recordType : procedure.getRecordTypes()) {
-          String qualifiedName = RecordTypeCollectionManager.getQualifiedName(procedure, recordType);
-          b.append("  -- Using schema-level composite type: ").append(qualifiedName).append("\n");
-          b.append("  -- Original record type: ").append(recordType.getName()).append("\n");
         }
       }
       
