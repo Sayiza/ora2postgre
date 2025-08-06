@@ -359,15 +359,15 @@ public class GeneralElement extends PlSqlAst {
 
   /**
    * Transform record field access to PostgreSQL composite type field access.
-   * Oracle: record_var.field_name → PostgreSQL: (record_var).field_name
+   * Oracle: record_var.field_name → PostgreSQL: record_var.field_name
    */
   private String transformRecordFieldAccess(Everything data, String variableName, String fieldName) {
     if (variableName == null || fieldName == null) {
       return "/* INVALID RECORD FIELD ACCESS */";
     }
     
-    // PostgreSQL composite type field access syntax: (composite_value).field_name
-    return "(" + variableName + ")." + fieldName.toLowerCase();
+    // PostgreSQL composite type field access syntax: composite_value.field_name
+    return variableName + "." + fieldName.toLowerCase();
   }
 
   /**

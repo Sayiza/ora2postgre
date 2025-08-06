@@ -315,14 +315,12 @@ end;
     
     // The critical test: field assignments should NOT show "Unknown collection method"
     assertFalse(procedureSQL.contains("Unknown collection method"), 
-                "Field assignments should not show 'Unknown collection method' but should use proper composite type syntax like (record).field");
+                "Field assignments should not show 'Unknown collection method' but should use proper composite type syntax like record.field");
     
     // Instead, should show proper PostgreSQL composite type field access syntax
-    assertTrue(procedureSQL.contains("(asingularemploee).emp_id") || 
-               procedureSQL.contains("asingularemploee.emp_id"), 
+    assertTrue(procedureSQL.contains("asingularemploee.emp_id"), 
                "Should contain proper field access syntax for emp_id");
-    assertTrue(procedureSQL.contains("(asingularemploee).emp_name") || 
-               procedureSQL.contains("asingularemploee.emp_name"), 
+    assertTrue(procedureSQL.contains("asingularemploee.emp_name"), 
                "Should contain proper field access syntax for emp_name");
   }
 
@@ -386,9 +384,9 @@ end;
                 "Field assignments should not show 'Unknown collection method' but should use proper composite type syntax");
     
     // Should contain proper field access for both assignments and expressions
-    assertTrue(functionSQL.contains("v_emp.emp_id") || functionSQL.contains("(v_emp).emp_id"), 
+    assertTrue(functionSQL.contains("v_emp.emp_id"), 
                "Should contain proper field access syntax for emp_id assignment and expression");
-    assertTrue(functionSQL.contains("v_emp.salary") || functionSQL.contains("(v_emp).salary"), 
+    assertTrue(functionSQL.contains("v_emp.salary"), 
                "Should contain proper field access syntax for salary assignment and expression");
   }
 }

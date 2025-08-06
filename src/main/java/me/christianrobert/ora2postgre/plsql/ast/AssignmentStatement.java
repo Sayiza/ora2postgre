@@ -233,8 +233,8 @@ public class AssignmentStatement extends Statement {
       return target.toString();
     }
     
-    // PostgreSQL composite type field access syntax: (composite_value).field_name
-    return "(" + variableName + ")." + fieldName.toLowerCase();
+    // PostgreSQL composite type field access syntax: composite_value.field_name
+    return variableName + "." + fieldName.toLowerCase();
   }
 
   /**
