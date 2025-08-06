@@ -853,13 +853,6 @@ public class MigrationController {
         ExportObjectType.saveObjectTypeSpecToPostgre(path, data.getObjectTypeSpecAst(), data.getObjectTypeBodyAst(), data);
       }
       
-      // Export record types if any of the components that can contain them are enabled
-      if (ExportRecordType.isRecordTypeExportNeeded(configurationService)) {
-        log.info("Starting record type export to PostgreSQL composite types");
-        ExportRecordType.saveRecordTypesToPostgre(path, data);
-        log.info("Record type export completed: {}", ExportRecordType.getExportSummary());
-      }
-      
       if (doPackageSpec) {
         ExportPackage.savePackageSpecToPostgre(path, data.getPackageSpecAst(), data.getPackageBodyAst(), data);
       }
@@ -882,6 +875,13 @@ public class MigrationController {
         log.info("Starting trigger export to PostgreSQL files");
         ExportTrigger.saveAllTriggers(path, data);
         log.info("Trigger export completed");
+      }
+      
+      // Export record types AFTER all components have been processed and record types collected
+      if (ExportRecordType.isRecordTypeExportNeeded(configurationService)) {
+        log.info("Starting record type export to PostgreSQL composite types");
+        ExportRecordType.saveRecordTypesToPostgre(path, data);
+        log.info("Record type export completed: {}", ExportRecordType.getExportSummary());
       }
     }
   }

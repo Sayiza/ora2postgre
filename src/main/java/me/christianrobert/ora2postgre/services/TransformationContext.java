@@ -1,6 +1,7 @@
 package me.christianrobert.ora2postgre.services;
 
 import me.christianrobert.ora2postgre.plsql.ast.Function;
+import me.christianrobert.ora2postgre.plsql.ast.Procedure;
 import jakarta.enterprise.context.ApplicationScoped;
 
 /**
@@ -26,6 +27,12 @@ public class TransformationContext {
      * This changes as we enter and exit different function contexts.
      */
     private Function currentFunction = null;
+    
+    /**
+     * The currently active procedure during transformation.
+     * This changes as we enter and exit different procedure contexts.
+     */
+    private Procedure currentProcedure = null;
     
     /**
      * Static test instance for unit tests that don't use CDI container.
@@ -55,6 +62,29 @@ public class TransformationContext {
      */
     public void clearCurrentFunction() {
         this.currentFunction = null;
+    }
+    
+    /**
+     * Gets the current procedure context.
+     * @return The current procedure being processed, or null if no procedure context is set
+     */
+    public Procedure getCurrentProcedure() {
+        return currentProcedure;
+    }
+    
+    /**
+     * Sets the current procedure context.
+     * @param procedure The procedure to set as current context, or null to clear context
+     */
+    public void setCurrentProcedure(Procedure procedure) {
+        this.currentProcedure = procedure;
+    }
+    
+    /**
+     * Clears the current procedure context.
+     */
+    public void clearCurrentProcedure() {
+        this.currentProcedure = null;
     }
     
     /**
@@ -93,6 +123,23 @@ public class TransformationContext {
     }
     
     /**
+     * Executes a block of code with a specific procedure context, automatically
+     * restoring the previous context when done.
+     * 
+     * @param procedure The procedure context to set during execution
+     * @param action The action to execute with the procedure context
+     */
+    public void withProcedureContext(Procedure procedure, Runnable action) {
+        Procedure previousProcedure = this.currentProcedure;
+        try {
+            this.currentProcedure = procedure;
+            action.run();
+        } finally {
+            this.currentProcedure = previousProcedure;
+        }
+    }
+    
+    /**
      * Checks if there is an active function context.
      * @return true if a function context is currently set, false otherwise
      */
@@ -100,10 +147,19 @@ public class TransformationContext {
         return currentFunction != null;
     }
     
+    /**
+     * Checks if there is an active procedure context.
+     * @return true if a procedure context is currently set, false otherwise
+     */
+    public boolean hasCurrentProcedure() {
+        return currentProcedure != null;
+    }
+    
     @Override
     public String toString() {
         return "TransformationContext{" +
                 "currentFunction=" + (currentFunction != null ? currentFunction.getName() : "null") +
+                ", currentProcedure=" + (currentProcedure != null ? currentProcedure.getName() : "null") +
                 '}';
     }
 }

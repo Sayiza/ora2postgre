@@ -424,6 +424,11 @@ public class UnaryExpression extends PlSqlAst {
       return "/* INVALID COLLECTION METHOD CALL */";
     }
     
+    // Check if this is actually record field access instead of a collection method
+    if (isRecordFieldAccess(data)) {
+      return transformRecordFieldAccess(data);
+    }
+    
     String arrayExpression = childExpression.toPostgre(data);
     
     // Check if this is a package collection variable
@@ -918,5 +923,95 @@ public class UnaryExpression extends PlSqlAst {
     // Fallback: empty array with proper type
     String baseType = typeInfo.getDataType().toPostgre(data);
     return "ARRAY[]::" + baseType + "[]";
+  }
+
+  /**
+   * Check if this expression represents record field access rather than a collection method.
+   * This distinguishes between record.field (field access) and collection.method() (collection methods).
+   */
+  private boolean isRecordFieldAccess(Everything data) {
+    if (collectionMethod == null || childExpression == null) {
+      return false;
+    }
+    
+    // Extract the base variable name from the child expression
+    String baseVariableName = extractBaseVariableName(childExpression.toPostgre(data));
+    if (baseVariableName == null) {
+      return false;
+    }
+    
+    // Get current function/procedure context to check for record types
+    Function currentFunction = getCurrentFunctionFromContext();
+    if (currentFunction != null) {
+      // Check if this variable is declared as a record type in the current function
+      if (isVariableOfRecordType(currentFunction, baseVariableName, collectionMethod)) {        
+        return true;
+      }
+    }
+    
+    // Check procedure context as well (if available)
+    // This is a simplified approach - in a full implementation we'd have proper context tracking
+    
+    return false;
+  }
+
+  /**
+   * Check if a variable is declared as a record type and the field exists in that record type.
+   */
+  private boolean isVariableOfRecordType(Function function, String variableName, String fieldName) {
+    // Check function variables for record type declarations
+    if (function.getVariables() != null) {
+      for (me.christianrobert.ora2postgre.plsql.ast.Variable variable : function.getVariables()) {
+        if (variable.getName().equalsIgnoreCase(variableName)) {
+          // Check if this variable's data type is a custom type (potential record type)
+          me.christianrobert.ora2postgre.plsql.ast.DataTypeSpec dataType = variable.getDataType();
+          if (dataType.getCustumDataType() != null) {
+            String customTypeName = dataType.getCustumDataType();
+            
+            // Check if this custom type is a record type in the current function
+            for (me.christianrobert.ora2postgre.plsql.ast.RecordType recordType : function.getRecordTypes()) {
+              if (recordType.getName().equalsIgnoreCase(customTypeName)) {
+                // Check if the field exists in this record type
+                return recordTypeHasField(recordType, fieldName);
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Check if a record type has a specific field.
+   */
+  private boolean recordTypeHasField(me.christianrobert.ora2postgre.plsql.ast.RecordType recordType, String fieldName) {
+    if (recordType.getFields() == null) {
+      return false;
+    }
+    
+    for (me.christianrobert.ora2postgre.plsql.ast.RecordType.RecordField field : recordType.getFields()) {
+      if (field.getName().equalsIgnoreCase(fieldName)) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Transform record field access to PostgreSQL composite type field access.
+   * Oracle: record_var.field_name → PostgreSQL: (record_var).field_name
+   */
+  private String transformRecordFieldAccess(Everything data) {
+    if (collectionMethod == null || childExpression == null) {
+      return "/* INVALID RECORD FIELD ACCESS */";
+    }
+    
+    String baseExpression = childExpression.toPostgre(data);
+    
+    // PostgreSQL composite type field access syntax: (composite_value).field_name
+    return "(" + baseExpression + ")." + collectionMethod.toLowerCase();
   }
 }

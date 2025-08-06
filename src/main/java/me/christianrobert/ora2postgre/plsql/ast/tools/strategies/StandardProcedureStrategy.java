@@ -63,7 +63,7 @@ public class StandardProcedureStrategy implements ProcedureTransformationStrateg
       if (procedure.getVariables() != null && !procedure.getVariables().isEmpty()) {
         for (me.christianrobert.ora2postgre.plsql.ast.Variable variable : procedure.getVariables()) {
           b.append("  ")
-                  .append(variable.toPostgre(context))
+                  .append(variable.toPostgre(context, procedure))
                   .append(";")
                   .append("\n");
         }

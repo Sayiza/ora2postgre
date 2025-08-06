@@ -78,6 +78,13 @@ public class DataTypeSpec extends PlSqlAst {
     if ( custumDataType != null && function != null ) {
       // Look for the custom type in function's local collection types
       
+      // Check RECORD types - resolve to qualified composite type name
+      for (RecordType recordType : function.getRecordTypes()) {
+        if (recordType.getName().equalsIgnoreCase(custumDataType)) {
+          return me.christianrobert.ora2postgre.plsql.ast.tools.managers.RecordTypeCollectionManager.getQualifiedName(function, recordType);
+        }
+      }
+      
       // Check VARRAY types - resolve to base type + []
       for (VarrayType varrayType : function.getVarrayTypes()) {
         if (varrayType.getName().equalsIgnoreCase(custumDataType)) {
@@ -105,6 +112,34 @@ public class DataTypeSpec extends PlSqlAst {
       // If not found in function-local types, fall back to package-level resolution
       if (function.getParentPackage() != null) {
         return toPostgre(data, function.getParentPackage().getSchema(), function.getParentPackage().getName());
+      }
+    }
+    
+    return " /* data type not implemented  */ ";
+  }
+
+  public String toPostgre(Everything data, Procedure procedure) {
+    if ( nativeDataType != null ) {
+      return TypeConverter.toPostgre(nativeDataType);
+    }
+    
+    // Handle procedure-local collection types as type aliases
+    if ( custumDataType != null && procedure != null ) {
+      // Look for the custom type in procedure's local collection types
+      
+      // Check RECORD types - resolve to qualified composite type name
+      for (RecordType recordType : procedure.getRecordTypes()) {
+        if (recordType.getName().equalsIgnoreCase(custumDataType)) {
+          return me.christianrobert.ora2postgre.plsql.ast.tools.managers.RecordTypeCollectionManager.getQualifiedName(procedure, recordType);
+        }
+      }
+      
+      // Note: Procedures only support record types, not VARRAY or TABLE OF types
+      // in this implementation. If needed, these could be added to the Procedure class.
+      
+      // If not found in procedure-local types, fall back to package-level resolution
+      if (procedure.getParentPackage() != null) {
+        return toPostgre(data, procedure.getParentPackage().getSchema(), procedure.getParentPackage().getName());
       }
     }
     

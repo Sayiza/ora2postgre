@@ -84,4 +84,27 @@ public class Variable extends PlSqlAst {
     
     return b.toString();
   }
+
+  public String toPostgre(Everything data, Procedure procedure) {
+    StringBuilder b = new StringBuilder();
+    b.append(name)
+            .append(" ")
+            .append(dataType.toPostgre(data, procedure));
+    
+    // Add default value if present
+    if (defaultValue != null) {
+      // Set procedure context for collection constructor resolution
+      TransformationContext context = transformationContext != null ? transformationContext : TransformationContext.getTestInstance();
+      if (context != null) {
+        context.withProcedureContext(procedure, () -> {
+          b.append(" := ").append(defaultValue.toPostgre(data));
+        });
+      } else {
+        // Fallback if no context available
+        b.append(" := ").append(defaultValue.toPostgre(data));
+      }
+    }
+    
+    return b.toString();
+  }
 }
