@@ -149,7 +149,7 @@ public class RecordTypeExportTimingTest {
   private Function createTestFunction() {
     OraclePackage parentPackage = new OraclePackage("test_pkg", "TEST_SCHEMA", null, null, null, 
                                                     null, null, null, null, null, null, null);
-    Function function = new Function("test_function", Arrays.asList(), null, "VARCHAR2", null);
+    Function function = new Function("test_function", Arrays.asList(), Arrays.asList(), "VARCHAR2", Arrays.asList());
     function.setSchema("TEST_SCHEMA");
     function.setParentPackage(parentPackage);
     
@@ -175,7 +175,7 @@ public class RecordTypeExportTimingTest {
   private Function createAnotherTestFunction() {
     OraclePackage parentPackage = new OraclePackage("test_pkg", "TEST_SCHEMA", null, null, null, 
                                                     null, null, null, null, null, null, null);
-    Function function = new Function("another_function", Arrays.asList(), null, "VARCHAR2", null);
+    Function function = new Function("another_function", Arrays.asList(), Arrays.asList(), "VARCHAR2", Arrays.asList());
     function.setSchema("TEST_SCHEMA");
     function.setParentPackage(parentPackage);
     
@@ -195,7 +195,7 @@ public class RecordTypeExportTimingTest {
   private Procedure createTestProcedure() {
     OraclePackage parentPackage = new OraclePackage("test_pkg", "TEST_SCHEMA", null, null, null, 
                                                     null, null, null, null, null, null, null);
-    Procedure procedure = new Procedure("test_procedure", Arrays.asList(), null, null, null);
+    Procedure procedure = new Procedure("test_procedure", Arrays.asList(), Arrays.asList(), Arrays.asList());
     procedure.setSchema("TEST_SCHEMA");
     procedure.setParentPackage(parentPackage);
     

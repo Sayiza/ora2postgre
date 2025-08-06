@@ -599,6 +599,8 @@ function populateConfigurationForm(config) {
   document.getElementById('doObjectTypeBody').checked = config.doObjectTypeBody || false;
   document.getElementById('doPackageSpec').checked = config.doPackageSpec || false;
   document.getElementById('doPackageBody').checked = config.doPackageBody || false;
+  document.getElementById('doStandaloneFunctions').checked = config.doStandaloneFunctions || false;
+  document.getElementById('doStandaloneProcedures').checked = config.doStandaloneProcedures || false;
   document.getElementById('doViewSignature').checked = config.doViewSignature || false;
   document.getElementById('doViewDdl').checked = config.doViewDdl || false;
   document.getElementById('doTriggers').checked = config.doTriggers || false;
@@ -636,6 +638,8 @@ function getConfigurationFromForm() {
     doObjectTypeBody: document.getElementById('doObjectTypeBody').checked,
     doPackageSpec: document.getElementById('doPackageSpec').checked,
     doPackageBody: document.getElementById('doPackageBody').checked,
+    doStandaloneFunctions: document.getElementById('doStandaloneFunctions').checked,
+    doStandaloneProcedures: document.getElementById('doStandaloneProcedures').checked,
     doViewSignature: document.getElementById('doViewSignature').checked,
     doViewDdl: document.getElementById('doViewDdl').checked,
     doTriggers: document.getElementById('doTriggers').checked,
