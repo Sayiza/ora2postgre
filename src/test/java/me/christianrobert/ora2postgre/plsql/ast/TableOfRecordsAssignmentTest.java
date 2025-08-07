@@ -216,6 +216,75 @@ public class TableOfRecordsAssignmentTest {
     }
 
     @Test
+    public void testTableOfRecordsCollectionMethods() {
+        String oracleSql = """
+            CREATE PACKAGE BODY TEST_SCHEMA.COLLECTION_METHODS_PKG AS
+              PROCEDURE test_collection_methods IS
+                TYPE item_rec IS RECORD (
+                  item_id NUMBER,
+                  item_name VARCHAR2(100)
+                );
+                
+                TYPE item_tab IS TABLE OF item_rec INDEX BY PLS_INTEGER;
+                l_items item_tab;
+                l_item item_rec;
+                v_count NUMBER;
+                v_exists BOOLEAN;
+              BEGIN
+                -- Test assignment first
+                l_item.item_id := 1;
+                l_item.item_name := 'Test Item';
+                l_items(5) := l_item;
+                l_items(10) := l_item;
+                
+                -- Test collection methods
+                v_count := l_items.COUNT;
+                v_exists := l_items.EXISTS(5);
+                
+                IF l_items.EXISTS(10) THEN
+                  NULL; -- Process item
+                END IF;
+              END;
+            END;
+            /
+            """;
+
+        PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
+        PlSqlAst ast = PlSqlAstMain.processPlsqlCode(plsqlCode);
+
+        assertTrue(ast instanceof OraclePackage);
+        OraclePackage pkg = (OraclePackage) ast;
+        
+        Procedure procedure = pkg.getProcedures().get(0);
+        String procedureSQL = procedure.toPostgre(data, false);
+
+        System.out.println("=== TABLE OF RECORDS COLLECTION METHODS TEST ===");
+        System.out.println("Generated PostgreSQL:");
+        System.out.println(procedureSQL);
+        System.out.println("================================================");
+
+        // Verify JSONB table of records declaration
+        assertTrue(procedureSQL.contains("l_items jsonb := '{}'::jsonb"));
+
+        // Verify collection method transformations
+        // l_items.COUNT should transform to jsonb_array_length(jsonb_object_keys(l_items))
+        assertTrue(procedureSQL.contains("jsonb_array_length(jsonb_object_keys(l_items))") ||
+                  procedureSQL.contains("jsonb_object_keys(l_items)"),
+                  "COUNT method should use JSONB key counting");
+
+        // l_items.EXISTS(5) should transform to (l_items ? '5')
+        assertTrue(procedureSQL.contains("(l_items ? '5')") || 
+                  procedureSQL.contains("l_items ? '5'"),
+                  "EXISTS method should use JSONB key existence check");
+
+        // Should not contain array_length for table of records
+        assertFalse(procedureSQL.contains("array_length(l_items"),
+                   "Should not use array_length for table of records");
+
+        System.out.println("✅ Table of records collection methods test PASSED");
+    }
+
+    @Test
     public void testBlockLevelTableOfRecordsAccess() {
         String oracleSql = """
             CREATE PACKAGE BODY TEST_SCHEMA.ACCESS_TEST_PKG AS

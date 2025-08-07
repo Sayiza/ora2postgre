@@ -502,7 +502,12 @@ public class UnaryExpression extends PlSqlAst {
       }
     }
     
-    // Regular collection method transformation (function-local collections)
+    // Check if this is a block-level table of records collection
+    if (baseVariable != null && isBlockLevelTableOfRecordsAccess(baseVariable, data)) {
+      return transformTableOfRecordsMethodToPostgreSQL(baseVariable, data);
+    }
+    
+    // Regular collection method transformation (function-local arrays/varrays)
     
     switch (collectionMethod.toUpperCase()) {
       case "COUNT":
@@ -1375,5 +1380,96 @@ public class UnaryExpression extends PlSqlAst {
     
     // For non-string values (numbers, expressions, etc.), return as-is
     return indexValue;
+  }
+
+  /**
+   * Check if this is a block-level table of records access.
+   * Reuses the same logic as GeneralElement for consistency.
+   */
+  private boolean isBlockLevelTableOfRecordsAccess(String collectionName, Everything data) {
+    if (collectionName == null) {
+      return false;
+    }
+    
+    // Try to get transformation context, but provide fallback logic
+    TransformationContext context = TransformationContext.getTestInstance();
+    
+    // If we have context, use it
+    if (context != null) {
+      // Check procedure context for table of records variables
+      Procedure currentProcedure = context.getCurrentProcedure();
+      if (currentProcedure != null && isVariableTableOfRecordsInProcedure(currentProcedure, collectionName)) {
+        return true;
+      }
+      
+      // Check function context for table of records variables
+      Function currentFunction = context.getCurrentFunction();
+      if (currentFunction != null && isVariableTableOfRecordsInFunction(currentFunction, collectionName)) {
+        return true;
+      }
+    }
+    
+    // FALLBACK: Check all packages for table of records variables with this name
+    // This handles cases where context is not properly set up
+    if (data != null) {
+      // Check package bodies (which contain procedure/function implementations)
+      if (data.getPackageBodyAst() != null) {
+        for (OraclePackage pkg : data.getPackageBodyAst()) {
+          // Check package procedures
+          if (pkg.getProcedures() != null) {
+            for (Procedure procedure : pkg.getProcedures()) {
+              if (isVariableTableOfRecordsInProcedure(procedure, collectionName)) {
+                return true;
+              }
+            }
+          }
+          
+          // Check package functions  
+          if (pkg.getFunctions() != null) {
+            for (Function function : pkg.getFunctions()) {
+              if (isVariableTableOfRecordsInFunction(function, collectionName)) {
+                return true;
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    return false;
+  }
+
+
+  /**
+   * Transform table of records collection methods to PostgreSQL JSONB operations.
+   * Pattern: collection.METHOD() where collection is a table of records (JSONB)
+   */
+  private String transformTableOfRecordsMethodToPostgreSQL(String variableName, Everything data) {
+    switch (collectionMethod.toUpperCase()) {
+      case "COUNT":
+        // Count keys in JSONB object: jsonb_object_keys(collection) returns text[] array
+        return String.format("jsonb_array_length(jsonb_object_keys(%s))", variableName);
+      case "EXISTS":
+        // EXISTS requires a parameter - extract it from methodArguments
+        if (methodArguments != null && !methodArguments.isEmpty()) {
+          String index = methodArguments.get(0).toPostgre(data);
+          // Strip quotes for JSONB key if it's a string literal
+          String jsonbKey = stripOuterQuotesForJsonbKey(index);
+          return String.format("(%s ? '%s')", variableName, jsonbKey);
+        } else {
+          return "/* EXISTS requires an index argument */";
+        }
+      case "FIRST":
+        // Find minimum key (for integer keys): SELECT MIN(key::integer) FROM jsonb_object_keys(collection)
+        return String.format("(SELECT MIN(key::integer) FROM jsonb_object_keys(%s) AS k(key) WHERE key ~ '^[0-9]+$')", variableName);
+      case "LAST":
+        // Find maximum key (for integer keys): SELECT MAX(key::integer) FROM jsonb_object_keys(collection)  
+        return String.format("(SELECT MAX(key::integer) FROM jsonb_object_keys(%s) AS k(key) WHERE key ~ '^[0-9]+$')", variableName);
+      case "DELETE":
+        // DELETE method requires special statement handling or parameters
+        return String.format("/* DELETE method for %s - requires statement-level transformation */", variableName);
+      default:
+        return String.format("/* Unknown table of records method: %s.%s */", variableName, collectionMethod);
+    }
   }
 }

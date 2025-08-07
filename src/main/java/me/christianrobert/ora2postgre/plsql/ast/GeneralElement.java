@@ -242,7 +242,12 @@ public class GeneralElement extends PlSqlAst {
       }
     }
     
-    // Regular collection method transformation (function-local collections)
+    // Check if this is a block-level table of records collection
+    if (isBlockLevelTableOfRecordsAccess(variableName, data)) {
+      return transformTableOfRecordsMethodCall(variableName, methodName, data);
+    }
+    
+    // Regular collection method transformation (function-local arrays/varrays)
     switch (methodName.toUpperCase()) {
       case "COUNT":
         return "array_length(" + variableName + ", 1)";
@@ -252,6 +257,33 @@ public class GeneralElement extends PlSqlAst {
         return "array_length(" + variableName + ", 1)";
       default:
         return "/* Unknown collection method: " + methodName + " */";
+    }
+  }
+
+  /**
+   * Transform collection method calls for table of records (JSONB collections).
+   * Pattern: collection.METHOD() where collection is a table of records
+   */
+  private String transformTableOfRecordsMethodCall(String variableName, String methodName, Everything data) {
+    switch (methodName.toUpperCase()) {
+      case "COUNT":
+        // Count keys in JSONB object: jsonb_object_keys(collection)
+        return String.format("jsonb_array_length(jsonb_object_keys(%s))", variableName);
+      case "EXISTS":
+        // EXISTS requires a parameter - return placeholder for parameter substitution
+        // This will be handled by calling code that has access to the parameter
+        return String.format("(%s ? %%s)", variableName);
+      case "FIRST":
+        // Find minimum key (for integer keys): SELECT MIN(key::integer) FROM jsonb_object_keys(collection)
+        return String.format("(SELECT MIN(key::integer) FROM jsonb_object_keys(%s) AS k(key) WHERE key ~ '^[0-9]+$')", variableName);
+      case "LAST":
+        // Find maximum key (for integer keys): SELECT MAX(key::integer) FROM jsonb_object_keys(collection)  
+        return String.format("(SELECT MAX(key::integer) FROM jsonb_object_keys(%s) AS k(key) WHERE key ~ '^[0-9]+$')", variableName);
+      case "DELETE":
+        // DELETE method requires special statement handling or parameters
+        return String.format("/* DELETE method for %s - requires statement-level transformation */", variableName);
+      default:
+        return String.format("/* Unknown table of records method: %s.%s */", variableName, methodName);
     }
   }
 
