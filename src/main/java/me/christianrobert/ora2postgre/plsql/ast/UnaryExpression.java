@@ -1171,16 +1171,19 @@ public class UnaryExpression extends PlSqlAst {
     // Get the index expression (should be single argument for l_products(100))
     String indexValue = arguments.get(0).toPostgre(data);
     
+    // Fix double quotes issue: strip outer quotes from string literals for JSONB keys
+    String jsonbKey = stripOuterQuotesForJsonbKey(indexValue);
+    
     // Get record type name for proper composite type casting
     String recordTypeName = getRecordTypeNameForTableOfRecords(collectionName, data);
     
     if (recordTypeName != null) {
       // Transform: collection(index) → jsonb_populate_record(NULL::composite_type, collection->'index')
       return String.format("jsonb_populate_record(NULL::%s, %s->'%s')", 
-          recordTypeName, collectionName, indexValue);
+          recordTypeName, collectionName, jsonbKey);
     } else {
       // Fallback without explicit type casting
-      return String.format("(%s->'%s')::jsonb", collectionName, indexValue);
+      return String.format("(%s->'%s')::jsonb", collectionName, jsonbKey);
     }
   }
 
@@ -1343,11 +1346,34 @@ public class UnaryExpression extends PlSqlAst {
       // Clean up field name (remove any additional whitespace or special characters)
       fieldName = fieldName.trim();
       
+      // Fix double quotes issue: strip outer quotes from string literals for JSONB keys
+      String jsonbKey = stripOuterQuotesForJsonbKey(indexValue);
+      
       // Transform to PostgreSQL JSONB field access
       // Pattern: (variable->'index'->>'field_name')::TYPE
-      return String.format("(%s->'%s'->>'%s')", variableName, indexValue, fieldName);
+      return String.format("(%s->'%s'->>'%s')", variableName, jsonbKey, fieldName);
     }
     
     return "/* INVALID TABLE OF RECORDS FIELD ACCESS PATTERN */";
+  }
+
+  /**
+   * Strip outer quotes from string literals for use as JSONB object keys.
+   * Oracle: l_collection('key') → PostgreSQL JSONB: l_collection->'key'
+   * This prevents double-quoting issues where 'key' becomes '{'key'}' instead of 'key'.
+   */
+  private String stripOuterQuotesForJsonbKey(String indexValue) {
+    if (indexValue == null) {
+      return indexValue;
+    }
+    
+    // Check if this is a quoted string literal
+    if (indexValue.startsWith("'") && indexValue.endsWith("'") && indexValue.length() > 2) {
+      // Strip the outer quotes: 'key' → key
+      return indexValue.substring(1, indexValue.length() - 1);
+    }
+    
+    // For non-string values (numbers, expressions, etc.), return as-is
+    return indexValue;
   }
 }

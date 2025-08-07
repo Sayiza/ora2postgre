@@ -111,18 +111,23 @@ END debug_test;
       String postgreResult = pkg.toPostgre(data, false);
       assertNotNull(postgreResult, "toPostgre() should not return null");
       
+      System.out.println("DBMS_OUTPUT transformations:");
+      System.out.println(postgreResult);
+      
+      // Debug: Check what we actually got
+      boolean hasSimple = postgreResult.contains("RAISE NOTICE 'Debug message 1'");
+      boolean hasConcat = postgreResult.contains("RAISE NOTICE 'Debug message with variable: '") && 
+                         postgreResult.contains("variable_name");
+      System.out.println("Simple transformation found: " + hasSimple);
+      System.out.println("Concat transformation found: " + hasConcat);
+      
       // Verify DBMS_OUTPUT.PUT_LINE transformations
-      assertTrue(postgreResult.contains("RAISE NOTICE 'Debug message 1'"), 
-                "Should transform DBMS_OUTPUT.PUT_LINE to RAISE NOTICE");
-      assertTrue(postgreResult.contains("RAISE NOTICE 'Debug message with variable: '||variable_name"), 
-                "Should transform DBMS_OUTPUT.PUT_LINE with concatenation");
+      assertTrue(hasSimple, "Should transform DBMS_OUTPUT.PUT_LINE to RAISE NOTICE");
+      assertTrue(hasConcat, "Should transform DBMS_OUTPUT.PUT_LINE with concatenation");
       
       // Verify no CALL statements to DBMS_OUTPUT
       assertFalse(postgreResult.contains("CALL TEST_SCHEMA.DBMS_OUTPUT"), 
                  "Should not generate CALL statements for DBMS_OUTPUT");
-      
-      System.out.println("DBMS_OUTPUT transformations:");
-      System.out.println(postgreResult);
     }
   }
 

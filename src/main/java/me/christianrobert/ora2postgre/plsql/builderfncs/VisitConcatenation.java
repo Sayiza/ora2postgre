@@ -19,7 +19,18 @@ public class VisitConcatenation {
       return astBuilder.visitChildren(ctx);
     }
     
-    // Handle binary operations (arithmetic/concatenation operations)
+    // Handle BAR BAR concatenation: concatenation BAR BAR concatenation
+    if (ctx.BAR() != null && ctx.BAR().size() == 2 && ctx.concatenation() != null && ctx.concatenation().size() == 2) {
+      // Parse left and right operands recursively
+      PlSqlAst leftAst = astBuilder.visit(ctx.concatenation(0));
+      PlSqlAst rightAst = astBuilder.visit(ctx.concatenation(1));
+      
+      if (leftAst instanceof Concatenation && rightAst instanceof Concatenation) {
+        return new Concatenation((Concatenation) leftAst, "||", (Concatenation) rightAst);
+      }
+    }
+    
+    // Handle arithmetic operations with op field: +, -, *, /, **, MOD
     if (ctx.concatenation() != null && ctx.concatenation().size() == 2 && ctx.op != null) {
       // Parse left and right operands recursively
       PlSqlAst leftAst = astBuilder.visit(ctx.concatenation(0));
@@ -31,7 +42,7 @@ public class VisitConcatenation {
       }
     }
     
-    // For other concatenation patterns, fall back to default behavior
-    return new Concatenation(new ModelExpression(UnaryExpression.forAtom(new Expression(new LogicalExpression(new UnaryLogicalExpression(ctx.getText()))))));
+    // Use proper default visitor behavior for other cases
+    return astBuilder.visitChildren(ctx);
   }
 }

@@ -46,6 +46,9 @@ public class TableOfRecordsAssignmentTest {
                 -- Test table of records assignment - Phase 1.8 transformation
                 l_employees(5) := l_emp;
                 l_employees(1000) := l_emp;
+                
+                -- This demonstrates the concatenation parsing issue
+                htp.p('Employee: ID = ' || l_employees(5).emp_id || ', Name = ' || l_employees(5).emp_name);
               END;
             END;
             /
@@ -67,6 +70,17 @@ public class TableOfRecordsAssignmentTest {
         System.out.println("Generated PostgreSQL:");
         System.out.println(procedureSQL);
         System.out.println("============================================");
+        
+        // Debug: Check for table of records patterns in output
+        if (procedureSQL.contains("l_employees(5).emp_id")) {
+            System.out.println("❌ PROBLEM: Raw Oracle syntax 'l_employees(5).emp_id' found in output");
+        } else if (procedureSQL.contains("l_employees->'5'->>'emp_id")) {
+            System.out.println("✅ SUCCESS: Proper JSONB transformation applied");
+        } else if (procedureSQL.contains("'Employee: ID = ');")) {
+            System.out.println("⚠️  PARTIAL: Concatenation processed but complex expressions lost");
+        } else {
+            System.out.println("⚠️  UNKNOWN: Unexpected output pattern");
+        }
 
         // Verify JSONB table of records declaration
         assertTrue(procedureSQL.contains("l_employees jsonb := '{}'::jsonb"));
@@ -83,6 +97,65 @@ public class TableOfRecordsAssignmentTest {
         assertFalse(procedureSQL.contains("l_employees(1000) :="));
 
         System.out.println("✅ Table of records assignment test PASSED");
+    }
+
+    @Test
+    public void testStringIndexedTableOfRecordsAssignment() {
+        String oracleSql = """
+            CREATE PACKAGE BODY TEST_SCHEMA.STRING_INDEX_PKG AS
+              PROCEDURE test_string_index IS
+                TYPE employee_rec IS RECORD (
+                  emp_id NUMBER,
+                  emp_name VARCHAR2(100)
+                );
+                
+                TYPE employee_map IS TABLE OF employee_rec INDEX BY VARCHAR2(20);
+                l_employees2 employee_map;
+                l_emp employee_rec;
+              BEGIN
+                -- Test string-indexed table of records assignment
+                l_employees2('x').emp_id := 12;
+                l_employees2('key1') := l_emp;
+                
+                -- Test string-indexed table of records access
+                l_emp := l_employees2('key1');
+                l_emp.emp_id := l_employees2('x').emp_id;
+              END;
+            END;
+            /
+            """;
+
+        PlsqlCode plsqlCode = new PlsqlCode("TEST_SCHEMA", oracleSql);
+        PlSqlAst ast = PlSqlAstMain.processPlsqlCode(plsqlCode);
+
+        assertTrue(ast instanceof OraclePackage);
+        OraclePackage pkg = (OraclePackage) ast;
+        
+        Procedure procedure = pkg.getProcedures().get(0);
+        String procedureSQL = procedure.toPostgre(data, false);
+
+        System.out.println("=== STRING-INDEXED TABLE OF RECORDS TEST ===");
+        System.out.println("Generated PostgreSQL:");
+        System.out.println(procedureSQL);
+        System.out.println("===============================================");
+
+        // Verify JSONB table of records declaration
+        assertTrue(procedureSQL.contains("l_employees2 jsonb := '{}'::jsonb"));
+
+        // Check for the double quotes bug
+        boolean hasDoubleQuotes = procedureSQL.contains("''x''") || procedureSQL.contains("''key1''");
+        boolean hasCorrectQuotes = procedureSQL.contains("'x'") && procedureSQL.contains("'key1'");
+        
+        System.out.println("Has double quotes bug: " + hasDoubleQuotes);
+        System.out.println("Has correct single quotes: " + hasCorrectQuotes);
+        
+        // These should work correctly after the fix
+        assertFalse(procedureSQL.contains("''x''"), "Should not have double quotes around string keys");
+        assertFalse(procedureSQL.contains("''key1''"), "Should not have double quotes around string keys");
+        assertTrue(procedureSQL.contains("jsonb_set(l_employees2, '{x}'") || 
+                  procedureSQL.contains("l_employees2->'x'"), "Should have correct string key transformation");
+
+        System.out.println("✅ String-indexed table of records test PASSED");
     }
 
     @Test
@@ -130,8 +203,8 @@ public class TableOfRecordsAssignmentTest {
         assertTrue(functionSQL.contains("l_data jsonb := '{}'::jsonb"));
 
         // Verify string-indexed assignment transformation
-        assertTrue(functionSQL.contains("l_data := jsonb_set(l_data, '{'key1'}'"));
-        assertTrue(functionSQL.contains("l_data := jsonb_set(l_data, '{'key2'}'"));
+        assertTrue(functionSQL.contains("l_data := jsonb_set(l_data, '{key1}'"));
+        assertTrue(functionSQL.contains("l_data := jsonb_set(l_data, '{key2}'"));
 
         // Should contain to_jsonb() calls
         assertTrue(functionSQL.contains("to_jsonb("));

@@ -582,18 +582,41 @@ public class GeneralElement extends PlSqlAst {
   private String transformBlockLevelTableOfRecordsAccess(String collectionName, Expression indexExpr, Everything data) {
     String indexValue = indexExpr.toPostgre(data);
     
+    // Fix double quotes issue: strip outer quotes from string literals for JSONB keys
+    String jsonbKey = stripOuterQuotesForJsonbKey(indexValue);
+    
     // Get record type name for proper composite type casting
     String recordTypeName = getRecordTypeNameForCollection(collectionName, data);
     
     if (recordTypeName != null) {
       // Transform: collection(index) → (collection->'index')::record_type
       return String.format("(%s->'%s')::%s", 
-          collectionName, indexValue, recordTypeName);
+          collectionName, jsonbKey, recordTypeName);
     } else {
       // Fallback without explicit type casting
       return String.format("(%s->'%s')::jsonb", 
-          collectionName, indexValue);
+          collectionName, jsonbKey);
     }
+  }
+
+  /**
+   * Strip outer quotes from string literals for use as JSONB object keys.
+   * Oracle: l_collection('key') → PostgreSQL JSONB: l_collection->'key'
+   * This prevents double-quoting issues where 'key' becomes '{'key'}' instead of 'key'.
+   */
+  private String stripOuterQuotesForJsonbKey(String indexValue) {
+    if (indexValue == null) {
+      return indexValue;
+    }
+    
+    // Check if this is a quoted string literal
+    if (indexValue.startsWith("'") && indexValue.endsWith("'") && indexValue.length() > 2) {
+      // Strip the outer quotes: 'key' → key
+      return indexValue.substring(1, indexValue.length() - 1);
+    }
+    
+    // For non-string values (numbers, expressions, etc.), return as-is
+    return indexValue;
   }
 
   /**

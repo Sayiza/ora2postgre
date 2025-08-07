@@ -122,7 +122,18 @@ public class ModPlsqlExecutorGenerationTest {
     assertTrue(generatedCode.contains("import java.sql.SQLException;"), 
               "Should import SQLException");
     
+    // Verify savepoint usage in package variable initialization (connection error fix)
+    assertTrue(generatedCode.contains("setSavepoint(\"package_init\")"), 
+              "Should use savepoint for package variable initialization");
+    assertTrue(generatedCode.contains("conn.rollback(savepoint)"), 
+              "Should rollback to savepoint on initialization failure");
+    assertTrue(generatedCode.contains("conn.releaseSavepoint(savepoint)"), 
+              "Should release savepoint on successful initialization");
+    assertTrue(generatedCode.contains("import java.sql.Savepoint"), 
+              "Should import Savepoint class");
+    
     System.out.println("✅ Generated code structure test passed");
+    System.out.println("✅ Savepoint-based package initialization verification passed");
   }
 
   @Test

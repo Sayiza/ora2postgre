@@ -92,6 +92,11 @@ public class AssignmentStatement extends Statement {
       }
     }
     
+    // Check if target is table of records field assignment (e.g., l_collection('key').field := value)
+    if (isTableOfRecordsFieldAssignmentTarget(target, data)) {
+      return transformTableOfRecordsFieldAssignment(target, expression, data);
+    }
+    
     // Check if target is record field access assignment
     if (isRecordFieldAssignmentTarget(target, data)) {
       String transformedTarget = transformRecordFieldAssignmentTarget(target, data);
@@ -377,6 +382,9 @@ public class AssignmentStatement extends Statement {
     String indexValue = indexExpr.toPostgre(data);
     String recordValue = value.toPostgre(data);
     
+    // Fix double quotes issue: strip outer quotes from string literals for JSONB keys
+    String jsonbKey = stripOuterQuotesForJsonbKey(indexValue);
+    
     // Get record type name for proper composite type casting
     String recordTypeName = getRecordTypeNameForCollection(collectionName, data);
     
@@ -385,17 +393,37 @@ public class AssignmentStatement extends Statement {
       if (recordValue.contains("ROW(") || recordValue.contains("::")) {
         // Value already includes type casting - use as is
         return String.format("%s := jsonb_set(%s, '{%s}', to_jsonb(%s));", 
-            collectionName, collectionName, indexValue, recordValue);
+            collectionName, collectionName, jsonbKey, recordValue);
       } else {
         // Add composite type casting for the record value
         return String.format("%s := jsonb_set(%s, '{%s}', to_jsonb((%s)::%s));", 
-            collectionName, collectionName, indexValue, recordValue, recordTypeName);
+            collectionName, collectionName, jsonbKey, recordValue, recordTypeName);
       }
     } else {
       // Fallback without explicit type casting
       return String.format("%s := jsonb_set(%s, '{%s}', to_jsonb(%s));", 
-          collectionName, collectionName, indexValue, recordValue);
+          collectionName, collectionName, jsonbKey, recordValue);
     }
+  }
+
+  /**
+   * Strip outer quotes from string literals for use as JSONB object keys.
+   * Oracle: l_collection('key') → PostgreSQL JSONB: l_collection->'{key}'
+   * This prevents double-quoting issues where 'key' becomes '{'key'}' instead of '{key}'.
+   */
+  private String stripOuterQuotesForJsonbKey(String indexValue) {
+    if (indexValue == null) {
+      return indexValue;
+    }
+    
+    // Check if this is a quoted string literal
+    if (indexValue.startsWith("'") && indexValue.endsWith("'") && indexValue.length() > 2) {
+      // Strip the outer quotes: 'key' → key
+      return indexValue.substring(1, indexValue.length() - 1);
+    }
+    
+    // For non-string values (numbers, expressions, etc.), return as-is
+    return indexValue;
   }
 
   /**
@@ -476,6 +504,61 @@ public class AssignmentStatement extends Statement {
     qualifiedName.append("_").append(recordTypeName.toLowerCase());
     
     return qualifiedName.toString();
+  }
+
+  /**
+   * Check if the assignment target is table of records field assignment.
+   * Pattern: l_collection('index').field := value
+   */
+  private boolean isTableOfRecordsFieldAssignmentTarget(GeneralElement target, Everything data) {
+    // Check if target is chained access (collection(index).field pattern)
+    if (!target.isChainedAccess()) {
+      return false;
+    }
+    
+    GeneralElement baseElement = target.getBaseElement();
+    if (baseElement == null || !baseElement.isCollectionIndexing()) {
+      return false;
+    }
+    
+    String collectionName = baseElement.getVariableName();
+    if (collectionName == null) {
+      return false;
+    }
+    
+    // Check if the collection is a table of records
+    return isBlockLevelTableOfRecordsAssignment(collectionName, data);
+  }
+  
+  /**
+   * Transform table of records field assignment.
+   * Pattern: l_collection('index').field := value
+   * Transformation: l_collection := jsonb_set(l_collection, '{index,field}', to_jsonb(value))
+   */
+  private String transformTableOfRecordsFieldAssignment(GeneralElement target, Expression value, Everything data) {
+    GeneralElement baseElement = target.getBaseElement();
+    String collectionName = baseElement.getVariableName();
+    Expression indexExpr = baseElement.getIndexExpression();
+    
+    // Get the field name from the chained parts
+    if (target.getChainedParts().isEmpty()) {
+      return "/* INVALID TABLE OF RECORDS FIELD ASSIGNMENT */";
+    }
+    
+    String fieldName = target.getChainedParts().get(0).getIdExpression();
+    if (fieldName == null) {
+      return "/* INVALID TABLE OF RECORDS FIELD ASSIGNMENT */";
+    }
+    
+    String indexValue = indexExpr.toPostgre(data);
+    String fieldValue = value.toPostgre(data);
+    
+    // Fix double quotes issue: strip outer quotes from string literals for JSONB keys
+    String jsonbKey = stripOuterQuotesForJsonbKey(indexValue);
+    
+    // Transform: collection := jsonb_set(collection, '{index,field}', to_jsonb(value))
+    return String.format("%s := jsonb_set(%s, '{%s,%s}', to_jsonb(%s));", 
+        collectionName, collectionName, jsonbKey, fieldName.toLowerCase(), fieldValue);
   }
 
 }
