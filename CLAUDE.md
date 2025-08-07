@@ -57,6 +57,8 @@ mvn clean test
    - Correct PostgreSQL syntax for JSONB operations, composite types, function calls
    - Valid identifier names and type casting
 4. **Testing Practice**: Run tests and manually inspect the complete generated output to ensure PostgreSQL syntax validity before committing changes
+5. **Test Completion Convention**: Only mark implementation steps as completed after ALL tests pass successfully
+6. **Test Discrepancy Protocol**: When detecting discrepancies between test results and expected behavior that cannot be immediately resolved, ask the user for feedback before proceeding
 
 ### Example - Variable Declaration Fix:
 **❌ Incorrect**: `l_products jsonb := '{}'::jsonb -- comment`  

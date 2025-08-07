@@ -264,8 +264,30 @@ public class GeneralElement extends PlSqlAst {
 
   /**
    * Transform chained access: obj.field.method
+   * Special handling for table of records access like l_products(100).prod_id
    */
   private String transformChainedAccess(Everything data) {
+    // Check if base element is collection indexing on table of records
+    if (baseElement != null && baseElement.isCollectionIndexing()) {
+      String collectionName = baseElement.getVariableName();
+      Expression indexExpr = baseElement.getIndexExpression();
+      
+      // Check if this is a table of records collection access
+      if (isBlockLevelTableOfRecordsAccess(collectionName, data)) {
+        // Transform the base: collection(index) → (collection->'index')::record_type
+        String transformedBase = transformBlockLevelTableOfRecordsAccess(collectionName, indexExpr, data);
+        
+        // Append the field access
+        StringBuilder sb = new StringBuilder();
+        sb.append(transformedBase);
+        for (GeneralElementPart part : chainedParts) {
+          sb.append(".").append(part.toPostgre(data));
+        }
+        return sb.toString();
+      }
+    }
+    
+    // Regular chained access transformation
     StringBuilder sb = new StringBuilder();
     sb.append(baseElement.toPostgre(data));
     for (GeneralElementPart part : chainedParts) {
@@ -470,22 +492,49 @@ public class GeneralElement extends PlSqlAst {
       return false;
     }
     
-    // Get current transformation context
+    // Try to get transformation context, but provide fallback logic
     TransformationContext context = TransformationContext.getTestInstance();
-    if (context == null) {
-      return false;
+    
+    // If we have context, use it
+    if (context != null) {
+      // Check procedure context for table of records variables
+      Procedure currentProcedure = context.getCurrentProcedure();
+      if (currentProcedure != null && isVariableTableOfRecordsInProcedure(currentProcedure, collectionName)) {
+        return true;
+      }
+      
+      // Check function context for table of records variables
+      Function currentFunction = context.getCurrentFunction();
+      if (currentFunction != null && isVariableTableOfRecordsInFunction(currentFunction, collectionName)) {
+        return true;
+      }
     }
     
-    // Check procedure context for table of records variables
-    Procedure currentProcedure = context.getCurrentProcedure();
-    if (currentProcedure != null && isVariableTableOfRecordsInProcedure(currentProcedure, collectionName)) {
-      return true;
-    }
-    
-    // Check function context for table of records variables
-    Function currentFunction = context.getCurrentFunction();
-    if (currentFunction != null && isVariableTableOfRecordsInFunction(currentFunction, collectionName)) {
-      return true;
+    // FALLBACK: Check all packages for table of records variables with this name
+    // This handles cases where context is not properly set up
+    if (data != null) {
+      // Check package bodies (which contain procedure/function implementations)
+      if (data.getPackageBodyAst() != null) {
+        for (OraclePackage pkg : data.getPackageBodyAst()) {
+          // Check package procedures
+          if (pkg.getProcedures() != null) {
+            for (Procedure procedure : pkg.getProcedures()) {
+              if (isVariableTableOfRecordsInProcedure(procedure, collectionName)) {
+                return true;
+              }
+            }
+          }
+          
+          // Check package functions  
+          if (pkg.getFunctions() != null) {
+            for (Function function : pkg.getFunctions()) {
+              if (isVariableTableOfRecordsInFunction(function, collectionName)) {
+                return true;
+              }
+            }
+          }
+        }
+      }
     }
     
     return false;
@@ -553,31 +602,67 @@ public class GeneralElement extends PlSqlAst {
    */
   private String getRecordTypeNameForCollection(String collectionName, Everything data) {
     TransformationContext context = TransformationContext.getTestInstance();
-    if (context == null) {
-      return null;
-    }
     
-    // Check procedure context
-    Procedure currentProcedure = context.getCurrentProcedure();
-    if (currentProcedure != null) {
-      for (Variable variable : currentProcedure.getVariables()) {
-        if (variable.getName().equalsIgnoreCase(collectionName) && variable.isTableOfRecords()) {
-          String recordTypeName = variable.getRecordTypeName();
-          if (recordTypeName != null) {
-            return buildQualifiedRecordTypeName(recordTypeName, currentProcedure, data);
+    // If we have context, try it first
+    if (context != null) {
+      // Check procedure context
+      Procedure currentProcedure = context.getCurrentProcedure();
+      if (currentProcedure != null) {
+        for (Variable variable : currentProcedure.getVariables()) {
+          if (variable.getName().equalsIgnoreCase(collectionName) && variable.isTableOfRecords()) {
+            String recordTypeName = variable.getRecordTypeName();
+            if (recordTypeName != null) {
+              return buildQualifiedRecordTypeName(recordTypeName, currentProcedure, data);
+            }
+          }
+        }
+      }
+      
+      // Check function context
+      Function currentFunction = context.getCurrentFunction();
+      if (currentFunction != null) {
+        for (Variable variable : currentFunction.getVariables()) {
+          if (variable.getName().equalsIgnoreCase(collectionName) && variable.isTableOfRecords()) {
+            String recordTypeName = variable.getRecordTypeName();
+            if (recordTypeName != null) {
+              return buildQualifiedRecordTypeName(recordTypeName, currentFunction, data);
+            }
           }
         }
       }
     }
     
-    // Check function context
-    Function currentFunction = context.getCurrentFunction();
-    if (currentFunction != null) {
-      for (Variable variable : currentFunction.getVariables()) {
-        if (variable.getName().equalsIgnoreCase(collectionName) && variable.isTableOfRecords()) {
-          String recordTypeName = variable.getRecordTypeName();
-          if (recordTypeName != null) {
-            return buildQualifiedRecordTypeName(recordTypeName, currentFunction, data);
+    // FALLBACK: Search all packages for table of records variables with this name
+    if (data != null) {
+      // Check package bodies (which contain procedure/function implementations)
+      if (data.getPackageBodyAst() != null) {
+        for (OraclePackage pkg : data.getPackageBodyAst()) {
+          // Check package procedures
+          if (pkg.getProcedures() != null) {
+            for (Procedure procedure : pkg.getProcedures()) {
+              for (Variable variable : procedure.getVariables()) {
+                if (variable.getName().equalsIgnoreCase(collectionName) && variable.isTableOfRecords()) {
+                  String recordTypeName = variable.getRecordTypeName();
+                  if (recordTypeName != null) {
+                    return buildQualifiedRecordTypeName(recordTypeName, procedure, data);
+                  }
+                }
+              }
+            }
+          }
+          
+          // Check package functions  
+          if (pkg.getFunctions() != null) {
+            for (Function function : pkg.getFunctions()) {
+              for (Variable variable : function.getVariables()) {
+                if (variable.getName().equalsIgnoreCase(collectionName) && variable.isTableOfRecords()) {
+                  String recordTypeName = variable.getRecordTypeName();
+                  if (recordTypeName != null) {
+                    return buildQualifiedRecordTypeName(recordTypeName, function, data);
+                  }
+                }
+              }
+            }
           }
         }
       }

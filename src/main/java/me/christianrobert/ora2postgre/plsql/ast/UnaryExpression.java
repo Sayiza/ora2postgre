@@ -359,7 +359,13 @@ public class UnaryExpression extends PlSqlAst {
       // Continue with normal function processing if not a collection constructor
       return standardFunction.toPostgre(data);
     } else if (isAtom()) {
-      // Check if atom represents a collection constructor
+      // FIRST: Check if atom represents table of records field access pattern: l_products(100).prod_id
+      String atomText = atom.toString();
+      if (atomText != null && containsTableOfRecordsFieldAccess(atomText, data)) {
+        return transformTableOfRecordsFieldAccess(atomText, data);
+      }
+      
+      // SECOND: Check if atom represents a collection constructor
       String functionName = extractFunctionNameFromExpression(atom);
       Function currentFunction = getCurrentFunctionFromContext();
       if (functionName != null && SchemaResolutionUtils.isCollectionTypeConstructor(data, functionName, currentFunction)) {
@@ -551,13 +557,19 @@ public class UnaryExpression extends PlSqlAst {
    * Transform collection constructor to PostgreSQL array syntax.
    * Oracle: t_numbers(1, 2, 3) → PostgreSQL: ARRAY[1, 2, 3]
    * Falls back to array indexing if not actually a collection constructor.
+   * SPECIAL HANDLING: Detects table of records variables and transforms to JSONB operations.
    */
   private String transformCollectionConstructorToPostgreSQL(Everything data) {
     if (constructorName == null) {
       return "/* INVALID COLLECTION CONSTRUCTOR */";
     }
     
-    // First check if this is actually a collection type constructor
+    // FIRST: Check if this is a table of records variable access
+    if (isTableOfRecordsVariable(constructorName, data)) {
+      return transformTableOfRecordsAccess(constructorName, constructorArguments, data);
+    }
+    
+    // SECOND: Check if this is actually a collection type constructor
     Function currentFunction = getCurrentFunctionFromContext();
     if (SchemaResolutionUtils.isCollectionTypeConstructor(data, constructorName, currentFunction)) {
       // Use the Everything.transformCollectionConstructor method for proper transformation
@@ -1055,5 +1067,287 @@ public class UnaryExpression extends PlSqlAst {
     
     // PostgreSQL composite type field access syntax: (composite_value).field_name
     return "(" + baseExpression + ")." + collectionMethod.toLowerCase();
+  }
+
+  /**
+   * Check if a variable is declared as a table of records type.
+   * Uses TransformationContext first, falls back to Everything data scan.
+   */
+  private boolean isTableOfRecordsVariable(String varName, Everything data) {
+    if (varName == null) {
+      return false;
+    }
+    
+    // Try to get transformation context first
+    TransformationContext context = transformationContext != null ? transformationContext : TransformationContext.getTestInstance();
+    
+    // If we have context, use it
+    if (context != null) {
+      // Check procedure context
+      Procedure currentProcedure = context.getCurrentProcedure();
+      if (currentProcedure != null && isVariableTableOfRecordsInProcedure(currentProcedure, varName)) {
+        return true;
+      }
+      
+      // Check function context
+      Function currentFunction = context.getCurrentFunction();
+      if (currentFunction != null && isVariableTableOfRecordsInFunction(currentFunction, varName)) {
+        return true;
+      }
+    }
+    
+    // FALLBACK: Search all packages for table of records variables with this name
+    if (data != null) {
+      // Check package bodies (which contain procedure/function implementations)
+      if (data.getPackageBodyAst() != null) {
+        for (OraclePackage pkg : data.getPackageBodyAst()) {
+          // Check package procedures
+          if (pkg.getProcedures() != null) {
+            for (Procedure procedure : pkg.getProcedures()) {
+              if (isVariableTableOfRecordsInProcedure(procedure, varName)) {
+                return true;
+              }
+            }
+          }
+          
+          // Check package functions  
+          if (pkg.getFunctions() != null) {
+            for (Function function : pkg.getFunctions()) {
+              if (isVariableTableOfRecordsInFunction(function, varName)) {
+                return true;
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Check if a variable is a table of records type in a procedure.
+   */
+  private boolean isVariableTableOfRecordsInProcedure(Procedure procedure, String varName) {
+    if (procedure.getVariables() == null) {
+      return false;
+    }
+    
+    for (me.christianrobert.ora2postgre.plsql.ast.Variable variable : procedure.getVariables()) {
+      if (variable.getName().equalsIgnoreCase(varName)) {
+        return variable.isTableOfRecords();
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Check if a variable is a table of records type in a function.
+   */
+  private boolean isVariableTableOfRecordsInFunction(Function function, String varName) {
+    if (function.getVariables() == null) {
+      return false;
+    }
+    
+    for (me.christianrobert.ora2postgre.plsql.ast.Variable variable : function.getVariables()) {
+      if (variable.getName().equalsIgnoreCase(varName)) {
+        return variable.isTableOfRecords();
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Transform table of records access to PostgreSQL JSONB operations.
+   * Handles both assignment target and field access patterns.
+   */
+  private String transformTableOfRecordsAccess(String collectionName, List<Expression> arguments, Everything data) {
+    if (arguments == null || arguments.isEmpty()) {
+      return "/* INVALID TABLE OF RECORDS ACCESS - NO INDEX */";
+    }
+    
+    // Get the index expression (should be single argument for l_products(100))
+    String indexValue = arguments.get(0).toPostgre(data);
+    
+    // Get record type name for proper composite type casting
+    String recordTypeName = getRecordTypeNameForTableOfRecords(collectionName, data);
+    
+    if (recordTypeName != null) {
+      // Transform: collection(index) → jsonb_populate_record(NULL::composite_type, collection->'index')
+      return String.format("jsonb_populate_record(NULL::%s, %s->'%s')", 
+          recordTypeName, collectionName, indexValue);
+    } else {
+      // Fallback without explicit type casting
+      return String.format("(%s->'%s')::jsonb", collectionName, indexValue);
+    }
+  }
+
+  /**
+   * Get the qualified record type name for a table of records collection.
+   * Reuses the same logic as other classes for consistency.
+   */
+  private String getRecordTypeNameForTableOfRecords(String collectionName, Everything data) {
+    TransformationContext context = transformationContext != null ? transformationContext : TransformationContext.getTestInstance();
+    
+    // If we have context, try it first
+    if (context != null) {
+      // Check procedure context
+      Procedure currentProcedure = context.getCurrentProcedure();
+      if (currentProcedure != null) {
+        for (me.christianrobert.ora2postgre.plsql.ast.Variable variable : currentProcedure.getVariables()) {
+          if (variable.getName().equalsIgnoreCase(collectionName) && variable.isTableOfRecords()) {
+            String recordTypeName = variable.getRecordTypeName();
+            if (recordTypeName != null) {
+              return buildQualifiedRecordTypeName(recordTypeName, currentProcedure, data);
+            }
+          }
+        }
+      }
+      
+      // Check function context
+      Function currentFunction = context.getCurrentFunction();
+      if (currentFunction != null) {
+        for (me.christianrobert.ora2postgre.plsql.ast.Variable variable : currentFunction.getVariables()) {
+          if (variable.getName().equalsIgnoreCase(collectionName) && variable.isTableOfRecords()) {
+            String recordTypeName = variable.getRecordTypeName();
+            if (recordTypeName != null) {
+              return buildQualifiedRecordTypeName(recordTypeName, currentFunction, data);
+            }
+          }
+        }
+      }
+    }
+    
+    // FALLBACK: Search all packages for table of records variables with this name
+    if (data != null) {
+      // Check package bodies (which contain procedure/function implementations)
+      if (data.getPackageBodyAst() != null) {
+        for (OraclePackage pkg : data.getPackageBodyAst()) {
+          // Check package procedures
+          if (pkg.getProcedures() != null) {
+            for (Procedure procedure : pkg.getProcedures()) {
+              for (me.christianrobert.ora2postgre.plsql.ast.Variable variable : procedure.getVariables()) {
+                if (variable.getName().equalsIgnoreCase(collectionName) && variable.isTableOfRecords()) {
+                  String recordTypeName = variable.getRecordTypeName();
+                  if (recordTypeName != null) {
+                    return buildQualifiedRecordTypeName(recordTypeName, procedure, data);
+                  }
+                }
+              }
+            }
+          }
+          
+          // Check package functions  
+          if (pkg.getFunctions() != null) {
+            for (Function function : pkg.getFunctions()) {
+              for (me.christianrobert.ora2postgre.plsql.ast.Variable variable : function.getVariables()) {
+                if (variable.getName().equalsIgnoreCase(collectionName) && variable.isTableOfRecords()) {
+                  String recordTypeName = variable.getRecordTypeName();
+                  if (recordTypeName != null) {
+                    return buildQualifiedRecordTypeName(recordTypeName, function, data);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    return null;
+  }
+
+  /**
+   * Build qualified record type name using the same pattern as other classes.
+   * Format: schema_package_routine_recordtype (lowercase with underscores)
+   */
+  private String buildQualifiedRecordTypeName(String recordTypeName, ExecutableRoutine routine, Everything data) {
+    if (recordTypeName == null || routine == null) {
+      return null;
+    }
+    
+    // Build qualified name: schema_package_routine_recordtype
+    StringBuilder qualifiedName = new StringBuilder();
+    
+    // Add schema (lowercase)
+    String schema = routine.getSchema();
+    if (schema == null && data != null && !data.getUserNames().isEmpty()) {
+      // Use the first schema from the data context as fallback
+      schema = data.getUserNames().get(0);
+    }
+    if (schema == null) {
+      schema = "unknown_schema"; // Last resort fallback
+    }
+    qualifiedName.append(schema.toLowerCase());
+    
+    // Add package/parent context
+    if (routine.getParentPackage() != null) {
+      qualifiedName.append("_").append(routine.getParentPackage().getName().toLowerCase());
+    } else if (routine.getParentType() != null) {
+      qualifiedName.append("_").append(routine.getParentType().getName().toLowerCase());
+    } else {
+      // Standalone routine - no package context
+    }
+    
+    // Add routine name
+    qualifiedName.append("_").append(routine.getName().toLowerCase());
+    
+    // Add record type name
+    qualifiedName.append("_").append(recordTypeName.toLowerCase());
+    
+    return qualifiedName.toString();
+  }
+
+  /**
+   * Check if atom text contains table of records field access pattern.
+   * Pattern: l_products(100).prod_id
+   */
+  private boolean containsTableOfRecordsFieldAccess(String atomText, Everything data) {
+    if (atomText == null) {
+      return false;
+    }
+    
+    // Look for pattern: variable_name(index).field_name
+    if (atomText.contains("(") && atomText.contains(").")) {
+      int parenIndex = atomText.indexOf('(');
+      if (parenIndex > 0) {
+        String variableName = atomText.substring(0, parenIndex);
+        return isTableOfRecordsVariable(variableName, data);
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Transform table of records field access from atom text.
+   * Pattern: l_products(100).prod_id → (l_products->'100'->>'prod_id')::NUMERIC
+   */
+  private String transformTableOfRecordsFieldAccess(String atomText, Everything data) {
+    if (atomText == null) {
+      return "/* INVALID TABLE OF RECORDS FIELD ACCESS */";
+    }
+    
+    // Parse the pattern: variable_name(index).field_name
+    int parenStartIndex = atomText.indexOf('(');
+    int parenEndIndex = atomText.indexOf(')', parenStartIndex);
+    int dotIndex = atomText.indexOf('.', parenEndIndex);
+    
+    if (parenStartIndex > 0 && parenEndIndex > parenStartIndex && dotIndex > parenEndIndex) {
+      String variableName = atomText.substring(0, parenStartIndex);
+      String indexValue = atomText.substring(parenStartIndex + 1, parenEndIndex);
+      String fieldName = atomText.substring(dotIndex + 1);
+      
+      // Clean up field name (remove any additional whitespace or special characters)
+      fieldName = fieldName.trim();
+      
+      // Transform to PostgreSQL JSONB field access
+      // Pattern: (variable->'index'->>'field_name')::TYPE
+      return String.format("(%s->'%s'->>'%s')", variableName, indexValue, fieldName);
+    }
+    
+    return "/* INVALID TABLE OF RECORDS FIELD ACCESS PATTERN */";
   }
 }

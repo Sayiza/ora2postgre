@@ -103,11 +103,11 @@ public class TableOfRecordsIntegrationTest {
     assertTrue(procedureSQL.contains("test_schema_employee_management_pkg_manage_employee_data_employee_rec"));
     
     // Verify table of records variable transformations
-    assertTrue(procedureSQL.contains("l_employees jsonb := '{}'::jsonb -- Table of test_schema_employee_management_pkg_manage_employee_data_employee_rec"),
+    assertTrue(procedureSQL.contains("l_employees jsonb := '{}'::jsonb; -- Table of test_schema_employee_management_pkg_manage_employee_data_employee_rec"),
                "Integer-indexed table of records should be transformed to JSONB");
-    assertTrue(procedureSQL.contains("l_emp_list jsonb := '{}'::jsonb -- Table of test_schema_employee_management_pkg_manage_employee_data_employee_rec"),
+    assertTrue(procedureSQL.contains("l_emp_list jsonb := '{}'::jsonb; -- Table of test_schema_employee_management_pkg_manage_employee_data_employee_rec"),
                "Nested table of records should be transformed to JSONB");
-    assertTrue(procedureSQL.contains("l_emp_by_name jsonb := '{}'::jsonb -- Table of test_schema_employee_management_pkg_manage_employee_data_employee_rec"),
+    assertTrue(procedureSQL.contains("l_emp_by_name jsonb := '{}'::jsonb; -- Table of test_schema_employee_management_pkg_manage_employee_data_employee_rec"),
                "String-indexed table of records should be transformed to JSONB");
     
     // Verify regular variables remain unchanged
@@ -186,8 +186,8 @@ public class TableOfRecordsIntegrationTest {
     assertTrue(functionSQL.contains("-- Original record type: dept_summary_rec"));
     
     // Verify table of records transformations in function context
-    assertTrue(functionSQL.contains("l_summaries jsonb := '{}'::jsonb -- Table of test_schema_function_collections_pkg_process_employee_collections_dept_summary_rec"));
-    assertTrue(functionSQL.contains("l_lookup jsonb := '{}'::jsonb -- Table of test_schema_function_collections_pkg_process_employee_collections_dept_summary_rec"));
+    assertTrue(functionSQL.contains("l_summaries jsonb := '{}'::jsonb; -- Table of test_schema_function_collections_pkg_process_employee_collections_dept_summary_rec"));
+    assertTrue(functionSQL.contains("l_lookup jsonb := '{}'::jsonb; -- Table of test_schema_function_collections_pkg_process_employee_collections_dept_summary_rec"));
     
     // Verify regular variable
     assertTrue(functionSQL.contains("v_result numeric := 0"));
@@ -257,8 +257,8 @@ public class TableOfRecordsIntegrationTest {
     assertTrue(procedureSQL.contains("-- Original record type: address_rec"));
     
     // Verify table of records transformations for different types
-    assertTrue(procedureSQL.contains("l_people jsonb := '{}'::jsonb -- Table of test_schema_mixed_types_pkg_test_mixed_declarations_person_rec"));
-    assertTrue(procedureSQL.contains("l_addresses jsonb := '{}'::jsonb -- Table of test_schema_mixed_types_pkg_test_mixed_declarations_address_rec"));
+    assertTrue(procedureSQL.contains("l_people jsonb := '{}'::jsonb; -- Table of test_schema_mixed_types_pkg_test_mixed_declarations_person_rec"));
+    assertTrue(procedureSQL.contains("l_addresses jsonb := '{}'::jsonb; -- Table of test_schema_mixed_types_pkg_test_mixed_declarations_address_rec"));
     
     // Verify individual record variables use composite types
     assertTrue(procedureSQL.contains("l_single_person test_schema_mixed_types_pkg_test_mixed_declarations_person_rec"));

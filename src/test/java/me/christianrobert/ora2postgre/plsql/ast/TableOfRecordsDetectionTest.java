@@ -297,7 +297,7 @@ public class TableOfRecordsDetectionTest {
           .findFirst().orElse(null);
       assertNotNull(l_employees);
       String empTransformed = l_employees.toPostgre(data, procedure);
-      assertTrue(empTransformed.contains("l_employees jsonb := '{}'::jsonb -- Table of test_schema_variable_transform_pkg_test_variable_declarations_employee_rec"));
+      assertTrue(empTransformed.contains("l_employees jsonb := '{}'::jsonb; -- Table of test_schema_variable_transform_pkg_test_variable_declarations_employee_rec"));
       
       Variable v_regular_var = procedure.getVariables().stream()
           .filter(v -> "v_regular_var".equals(v.getName()))
