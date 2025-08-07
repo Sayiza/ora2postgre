@@ -36,6 +36,11 @@ public class AssignmentStatement extends Statement {
       String collectionName = target.getVariableName();
       Expression indexExpr = target.getIndexExpression();
       
+      // Check if this is a block-level table of records assignment (Phase 1.8)
+      if (isBlockLevelTableOfRecordsAssignment(collectionName, data)) {
+        return transformBlockLevelTableOfRecordsAssignment(collectionName, indexExpr, expression, data);
+      }
+      
       // Check if this is a package collection variable
       if (PackageVariableReferenceTransformer.isPackageVariableReference(collectionName, data)) {
         OraclePackage pkg = PackageVariableReferenceTransformer.findContainingPackage(collectionName, data);
@@ -295,6 +300,182 @@ public class AssignmentStatement extends Statement {
       }
     }
     return false;
+  }
+
+  /**
+   * Check if this is a block-level table of records assignment.
+   * Phase 1.8: Table of Records Assignment Transformation
+   */
+  private boolean isBlockLevelTableOfRecordsAssignment(String collectionName, Everything data) {
+    if (collectionName == null) {
+      return false;
+    }
+    
+    // Get current transformation context
+    TransformationContext context = TransformationContext.getTestInstance();
+    if (context == null) {
+      return false;
+    }
+    
+    // Check procedure context for table of records variables
+    Procedure currentProcedure = context.getCurrentProcedure();
+    if (currentProcedure != null) {
+      return isVariableTableOfRecordsInProcedure(currentProcedure, collectionName);
+    }
+    
+    // Check function context for table of records variables
+    Function currentFunction = context.getCurrentFunction();
+    if (currentFunction != null) {
+      return isVariableTableOfRecordsInFunction(currentFunction, collectionName);
+    }
+    
+    return false;
+  }
+
+  /**
+   * Check if a variable is a table of records type in a procedure.
+   */
+  private boolean isVariableTableOfRecordsInProcedure(Procedure procedure, String collectionName) {
+    if (procedure.getVariables() == null) {
+      return false;
+    }
+    
+    for (Variable variable : procedure.getVariables()) {
+      if (variable.getName().equalsIgnoreCase(collectionName)) {
+        return variable.isTableOfRecords();
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Check if a variable is a table of records type in a function.
+   */
+  private boolean isVariableTableOfRecordsInFunction(Function function, String collectionName) {
+    if (function.getVariables() == null) {
+      return false;
+    }
+    
+    for (Variable variable : function.getVariables()) {
+      if (variable.getName().equalsIgnoreCase(collectionName)) {
+        return variable.isTableOfRecords();
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Transform block-level table of records assignment.
+   * Pattern: collection[index] := record_value
+   * Transformation: collection := jsonb_set(collection, '{index}', to_jsonb(record_value))
+   * Phase 1.8: Table of Records Assignment Transformation
+   */
+  private String transformBlockLevelTableOfRecordsAssignment(String collectionName, Expression indexExpr, 
+                                                           Expression value, Everything data) {
+    String indexValue = indexExpr.toPostgre(data);
+    String recordValue = value.toPostgre(data);
+    
+    // Get record type name for proper composite type casting
+    String recordTypeName = getRecordTypeNameForCollection(collectionName, data);
+    
+    if (recordTypeName != null) {
+      // If we have explicit record construction, ensure proper composite type casting
+      if (recordValue.contains("ROW(") || recordValue.contains("::")) {
+        // Value already includes type casting - use as is
+        return String.format("%s := jsonb_set(%s, '{%s}', to_jsonb(%s));", 
+            collectionName, collectionName, indexValue, recordValue);
+      } else {
+        // Add composite type casting for the record value
+        return String.format("%s := jsonb_set(%s, '{%s}', to_jsonb((%s)::%s));", 
+            collectionName, collectionName, indexValue, recordValue, recordTypeName);
+      }
+    } else {
+      // Fallback without explicit type casting
+      return String.format("%s := jsonb_set(%s, '{%s}', to_jsonb(%s));", 
+          collectionName, collectionName, indexValue, recordValue);
+    }
+  }
+
+  /**
+   * Get the qualified record type name for a table of records collection.
+   * Builds qualified names using the same pattern as Variable.toPostgre()
+   */
+  private String getRecordTypeNameForCollection(String collectionName, Everything data) {
+    TransformationContext context = TransformationContext.getTestInstance();
+    if (context == null) {
+      return null;
+    }
+    
+    // Check procedure context
+    Procedure currentProcedure = context.getCurrentProcedure();
+    if (currentProcedure != null) {
+      for (Variable variable : currentProcedure.getVariables()) {
+        if (variable.getName().equalsIgnoreCase(collectionName) && variable.isTableOfRecords()) {
+          String recordTypeName = variable.getRecordTypeName();
+          if (recordTypeName != null) {
+            return buildQualifiedRecordTypeName(recordTypeName, currentProcedure, data);
+          }
+        }
+      }
+    }
+    
+    // Check function context
+    Function currentFunction = context.getCurrentFunction();
+    if (currentFunction != null) {
+      for (Variable variable : currentFunction.getVariables()) {
+        if (variable.getName().equalsIgnoreCase(collectionName) && variable.isTableOfRecords()) {
+          String recordTypeName = variable.getRecordTypeName();
+          if (recordTypeName != null) {
+            return buildQualifiedRecordTypeName(recordTypeName, currentFunction, data);
+          }
+        }
+      }
+    }
+    
+    return null;
+  }
+
+  /**
+   * Build qualified record type name using the same pattern as Variable class.
+   * Format: schema_package_routine_recordtype (lowercase with underscores)
+   */
+  private String buildQualifiedRecordTypeName(String recordTypeName, ExecutableRoutine routine, Everything data) {
+    if (recordTypeName == null || routine == null) {
+      return null;
+    }
+    
+    // Build qualified name: schema_package_routine_recordtype
+    StringBuilder qualifiedName = new StringBuilder();
+    
+    // Add schema (lowercase)
+    String schema = routine.getSchema();
+    if (schema == null && data != null && !data.getUserNames().isEmpty()) {
+      // Use the first schema from the data context as fallback
+      schema = data.getUserNames().get(0);
+    }
+    if (schema == null) {
+      schema = "unknown_schema"; // Last resort fallback
+    }
+    qualifiedName.append(schema.toLowerCase());
+    
+    // Add package/parent context
+    if (routine.getParentPackage() != null) {
+      qualifiedName.append("_").append(routine.getParentPackage().getName().toLowerCase());
+    } else if (routine.getParentType() != null) {
+      qualifiedName.append("_").append(routine.getParentType().getName().toLowerCase());
+    } else {
+      // Standalone routine - no package context
+    }
+    
+    // Add routine name
+    qualifiedName.append("_").append(routine.getName().toLowerCase());
+    
+    // Add record type name
+    qualifiedName.append("_").append(recordTypeName.toLowerCase());
+    
+    return qualifiedName.toString();
   }
 
 }

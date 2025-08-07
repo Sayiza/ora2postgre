@@ -44,6 +44,26 @@ java -jar target/quarkus-app/quarkus-run.jar
 mvn clean test
 ```
 
+## **PostgreSQL Code Validation Rule**
+
+**CRITICAL REQUIREMENT**: **Always review generated PostgreSQL code in test files for syntactic validity by inspecting the complete generated code via system standard output.**
+
+### Implementation Requirements:
+1. **Test Output Retention**: Keep System.out.println() statements showing generated PostgreSQL code in test classes - this output is valuable for manual review and debugging
+2. **Syntax Validation**: When implementing or modifying PostgreSQL generation methods (toPostgre()), always verify the complete generated PostgreSQL code is syntactically correct
+3. **Common Issues to Check**:
+   - Missing semicolons after statements (especially variable declarations)
+   - Proper parentheses balancing
+   - Correct PostgreSQL syntax for JSONB operations, composite types, function calls
+   - Valid identifier names and type casting
+4. **Testing Practice**: Run tests and manually inspect the complete generated output to ensure PostgreSQL syntax validity before committing changes
+
+### Example - Variable Declaration Fix:
+**❌ Incorrect**: `l_products jsonb := '{}'::jsonb -- comment`  
+**✅ Correct**: `l_products jsonb := '{}'::jsonb; -- comment`
+
+The semicolon after `'{}'::jsonb` was missing and would cause PostgreSQL syntax errors. This was caught by reviewing the complete test output showing the generated DECLARE section.
+
 ### Legacy Run Command (Deprecated)
 ```bash
 # Old CLI approach - no longer the primary method

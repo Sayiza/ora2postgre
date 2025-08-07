@@ -57,7 +57,7 @@ public class Variable extends PlSqlAst {
       // Transform table of records to JSONB
       String recordTypeName = getRecordTypeName();
       b.append(name)
-              .append(" jsonb := '{}'::jsonb"); // Initialize as empty JSONB object
+              .append(" jsonb := '{}'::jsonb;"); // Initialize as empty JSONB object
       
       // Add comment to indicate original type
       if (recordTypeName != null) {
@@ -98,7 +98,7 @@ public class Variable extends PlSqlAst {
         String qualifiedRecordType = getQualifiedRecordTypeName(recordTypeName, function, data);
         
         finalB.append(name)
-                .append(" jsonb := '{}'::jsonb"); // Initialize as empty JSONB object
+                .append(" jsonb := '{}'::jsonb;"); // Initialize as empty JSONB object
         
         // Add comment to indicate original type
         if (qualifiedRecordType != null) {
@@ -140,7 +140,7 @@ public class Variable extends PlSqlAst {
         String qualifiedRecordType = getQualifiedRecordTypeName(recordTypeName, procedure, data);
         
         finalB.append(name)
-                .append(" jsonb := '{}'::jsonb"); // Initialize as empty JSONB object
+                .append(" jsonb := '{}'::jsonb;"); // Initialize as empty JSONB object
         
         // Add comment to indicate original type
         if (qualifiedRecordType != null) {
