@@ -3,6 +3,8 @@ package me.christianrobert.ora2postgre.plsql.ast.tools.transformers;
 import me.christianrobert.ora2postgre.plsql.ast.OraclePackage;
 import me.christianrobert.ora2postgre.plsql.ast.Variable;
 import me.christianrobert.ora2postgre.plsql.ast.DataTypeSpec;
+import me.christianrobert.ora2postgre.plsql.ast.VarrayType;
+import me.christianrobert.ora2postgre.plsql.ast.NestedTableType;
 import me.christianrobert.ora2postgre.global.Everything;
 import java.util.HashMap;
 import java.util.Map;
@@ -75,7 +77,21 @@ public class PackageVariableReferenceTransformer {
    * @return PostgreSQL function call for reading the variable
    */
   public static String transformRead(String targetSchema, String packageName, String varName, String dataType) {
-    String accessorType = mapDataTypeToAccessor(dataType);
+    return transformRead(targetSchema, packageName, varName, dataType, null);
+  }
+
+  /**
+   * Transform Oracle package variable read access to PostgreSQL function call with package context.
+   * 
+   * @param targetSchema Target schema where package variable tables are located
+   * @param packageName Name of the Oracle package
+   * @param varName Name of the package variable
+   * @param dataType Oracle data type of the variable
+   * @param pkg Package context for custom type lookup (can be null)
+   * @return PostgreSQL function call for reading the variable
+   */
+  public static String transformRead(String targetSchema, String packageName, String varName, String dataType, OraclePackage pkg) {
+    String accessorType = mapDataTypeToAccessorWithContext(dataType, pkg);
     
     if ("collection".equals(accessorType)) {
       // Collection variables require special handling
@@ -99,7 +115,22 @@ public class PackageVariableReferenceTransformer {
    * @return PostgreSQL function call for writing the variable
    */
   public static String transformWrite(String targetSchema, String packageName, String varName, String dataType, String value) {
-    String accessorType = mapDataTypeToAccessor(dataType);
+    return transformWrite(targetSchema, packageName, varName, dataType, value, null);
+  }
+
+  /**
+   * Transform Oracle package variable write access to PostgreSQL function call with package context.
+   * 
+   * @param targetSchema Target schema where package variable tables are located
+   * @param packageName Name of the Oracle package
+   * @param varName Name of the package variable
+   * @param dataType Oracle data type of the variable
+   * @param value PostgreSQL expression for the value to write
+   * @param pkg Package context for custom type lookup (can be null)
+   * @return PostgreSQL function call for writing the variable
+   */
+  public static String transformWrite(String targetSchema, String packageName, String varName, String dataType, String value, OraclePackage pkg) {
+    String accessorType = mapDataTypeToAccessorWithContext(dataType, pkg);
     
     if ("collection".equals(accessorType)) {
       // Collection variables require special handling
@@ -261,6 +292,17 @@ public class PackageVariableReferenceTransformer {
    * @return PostgreSQL accessor function suffix
    */
   public static String mapDataTypeToAccessor(String oracleType) {
+    return mapDataTypeToAccessorWithContext(oracleType, null);
+  }
+
+  /**
+   * Map Oracle data type to PostgreSQL accessor function suffix with package context.
+   * 
+   * @param oracleType Oracle data type string
+   * @param pkg Package context for custom type lookup (can be null)
+   * @return PostgreSQL accessor function suffix
+   */
+  public static String mapDataTypeToAccessorWithContext(String oracleType, OraclePackage pkg) {
     if (oracleType == null) {
       return "text"; // fallback
     }
@@ -270,6 +312,11 @@ public class PackageVariableReferenceTransformer {
     // Handle collection types (Oracle and PostgreSQL syntax)
     if (upperType.contains("VARRAY") || upperType.contains("TABLE OF") || 
         upperType.contains("NESTED TABLE") || upperType.endsWith("[]")) {
+      return "collection";
+    }
+    
+    // Check if this is a custom collection type defined in the package
+    if (pkg != null && isDefinedCollectionType(oracleType, pkg)) {
       return "collection";
     }
     
@@ -353,7 +400,9 @@ public class PackageVariableReferenceTransformer {
     if (var != null) {
       // For collection types, preserve Oracle type information for mapping
       String oracleType = getOracleDataTypeString(var.getDataType());
-      if (oracleType != null && isOracleCollectionType(oracleType)) {
+      
+      // Check if this is a collection type by looking up the type definition in the package
+      if (oracleType != null && (isOracleCollectionType(oracleType) || isDefinedCollectionType(oracleType, pkg))) {
         return oracleType; // Return Oracle type for proper collection detection
       }
       
@@ -376,19 +425,23 @@ public class PackageVariableReferenceTransformer {
       return null;
     }
     
-    // Use the toString() method which should preserve Oracle syntax
-    String typeString = dataTypeSpec.toString();
-    
-    // Also check the native and custom data type fields
-    if (typeString == null || typeString.trim().isEmpty()) {
-      if (dataTypeSpec.getNativeDataType() != null) {
-        typeString = dataTypeSpec.getNativeDataType();
-      } else if (dataTypeSpec.getCustumDataType() != null) {
-        typeString = dataTypeSpec.getCustumDataType();
-      }
+    // First try to get custom data type (user-defined types like t_numbers)
+    if (dataTypeSpec.getCustumDataType() != null && !dataTypeSpec.getCustumDataType().trim().isEmpty()) {
+      return dataTypeSpec.getCustumDataType().trim();
     }
     
-    return typeString;
+    // Then try native data type (built-in Oracle types like VARCHAR2, NUMBER)
+    if (dataTypeSpec.getNativeDataType() != null && !dataTypeSpec.getNativeDataType().trim().isEmpty()) {
+      return dataTypeSpec.getNativeDataType().trim();
+    }
+    
+    // Last resort: toString() - but this might not be reliable
+    String typeString = dataTypeSpec.toString();
+    if (typeString != null && !typeString.trim().isEmpty() && !typeString.contains("@")) {
+      return typeString.trim();
+    }
+    
+    return null;
   }
 
   /**
@@ -405,6 +458,35 @@ public class PackageVariableReferenceTransformer {
     String upperType = oracleType.toUpperCase();
     return upperType.contains("VARRAY") || upperType.contains("TABLE OF") || 
            upperType.contains("NESTED TABLE");
+  }
+  
+  /**
+   * Check if a type name is defined as a collection type in the given package.
+   * 
+   * @param typeName Type name to check
+   * @param pkg Package to search
+   * @return true if the type is defined as a VARRAY or nested table type
+   */
+  private static boolean isDefinedCollectionType(String typeName, OraclePackage pkg) {
+    if (typeName == null || pkg == null) {
+      return false;
+    }
+    
+    // Check VARRAY types
+    for (VarrayType varray : pkg.getVarrayTypes()) {
+      if (typeName.equalsIgnoreCase(varray.getName())) {
+        return true;
+      }
+    }
+    
+    // Check nested table types
+    for (NestedTableType nestedTable : pkg.getNestedTableTypes()) {
+      if (typeName.equalsIgnoreCase(nestedTable.getName())) {
+        return true;
+      }
+    }
+    
+    return false;
   }
 
   /**

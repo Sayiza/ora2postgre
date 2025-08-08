@@ -72,6 +72,9 @@ public class UnaryExpression extends PlSqlAst {
   private final boolean isCollectionConstructor; // True if this represents collection constructor: t_numbers(1,2,3)
   private final String constructorName; // Constructor name for collection constructors
   private final List<Expression> constructorArguments; // Arguments for collection constructors
+  private final boolean isPotentialVariableAccess; // True if this could be variable access: g_numbers(1) - deferred semantic analysis
+  private final String potentialVariableName; // Variable name for potential variable access
+  private final List<Expression> potentialAccessArguments; // Arguments for potential variable access
 
   // Constructor for unary operations (-, +, PRIOR, etc.)
   public UnaryExpression(String unaryOperator, UnaryExpression childExpression) {
@@ -90,6 +93,9 @@ public class UnaryExpression extends PlSqlAst {
     this.isCollectionConstructor = false;
     this.constructorName = null;
     this.constructorArguments = null;
+    this.isPotentialVariableAccess = false;
+    this.potentialVariableName = null;
+    this.potentialAccessArguments = null;
   }
 
   // Constructor for case expressions
@@ -109,6 +115,9 @@ public class UnaryExpression extends PlSqlAst {
     this.isCollectionConstructor = false;
     this.constructorName = null;
     this.constructorArguments = null;
+    this.isPotentialVariableAccess = false;
+    this.potentialVariableName = null;
+    this.potentialAccessArguments = null;
   }
 
   // Private constructor for specific types
@@ -128,6 +137,9 @@ public class UnaryExpression extends PlSqlAst {
     this.isCollectionConstructor = false;
     this.constructorName = null;
     this.constructorArguments = null;
+    this.isPotentialVariableAccess = false;
+    this.potentialVariableName = null;
+    this.potentialAccessArguments = null;
   }
 
   // Constructor for standard functions
@@ -157,6 +169,9 @@ public class UnaryExpression extends PlSqlAst {
     this.isCollectionConstructor = false;
     this.constructorName = null;
     this.constructorArguments = null;
+    this.isPotentialVariableAccess = false;
+    this.potentialVariableName = null;
+    this.potentialAccessArguments = null;
   }
 
   // Constructor for array indexing calls
@@ -176,6 +191,9 @@ public class UnaryExpression extends PlSqlAst {
     this.isCollectionConstructor = false;
     this.constructorName = null;
     this.constructorArguments = null;
+    this.isPotentialVariableAccess = false;
+    this.potentialVariableName = null;
+    this.potentialAccessArguments = null;
   }
 
   // Constructor for collection constructors (NEW)
@@ -195,8 +213,43 @@ public class UnaryExpression extends PlSqlAst {
     this.isCollectionConstructor = true;
     this.constructorName = constructorName;
     this.constructorArguments = constructorArguments != null ? new ArrayList<>(constructorArguments) : new ArrayList<>();
+    this.isPotentialVariableAccess = false;
+    this.potentialVariableName = null;
+    this.potentialAccessArguments = null;
   }
 
+  // Constructor for potential variable access (deferred semantic analysis)
+  public static UnaryExpression forPotentialVariableAccess(String variableName, List<Expression> arguments) {
+    return new UnaryExpression(null, null, null, null, null, null, null, 
+        null, null, false, null, null, false, null, null,
+        true, variableName, arguments != null ? new ArrayList<>(arguments) : new ArrayList<>());
+  }
+
+  // Complete constructor for internal use
+  private UnaryExpression(String unaryOperator, UnaryExpression childExpression, Expression caseExpression, 
+      Expression quantifiedExpression, Expression standardFunction, Expression atom, Expression implicitCursorExpression,
+      String collectionMethod, List<Expression> methodArguments, boolean isArrayIndexing, String arrayVariable, 
+      Expression indexExpression, boolean isCollectionConstructor, String constructorName, List<Expression> constructorArguments,
+      boolean isPotentialVariableAccess, String potentialVariableName, List<Expression> potentialAccessArguments) {
+    this.unaryOperator = unaryOperator;
+    this.childExpression = childExpression;
+    this.caseExpression = caseExpression;
+    this.quantifiedExpression = quantifiedExpression;
+    this.standardFunction = standardFunction;
+    this.atom = atom;
+    this.implicitCursorExpression = implicitCursorExpression;
+    this.collectionMethod = collectionMethod;
+    this.methodArguments = methodArguments;
+    this.isArrayIndexing = isArrayIndexing;
+    this.arrayVariable = arrayVariable;
+    this.indexExpression = indexExpression;
+    this.isCollectionConstructor = isCollectionConstructor;
+    this.constructorName = constructorName;
+    this.constructorArguments = constructorArguments;
+    this.isPotentialVariableAccess = isPotentialVariableAccess;
+    this.potentialVariableName = potentialVariableName;
+    this.potentialAccessArguments = potentialAccessArguments;
+  }
 
   public String getUnaryOperator() {
     return unaryOperator;
@@ -287,6 +340,18 @@ public class UnaryExpression extends PlSqlAst {
     return constructorArguments != null ? new ArrayList<>(constructorArguments) : new ArrayList<>();
   }
 
+  public boolean isPotentialVariableAccess() {
+    return isPotentialVariableAccess;
+  }
+
+  public String getPotentialVariableName() {
+    return potentialVariableName;
+  }
+
+  public List<Expression> getPotentialAccessArguments() {
+    return potentialAccessArguments != null ? new ArrayList<>(potentialAccessArguments) : new ArrayList<>();
+  }
+
   @Override
   public <T> T accept(PlSqlAstVisitor<T> visitor) {
     return visitor.visit(this);
@@ -330,6 +395,17 @@ public class UnaryExpression extends PlSqlAst {
         for (int i = 0; i < constructorArguments.size(); i++) {
           if (i > 0) sb.append(", ");
           sb.append(constructorArguments.get(i).toString());
+        }
+      }
+      sb.append(")");
+      return sb.toString();
+    } else if (isPotentialVariableAccess()) {
+      StringBuilder sb = new StringBuilder();
+      sb.append(potentialVariableName).append("(");
+      if (potentialAccessArguments != null) {
+        for (int i = 0; i < potentialAccessArguments.size(); i++) {
+          if (i > 0) sb.append(", ");
+          sb.append(potentialAccessArguments.get(i).toString());
         }
       }
       sb.append(")");
@@ -398,6 +474,9 @@ public class UnaryExpression extends PlSqlAst {
     } else if (isCollectionConstructor()) {
       // Transform collection constructor to PostgreSQL array syntax
       return transformCollectionConstructorToPostgreSQL(data);
+    } else if (isPotentialVariableAccess()) {
+      // SEMANTIC ANALYSIS: Determine what this potential variable access represents
+      return transformPotentialVariableAccessToPostgreSQL(data);
     } else {
       return "/* INVALID UNARY EXPRESSION */";
     }
@@ -620,7 +699,7 @@ public class UnaryExpression extends PlSqlAst {
         String dataType = PackageVariableReferenceTransformer.getPackageVariableDataType(arrayVariable, pkg);
         
         // For package collections, we need to get the element type
-        String elementType = extractElementDataType(dataType);
+        String elementType = extractElementDataType(dataType, pkg, data);
         
         // Transform package collection element access to direct table access
         return PackageVariableReferenceTransformer.transformCollectionElementRead(
@@ -636,12 +715,12 @@ public class UnaryExpression extends PlSqlAst {
   /**
    * Extract the element data type from a collection data type.
    */
-  private String extractElementDataType(String collectionType) {
+  private String extractElementDataType(String collectionType, OraclePackage pkg, Everything data) {
     if (collectionType == null) {
       return "text";
     }
     
-    // Handle VARRAY and TABLE OF types
+    // Handle direct VARRAY and TABLE OF type definitions (like "VARRAY(10) OF NUMBER")
     if (collectionType.toUpperCase().contains("VARRAY") || collectionType.toUpperCase().contains("TABLE")) {
       // Look for "OF type" pattern
       int ofIndex = collectionType.toUpperCase().indexOf(" OF ");
@@ -655,7 +734,52 @@ public class UnaryExpression extends PlSqlAst {
       }
     }
     
+    // Handle named collection types (like "t_numbers") - need to look up the actual definition
+    if (pkg != null) {
+      // Look for VARRAY type definitions in the package
+      for (VarrayType varray : pkg.getVarrayTypes()) {
+        if (collectionType.equalsIgnoreCase(varray.getName())) {
+          String elementType = getDataTypeString(varray.getDataType());
+          return elementType;
+        }
+      }
+      
+      // Look for nested table type definitions in the package
+      for (NestedTableType nestedTable : pkg.getNestedTableTypes()) {
+        if (collectionType.equalsIgnoreCase(nestedTable.getName())) {
+          String elementType = getDataTypeString(nestedTable.getDataType());
+          return elementType;
+        }
+      }
+    }
     return "text"; // Default fallback
+  }
+  
+  /**
+   * Get the string representation of a data type.
+   */
+  private String getDataTypeString(me.christianrobert.ora2postgre.plsql.ast.DataTypeSpec dataTypeSpec) {
+    if (dataTypeSpec == null) {
+      return "text";
+    }
+    
+    // Check native data type first
+    if (dataTypeSpec.getNativeDataType() != null && !dataTypeSpec.getNativeDataType().trim().isEmpty()) {
+      return dataTypeSpec.getNativeDataType().trim();
+    }
+    
+    // Check custom data type
+    if (dataTypeSpec.getCustumDataType() != null && !dataTypeSpec.getCustumDataType().trim().isEmpty()) {
+      return dataTypeSpec.getCustumDataType().trim();
+    }
+    
+    // Fallback to toString
+    String typeString = dataTypeSpec.toString();
+    if (typeString != null && !typeString.trim().isEmpty()) {
+      return typeString.trim();
+    }
+    
+    return "text";
   }
 
   
@@ -1470,6 +1594,75 @@ public class UnaryExpression extends PlSqlAst {
         return String.format("/* DELETE method for %s - requires statement-level transformation */", variableName);
       default:
         return String.format("/* Unknown table of records method: %s.%s */", variableName, collectionMethod);
+    }
+  }
+
+  /**
+   * Transform potential variable access using semantic analysis with proper priority order.
+   * Priority 1: Package variable access (highest priority)
+   * Priority 2: Collection type constructor 
+   * Priority 3: Local variable array indexing (lowest priority)
+   */
+  private String transformPotentialVariableAccessToPostgreSQL(Everything data) {
+    if (potentialVariableName == null) {
+      return "/* INVALID POTENTIAL VARIABLE ACCESS - NO NAME */";
+    }
+    
+    // PRIORITY 1: Check if this is a package variable reference (highest priority)
+    if (PackageVariableReferenceTransformer.isPackageVariableReference(potentialVariableName, data)) {
+      return transformPackageVariableAccess(data);
+    }
+    
+    // PRIORITY 2: Check if this is a collection type constructor
+    Function currentFunction = getCurrentFunctionFromContext();
+    if (SchemaResolutionUtils.isCollectionTypeConstructor(data, potentialVariableName, currentFunction)) {
+      return SchemaResolutionUtils.transformCollectionConstructor(data, potentialVariableName, potentialAccessArguments, currentFunction);
+    }
+    
+    // PRIORITY 3: Fall back to local variable array indexing (lowest priority)
+    if (potentialAccessArguments != null && potentialAccessArguments.size() == 1) {
+      // Single argument - treat as array indexing: var(index) -> var[index]
+      String indexString = potentialAccessArguments.get(0).toPostgre(data);
+      return potentialVariableName + "[" + indexString + "]";
+    } else if (potentialAccessArguments != null && potentialAccessArguments.size() > 1) {
+      // Multiple arguments - might be a function call
+      StringBuilder sb = new StringBuilder();
+      sb.append(potentialVariableName).append("(");
+      for (int i = 0; i < potentialAccessArguments.size(); i++) {
+        if (i > 0) sb.append(", ");
+        sb.append(potentialAccessArguments.get(i).toPostgre(data));
+      }
+      sb.append(")");
+      return sb.toString();
+    } else {
+      // No arguments - just the variable name
+      return potentialVariableName;
+    }
+  }
+
+  /**
+   * Transform package variable access to appropriate PostgreSQL function calls.
+   */
+  private String transformPackageVariableAccess(Everything data) {
+    OraclePackage pkg = PackageVariableReferenceTransformer.findContainingPackage(potentialVariableName, data);
+    if (pkg == null) {
+      return "/* PACKAGE NOT FOUND FOR VARIABLE: " + potentialVariableName + " */";
+    }
+    
+    String dataType = PackageVariableReferenceTransformer.getPackageVariableDataType(potentialVariableName, pkg);
+    
+    if (potentialAccessArguments == null || potentialAccessArguments.isEmpty()) {
+      // Simple variable access: g_var -> sys.get_package_var_*()
+      return PackageVariableReferenceTransformer.transformRead(pkg.getSchema(), pkg.getName(), potentialVariableName, dataType, pkg);
+    } else if (potentialAccessArguments.size() == 1) {
+      // Collection element access: g_numbers(1) -> sys.get_package_collection_element_*()
+      String indexString = potentialAccessArguments.get(0).toPostgre(data);
+      String elementDataType = extractElementDataType(dataType, pkg, data);
+      return PackageVariableReferenceTransformer.transformCollectionElementRead(
+          pkg.getSchema(), pkg.getName(), potentialVariableName, elementDataType, indexString);
+    } else {
+      // Multiple arguments - this shouldn't happen for package variables, but handle gracefully
+      return "/* UNEXPECTED MULTIPLE ARGUMENTS FOR PACKAGE VARIABLE: " + potentialVariableName + " */";
     }
   }
 }

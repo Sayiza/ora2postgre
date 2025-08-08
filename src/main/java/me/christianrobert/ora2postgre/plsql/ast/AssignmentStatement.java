@@ -83,7 +83,7 @@ public class AssignmentStatement extends Statement {
         
         // Transform package variable assignment to direct table access
         String writeCall = PackageVariableReferenceTransformer.transformWrite(
-            pkg.getSchema(), pkg.getName(), targetVariableName, dataType, expression.toPostgre(data));
+            pkg.getSchema(), pkg.getName(), targetVariableName, dataType, expression.toPostgre(data), pkg);
         
         b.append(writeCall)
             .append(";");

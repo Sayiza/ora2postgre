@@ -227,17 +227,14 @@ public class VisitUnaryExpression {
           // For now, we'll need access to Everything and current function context
           // This will be passed from the calling context
           
-          // Extract ALL arguments for proper collection constructor handling
+          // Extract ALL arguments for potential variable access (neutral parsing)
           List<Expression> arguments = extractMethodArguments(partCtx, astBuilder);
           if (arguments != null && !arguments.isEmpty()) {
-            // For now, create collection constructor with ALL arguments
-            // This will be enhanced with semantic detection when we have the full context
-            
-            // Create collection constructor with ALL arguments instead of just the first one
-            return new UnaryExpression(identifier, arguments);
+            // Create potential variable access - defer semantic analysis to transformation phase
+            return UnaryExpression.forPotentialVariableAccess(identifier, arguments);
           } else {
-            // Handle empty constructor: t_numbers() -> ARRAY[]
-            return new UnaryExpression(identifier, new ArrayList<>());
+            // Handle empty access: identifier() - could be empty constructor or function call
+            return UnaryExpression.forPotentialVariableAccess(identifier, new ArrayList<>());
           }
         }
       }
