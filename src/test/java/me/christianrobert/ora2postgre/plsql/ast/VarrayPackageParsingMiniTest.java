@@ -85,10 +85,10 @@ END pkg_varray_example;
       // Additional validations to ensure parsing captured the structure
       assertFalse(postgreResult.trim().isEmpty(), "PostgreSQL result should not be empty");
       
-      // Verify that collection element assignment uses correct numeric type
-      assertTrue(postgreResult.contains("sys.set_package_collection_element_numeric"), 
-          "Should use numeric type for NUMBER collection elements, but got: " + 
-          (postgreResult.contains("sys.set_package_collection_element_text") ? "text type" : "unknown type"));
+      // Verify that collection element assignment uses unified JSON-based storage
+      assertTrue(postgreResult.contains("sys.set_package_var_element"), 
+          "Should use unified JSON storage for all collection elements, but got: " + 
+          (postgreResult.contains("sys.set_package_collection_element") ? "legacy type-specific storage" : "unknown storage method"));
       
       // Verify basic structure was parsed
       if (pkg.getProcedures() != null) {

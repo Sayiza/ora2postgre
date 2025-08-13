@@ -11,69 +11,38 @@ import java.util.Map;
 
 /**
  * Transformer class for converting Oracle package variable references to PostgreSQL 
- * direct table access function calls. This eliminates the need for PRE/POST 
- * synchronization by using the Direct Table Access Pattern.
+ * unified JSON-based storage function calls. This eliminates type-specific functions
+ * and provides consistent storage for all variable types including collections.
  * 
  * Transforms:
- * - Regular variables: gX -> sys.get_package_var_numeric('package', 'gX')
- * - Collection variables: arr(1) -> sys.get_package_collection_element_numeric('package', 'arr', 1)
- * - Collection methods: arr.COUNT -> sys.get_package_collection_count('package', 'arr')
- * - Assignment: gX := value -> sys.set_package_var_numeric('package', 'gX', value)
+ * - Regular variables: gX -> sys.get_package_var('schema', 'package', 'gX')
+ * - Collection variables: arr(1) -> sys.get_package_var_element('schema', 'package', 'arr', 1)
+ * - Collection methods: arr.COUNT -> sys.get_package_var_count('schema', 'package', 'arr')
+ * - Assignment: gX := value -> sys.set_package_var('schema', 'package', 'gX', value::jsonb)
  */
 public class PackageVariableReferenceTransformer {
 
-  // Oracle data type to PostgreSQL accessor function mapping
+  // Legacy data type mapping - kept for backward compatibility but no longer used in JSON approach
+  @Deprecated
   private static final Map<String, String> DATA_TYPE_TO_ACCESSOR = new HashMap<>();
   
   static {
-    initializeDataTypeMapping();
-  }
-
-  /**
-   * Initialize Oracle data type to PostgreSQL accessor function mapping.
-   */
-  private static void initializeDataTypeMapping() {
-    // Numeric types
+    // Keep for backward compatibility - but all operations now use unified JSON storage
     DATA_TYPE_TO_ACCESSOR.put("NUMBER", "numeric");
-    DATA_TYPE_TO_ACCESSOR.put("INTEGER", "numeric");
-    DATA_TYPE_TO_ACCESSOR.put("INT", "numeric");
-    DATA_TYPE_TO_ACCESSOR.put("NUMERIC", "numeric");
-    DATA_TYPE_TO_ACCESSOR.put("DECIMAL", "numeric");
-    DATA_TYPE_TO_ACCESSOR.put("FLOAT", "numeric");
-    DATA_TYPE_TO_ACCESSOR.put("REAL", "numeric");
-    DATA_TYPE_TO_ACCESSOR.put("DOUBLE", "numeric");
-    
-    // String types
     DATA_TYPE_TO_ACCESSOR.put("VARCHAR2", "text");
-    DATA_TYPE_TO_ACCESSOR.put("VARCHAR", "text");
-    DATA_TYPE_TO_ACCESSOR.put("CHAR", "text");
-    DATA_TYPE_TO_ACCESSOR.put("NCHAR", "text");
-    DATA_TYPE_TO_ACCESSOR.put("NVARCHAR2", "text");
-    DATA_TYPE_TO_ACCESSOR.put("CLOB", "text");
-    DATA_TYPE_TO_ACCESSOR.put("NCLOB", "text");
-    
-    // Boolean types
     DATA_TYPE_TO_ACCESSOR.put("BOOLEAN", "boolean");
-    
-    // Date/time types
     DATA_TYPE_TO_ACCESSOR.put("DATE", "timestamp");
-    DATA_TYPE_TO_ACCESSOR.put("TIMESTAMP", "timestamp");
-    DATA_TYPE_TO_ACCESSOR.put("TIMESTAMP WITH TIME ZONE", "timestamp");
-    DATA_TYPE_TO_ACCESSOR.put("TIMESTAMP WITH LOCAL TIME ZONE", "timestamp");
-    
-    // Collection types - handled by collection-specific functions
     DATA_TYPE_TO_ACCESSOR.put("VARRAY", "collection");
     DATA_TYPE_TO_ACCESSOR.put("TABLE", "collection");
-    DATA_TYPE_TO_ACCESSOR.put("NESTED TABLE", "collection");
   }
 
   /**
-   * Transform Oracle package variable read access to PostgreSQL function call.
+   * Transform Oracle package variable read access to unified JSON-based PostgreSQL function call.
    * 
    * @param targetSchema Target schema where package variable tables are located
    * @param packageName Name of the Oracle package
    * @param varName Name of the package variable
-   * @param dataType Oracle data type of the variable
+   * @param dataType Oracle data type of the variable (for documentation only)
    * @return PostgreSQL function call for reading the variable
    */
   public static String transformRead(String targetSchema, String packageName, String varName, String dataType) {
@@ -81,36 +50,29 @@ public class PackageVariableReferenceTransformer {
   }
 
   /**
-   * Transform Oracle package variable read access to PostgreSQL function call with package context.
+   * Transform Oracle package variable read access to unified JSON-based PostgreSQL function call.
+   * All package variables are now stored as JSONB for consistency and extensibility.
    * 
    * @param targetSchema Target schema where package variable tables are located
    * @param packageName Name of the Oracle package
    * @param varName Name of the package variable
-   * @param dataType Oracle data type of the variable
+   * @param dataType Oracle data type of the variable (for documentation only)
    * @param pkg Package context for custom type lookup (can be null)
    * @return PostgreSQL function call for reading the variable
    */
   public static String transformRead(String targetSchema, String packageName, String varName, String dataType, OraclePackage pkg) {
-    String accessorType = mapDataTypeToAccessorWithContext(dataType, pkg);
-    
-    if ("collection".equals(accessorType)) {
-      // Collection variables require special handling
-      return String.format("sys.get_package_collection('%s', '%s', '%s')", 
-          targetSchema.toLowerCase(), packageName.toLowerCase(), varName.toLowerCase());
-    } else {
-      // Regular package variables
-      return String.format("sys.get_package_var_%s('%s', '%s', '%s')", 
-          accessorType, targetSchema.toLowerCase(), packageName.toLowerCase(), varName.toLowerCase());
-    }
+    // Unified JSON-based storage for all variable types
+    return String.format("sys.get_package_var('%s', '%s', '%s')", 
+        targetSchema.toLowerCase(), packageName.toLowerCase(), varName.toLowerCase());
   }
 
   /**
-   * Transform Oracle package variable write access to PostgreSQL function call.
+   * Transform Oracle package variable write access to unified JSON-based PostgreSQL function call.
    * 
    * @param targetSchema Target schema where package variable tables are located
    * @param packageName Name of the Oracle package
    * @param varName Name of the package variable
-   * @param dataType Oracle data type of the variable
+   * @param dataType Oracle data type of the variable (for casting hints)
    * @param value PostgreSQL expression for the value to write
    * @return PostgreSQL function call for writing the variable
    */
@@ -119,82 +81,68 @@ public class PackageVariableReferenceTransformer {
   }
 
   /**
-   * Transform Oracle package variable write access to PostgreSQL function call with package context.
+   * Transform Oracle package variable write access to unified JSON-based PostgreSQL function call.
+   * All values are converted to JSONB for consistent storage.
    * 
    * @param targetSchema Target schema where package variable tables are located
    * @param packageName Name of the Oracle package
    * @param varName Name of the package variable
-   * @param dataType Oracle data type of the variable
+   * @param dataType Oracle data type of the variable (for casting hints)
    * @param value PostgreSQL expression for the value to write
    * @param pkg Package context for custom type lookup (can be null)
    * @return PostgreSQL function call for writing the variable
    */
   public static String transformWrite(String targetSchema, String packageName, String varName, String dataType, String value, OraclePackage pkg) {
-    String accessorType = mapDataTypeToAccessorWithContext(dataType, pkg);
+    // Convert value to JSONB based on data type context
+    String jsonValue = convertValueToJsonb(value, dataType, pkg);
     
-    if ("collection".equals(accessorType)) {
-      // Collection variables require special handling
-      return String.format("PERFORM sys.set_package_collection('%s', '%s', '%s', %s)", 
-          targetSchema.toLowerCase(), packageName.toLowerCase(), varName.toLowerCase(), value);
-    } else {
-      // Regular package variables
-      return String.format("PERFORM sys.set_package_var_%s('%s', '%s', '%s', %s)", 
-          accessorType, targetSchema.toLowerCase(), packageName.toLowerCase(), varName.toLowerCase(), value);
-    }
+    // Unified JSON-based storage for all variable types
+    return String.format("PERFORM sys.set_package_var('%s', '%s', '%s', %s)", 
+        targetSchema.toLowerCase(), packageName.toLowerCase(), varName.toLowerCase(), jsonValue);
   }
 
   /**
-   * Transform Oracle collection element read access to PostgreSQL function call.
+   * Transform Oracle collection element read access to unified JSON-based PostgreSQL function call.
    * 
+   * @param targetSchema Target schema name
    * @param packageName Name of the Oracle package
    * @param collectionName Name of the collection variable
-   * @param elementDataType Oracle data type of the collection elements
+   * @param elementDataType Oracle data type of the collection elements (for documentation)
    * @param index Index expression (1-based)
    * @return PostgreSQL function call for reading the collection element
    */
   public static String transformCollectionElementRead(String targetSchema, String packageName, String collectionName, 
       String elementDataType, String index) {
-    String accessorType = mapDataTypeToAccessor(elementDataType);
-    
-    if ("collection".equals(accessorType)) {
-      // Nested collections - return as text and let caller handle casting
-      return String.format("sys.get_package_collection_element('%s', '%s', '%s', %s)", 
-          targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase(), index);
-    } else {
-      // Typed collection elements
-      return String.format("sys.get_package_collection_element_%s('%s', '%s', '%s', %s)", 
-          accessorType, targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase(), index);
-    }
+    // Unified JSON-based element access for all collection types
+    return String.format("sys.get_package_var_element('%s', '%s', '%s', %s)", 
+        targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase(), index);
   }
 
   /**
-   * Transform Oracle collection element write access to PostgreSQL function call.
+   * Transform Oracle collection element write access to unified JSON-based PostgreSQL function call.
    * 
+   * @param targetSchema Target schema name
    * @param packageName Name of the Oracle package
    * @param collectionName Name of the collection variable
-   * @param elementDataType Oracle data type of the collection elements
+   * @param elementDataType Oracle data type of the collection elements (for casting hints)
    * @param index Index expression (1-based)
    * @param value PostgreSQL expression for the value to write
    * @return PostgreSQL function call for writing the collection element
    */
   public static String transformCollectionElementWrite(String targetSchema, String packageName, String collectionName, 
       String elementDataType, String index, String value) {
-    String accessorType = mapDataTypeToAccessor(elementDataType);
+    // Convert element value to JSONB
+    String jsonValue = convertValueToJsonb(value, elementDataType, null);
     
-    if ("collection".equals(accessorType)) {
-      // Nested collections - accept as text
-      return String.format("PERFORM sys.set_package_collection_element('%s', '%s', '%s', %s, %s)", 
-          targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase(), index, value);
-    } else {
-      // Typed collection elements
-      return String.format("PERFORM sys.set_package_collection_element_%s('%s', '%s', '%s', %s, %s)", 
-          accessorType, targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase(), index, value);
-    }
+    // Unified JSON-based element assignment for all collection types
+    return String.format("PERFORM sys.set_package_var_element('%s', '%s', '%s', %s, %s)", 
+        targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase(), index, jsonValue);
   }
 
   /**
-   * Transform Oracle collection method calls to PostgreSQL function calls.
+   * Transform Oracle collection method calls to unified JSON-based PostgreSQL function calls.
    * 
+   * @param targetSchema Target schema name
    * @param packageName Name of the Oracle package
    * @param collectionName Name of the collection variable
    * @param methodName Oracle collection method (COUNT, FIRST, LAST, etc.)
@@ -205,21 +153,21 @@ public class PackageVariableReferenceTransformer {
     
     switch (method) {
       case "COUNT":
-        return String.format("sys.get_package_collection_count('%s', '%s', '%s')", 
+        return String.format("sys.get_package_var_count('%s', '%s', '%s')", 
             targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase());
       case "FIRST":
-        return String.format("sys.get_package_collection_first('%s', '%s', '%s')", 
+        return String.format("sys.get_package_var_first('%s', '%s', '%s')", 
             targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase());
       case "LAST":
-        return String.format("sys.get_package_collection_last('%s', '%s', '%s')", 
+        return String.format("sys.get_package_var_last('%s', '%s', '%s')", 
             targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase());
       case "EXISTS":
         // EXISTS requires an index parameter, returns placeholder for parameter substitution
-        return String.format("sys.package_collection_exists('%s', '%s', '%s', %%s)", 
+        return String.format("sys.get_package_var_exists('%s', '%s', '%s', %%s)", 
             targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase());
       case "EXTEND":
         // EXTEND is a procedure, not a function - handle in statement transformation
-        return String.format("sys.extend_package_collection('%s', '%s', '%s', NULL)", 
+        return String.format("sys.extend_package_var('%s', '%s', '%s', NULL)", 
             targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase());
       default:
         // Unknown method - return as comment for manual handling
@@ -229,7 +177,7 @@ public class PackageVariableReferenceTransformer {
   }
 
   /**
-   * Transform Oracle collection EXTEND method call to PostgreSQL function call.
+   * Transform Oracle collection EXTEND method call to unified JSON-based PostgreSQL function call.
    * 
    * @param targetSchema Target schema name
    * @param packageName Name of the Oracle package
@@ -239,16 +187,17 @@ public class PackageVariableReferenceTransformer {
    */
   public static String transformCollectionExtend(String targetSchema, String packageName, String collectionName, String value) {
     if (value == null || value.trim().isEmpty()) {
-      return String.format("PERFORM sys.extend_package_collection('%s', '%s', '%s', NULL)", 
+      return String.format("PERFORM sys.extend_package_var('%s', '%s', '%s', NULL)", 
           targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase());
     } else {
-      return String.format("PERFORM sys.extend_package_collection('%s', '%s', '%s', %s)", 
-          targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase(), value);
+      String jsonValue = convertValueToJsonb(value, null, null);
+      return String.format("PERFORM sys.extend_package_var('%s', '%s', '%s', %s)", 
+          targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase(), jsonValue);
     }
   }
 
   /**
-   * Transform Oracle collection DELETE method call to PostgreSQL function call.
+   * Transform Oracle collection DELETE method call to unified JSON-based PostgreSQL function call.
    * 
    * @param targetSchema Target schema name
    * @param packageName Name of the Oracle package
@@ -258,16 +207,16 @@ public class PackageVariableReferenceTransformer {
    */
   public static String transformCollectionDelete(String targetSchema, String packageName, String collectionName, String index) {
     if (index == null || index.trim().isEmpty()) {
-      return String.format("PERFORM sys.delete_package_collection_all('%s', '%s', '%s')", 
+      return String.format("PERFORM sys.delete_package_var_all('%s', '%s', '%s')", 
           targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase());
     } else {
-      return String.format("PERFORM sys.delete_package_collection_element('%s', '%s', '%s', %s)", 
+      return String.format("PERFORM sys.delete_package_var_element('%s', '%s', '%s', %s)", 
           targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase(), index);
     }
   }
 
   /**
-   * Transform Oracle collection TRIM method call to PostgreSQL function call.
+   * Transform Oracle collection TRIM method call to unified JSON-based PostgreSQL function call.
    * 
    * @param targetSchema Target schema name
    * @param packageName Name of the Oracle package
@@ -277,55 +226,147 @@ public class PackageVariableReferenceTransformer {
    */
   public static String transformCollectionTrim(String targetSchema, String packageName, String collectionName, String trimCount) {
     if (trimCount == null || trimCount.trim().isEmpty()) {
-      return String.format("PERFORM sys.trim_package_collection('%s', '%s', '%s', 1)", 
+      return String.format("PERFORM sys.trim_package_var('%s', '%s', '%s', 1)", 
           targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase());
     } else {
-      return String.format("PERFORM sys.trim_package_collection('%s', '%s', '%s', %s)", 
+      return String.format("PERFORM sys.trim_package_var('%s', '%s', '%s', %s)", 
           targetSchema.toLowerCase(), packageName.toLowerCase(), collectionName.toLowerCase(), trimCount);
     }
   }
 
   /**
-   * Map Oracle data type to PostgreSQL accessor function suffix.
+   * Convert Oracle value expression to PostgreSQL JSONB format.
+   * This method handles type-specific conversion for JSON storage.
    * 
-   * @param oracleType Oracle data type string
-   * @return PostgreSQL accessor function suffix
+   * @param value PostgreSQL expression for the value
+   * @param dataType Oracle data type (for conversion hints)
+   * @param pkg Package context (can be null)
+   * @return JSONB-compatible expression
    */
-  public static String mapDataTypeToAccessor(String oracleType) {
-    return mapDataTypeToAccessorWithContext(oracleType, null);
+  public static String convertValueToJsonb(String value, String dataType, OraclePackage pkg) {
+    if (value == null || value.trim().isEmpty()) {
+      return "NULL";
+    }
+    
+    String trimmedValue = value.trim();
+    
+    // Handle Oracle collection constructors
+    if (isCollectionConstructor(trimmedValue, dataType, pkg)) {
+      return convertCollectionConstructorToJsonb(trimmedValue);
+    }
+    
+    // Handle PostgreSQL arrays (from previous transformations)
+    if (trimmedValue.startsWith("ARRAY[")) {
+      // Find the closing bracket for the array content (not type casting)
+      int arrayStart = 6; // After "ARRAY["
+      int arrayEnd = -1;
+      int bracketCount = 1; // Already opened one bracket
+      
+      for (int i = arrayStart; i < trimmedValue.length() && bracketCount > 0; i++) {
+        char c = trimmedValue.charAt(i);
+        if (c == '[') bracketCount++;
+        else if (c == ']') {
+          bracketCount--;
+          if (bracketCount == 0) {
+            arrayEnd = i;
+            break;
+          }
+        }
+      }
+      
+      if (arrayEnd > arrayStart) {
+        // Extract just the array content, ignore any type casting
+        String arrayContent = trimmedValue.substring(arrayStart, arrayEnd);
+        return String.format("'[%s]'::jsonb", arrayContent);
+      } else {
+        // Fallback for malformed arrays
+        return "'[]'::jsonb";
+      }
+    }
+    
+    // Handle NULL literals
+    if ("NULL".equalsIgnoreCase(trimmedValue)) {
+      return "NULL";
+    }
+    
+    // Handle string literals - keep as JSON strings
+    if (trimmedValue.startsWith("'") && trimmedValue.endsWith("'")) {
+      return String.format("%s::jsonb", trimmedValue);
+    }
+    
+    // Handle numeric literals
+    if (trimmedValue.matches("\\d+(\\.\\d+)?")) {
+      return String.format("%s::jsonb", trimmedValue);
+    }
+    
+    // Handle boolean literals
+    if ("TRUE".equalsIgnoreCase(trimmedValue) || "FALSE".equalsIgnoreCase(trimmedValue)) {
+      return String.format("%s::jsonb", trimmedValue.toLowerCase());
+    }
+    
+    // For complex expressions, wrap in to_jsonb()
+    return String.format("to_jsonb(%s)", trimmedValue);
+  }
+  
+  /**
+   * Check if a value expression is an Oracle collection constructor.
+   */
+  private static boolean isCollectionConstructor(String value, String dataType, OraclePackage pkg) {
+    if (value == null || dataType == null) {
+      return false;
+    }
+    
+    // Check for custom type constructors (e.g., t_numbers())
+    if (pkg != null && value.matches("\\w+\\(.*\\)")) {
+      String typeName = value.substring(0, value.indexOf("("));
+      return isDefinedCollectionType(typeName, pkg);
+    }
+    
+    return false;
+  }
+  
+  /**
+   * Convert Oracle collection constructor to JSONB array.
+   * Examples: t_numbers() -> '[]'::jsonb, t_numbers(1,2,3) -> '[1,2,3]'::jsonb
+   */
+  private static String convertCollectionConstructorToJsonb(String constructor) {
+    if (constructor == null) {
+      return "'[]'::jsonb";
+    }
+    
+    int parenStart = constructor.indexOf("(");
+    int parenEnd = constructor.lastIndexOf(")");
+    
+    if (parenStart == -1 || parenEnd == -1 || parenEnd <= parenStart) {
+      return "'[]'::jsonb"; // Empty constructor
+    }
+    
+    String arguments = constructor.substring(parenStart + 1, parenEnd).trim();
+    
+    if (arguments.isEmpty()) {
+      return "'[]'::jsonb"; // Empty constructor
+    }
+    
+    // Convert arguments to JSON array format
+    return String.format("'[%s]'::jsonb", arguments);
   }
 
   /**
-   * Map Oracle data type to PostgreSQL accessor function suffix with package context.
-   * 
-   * @param oracleType Oracle data type string
-   * @param pkg Package context for custom type lookup (can be null)
-   * @return PostgreSQL accessor function suffix
+   * Legacy method for backward compatibility.
+   * @deprecated Use unified JSON-based approach instead
    */
+  @Deprecated
+  public static String mapDataTypeToAccessor(String oracleType) {
+    return "jsonb"; // All types now use unified JSON storage
+  }
+
+  /**
+   * Legacy method for backward compatibility.
+   * @deprecated Use unified JSON-based approach instead
+   */
+  @Deprecated
   public static String mapDataTypeToAccessorWithContext(String oracleType, OraclePackage pkg) {
-    if (oracleType == null) {
-      return "text"; // fallback
-    }
-    
-    String upperType = oracleType.toUpperCase();
-    
-    // Handle collection types (Oracle and PostgreSQL syntax)
-    if (upperType.contains("VARRAY") || upperType.contains("TABLE OF") || 
-        upperType.contains("NESTED TABLE") || upperType.endsWith("[]")) {
-      return "collection";
-    }
-    
-    // Check if this is a custom collection type defined in the package
-    if (pkg != null && isDefinedCollectionType(oracleType, pkg)) {
-      return "collection";
-    }
-    
-    // Handle parameterized types (e.g., VARCHAR2(100), NUMBER(10,2))
-    if (upperType.contains("(")) {
-      upperType = upperType.substring(0, upperType.indexOf("("));
-    }
-    
-    return DATA_TYPE_TO_ACCESSOR.getOrDefault(upperType, "text");
+    return "jsonb"; // All types now use unified JSON storage
   }
 
   /**

@@ -187,12 +187,12 @@ EXCEPTION
 END;
 $$;
 
--- Write package variable (accepts text, caller handles casting)
+-- Write package variable (accepts JSONB for unified storage)
 CREATE OR REPLACE FUNCTION SYS.set_package_var(
   target_schema text,
   package_name text, 
   var_name text, 
-  value text
+  value jsonb
 ) RETURNS void LANGUAGE plpgsql AS $$
 DECLARE
   table_name text;
@@ -200,8 +200,8 @@ BEGIN
   -- Build table name using target schema instead of current_schema()
   table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
   
-  -- Update session temp table
-  EXECUTE format('UPDATE %I SET value = %L', table_name, value);
+  -- Update session temp table with JSONB value
+  EXECUTE format('UPDATE %I SET value = %L', table_name, value::text);
 EXCEPTION
   WHEN undefined_table THEN
     -- Table doesn't exist, log warning for debugging
@@ -212,291 +212,219 @@ EXCEPTION
 END;
 $$;
 
--- Type-safe wrapper functions for common data types
+-- JSON-Based Unified Package Variable System
+-- All package variables are now stored as JSONB for consistency, extensibility, and future complex type support
 
--- Numeric getter/setter
-CREATE OR REPLACE FUNCTION SYS.get_package_var_numeric(target_schema text, package_name text, var_name text) 
-RETURNS numeric LANGUAGE plpgsql AS $$
+-- Get collection element by index (1-based, Oracle-style, returns JSONB)
+CREATE OR REPLACE FUNCTION SYS.get_package_var_element(
+  target_schema text, 
+  package_name text, 
+  var_name text, 
+  index_pos integer
+) RETURNS jsonb LANGUAGE plpgsql AS $$
 DECLARE
-  value text;
+  table_name text;
+  json_value text;
+  json_array jsonb;
 BEGIN
-  value := SYS.get_package_var(target_schema, package_name, var_name);
-  IF value IS NULL THEN
+  table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
+  
+  -- Get the JSONB array from the package variable table
+  EXECUTE format('SELECT value FROM %I LIMIT 1', table_name) INTO json_value;
+  
+  IF json_value IS NULL THEN
     RETURN NULL;
   END IF;
-  RETURN value::numeric;
-EXCEPTION
-  WHEN invalid_text_representation THEN
-    RAISE WARNING 'Invalid numeric value for package variable %.%: %', package_name, var_name, value;
-    RETURN NULL;
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION SYS.set_package_var_numeric(target_schema text, package_name text, var_name text, value numeric) 
-RETURNS void LANGUAGE plpgsql AS $$
-BEGIN
-  PERFORM SYS.set_package_var(target_schema, package_name, var_name, value::text);
-END;
-$$;
-
--- Boolean getter/setter
-CREATE OR REPLACE FUNCTION SYS.get_package_var_boolean(target_schema text, package_name text, var_name text) 
-RETURNS boolean LANGUAGE plpgsql AS $$
-DECLARE
-  value text;
-BEGIN
-  value := SYS.get_package_var(target_schema, package_name, var_name);
-  IF value IS NULL THEN
-    RETURN NULL;
-  END IF;
-  RETURN value::boolean;
-EXCEPTION
-  WHEN invalid_text_representation THEN
-    RAISE WARNING 'Invalid boolean value for package variable %.%: %', package_name, var_name, value;
-    RETURN NULL;
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION SYS.set_package_var_boolean(target_schema text, package_name text, var_name text, value boolean) 
-RETURNS void LANGUAGE plpgsql AS $$
-BEGIN
-  PERFORM SYS.set_package_var(target_schema, package_name, var_name, value::text);
-END;
-$$;
-
--- Text/VARCHAR2 getter/setter
-CREATE OR REPLACE FUNCTION SYS.get_package_var_text(target_schema text, package_name text, var_name text) 
-RETURNS text LANGUAGE plpgsql AS $$
-BEGIN
-  RETURN SYS.get_package_var(target_schema, package_name, var_name);
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION SYS.set_package_var_text(target_schema text, package_name text, var_name text, value text) 
-RETURNS void LANGUAGE plpgsql AS $$
-BEGIN
-  PERFORM SYS.set_package_var(target_schema, package_name, var_name, value);
-END;
-$$;
-
--- Date/Timestamp getter/setter
-CREATE OR REPLACE FUNCTION SYS.get_package_var_timestamp(target_schema text, package_name text, var_name text) 
-RETURNS timestamp LANGUAGE plpgsql AS $$
-DECLARE
-  value text;
-BEGIN
-  value := SYS.get_package_var(target_schema, package_name, var_name);
-  IF value IS NULL THEN
-    RETURN NULL;
-  END IF;
-  RETURN value::timestamp;
-EXCEPTION
-  WHEN invalid_text_representation THEN
-    RAISE WARNING 'Invalid timestamp value for package variable %.%: %', package_name, var_name, value;
-    RETURN NULL;
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION SYS.set_package_var_timestamp(target_schema text, package_name text, var_name text, value timestamp) 
-RETURNS void LANGUAGE plpgsql AS $$
-BEGIN
-  PERFORM SYS.set_package_var(target_schema, package_name, var_name, value::text);
-END;
-$$;
-
--- Collection Accessor Functions
--- These functions provide direct access to package collection variables (VARRAY/TABLE OF)
--- Following the same session-isolated pattern as regular package variables
-
--- Get entire collection as PostgreSQL array
-CREATE OR REPLACE FUNCTION SYS.get_package_collection(target_schema text, package_name text, var_name text) 
-RETURNS text[] LANGUAGE plpgsql AS $$
-DECLARE
-  table_name text;
-  result text[];
-BEGIN
-  table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
   
-  -- Reconstruct array from table rows (same as PackageCollectionHelper prologue)
-  EXECUTE format('SELECT CASE WHEN COUNT(*) = 0 THEN ARRAY[]::text[]
-                               ELSE array_agg(value ORDER BY row_number() OVER ())
-                          END FROM %I', table_name) INTO result;
+  -- Parse as JSONB and extract array element (convert to 0-based indexing)
+  json_array := json_value::jsonb;
   
-  RETURN result;
-EXCEPTION
-  WHEN undefined_table THEN
-    RETURN ARRAY[]::text[];
-  WHEN others THEN
-    RAISE WARNING 'Error reading package collection %.%: %', package_name, var_name, SQLERRM;
-    RETURN ARRAY[]::text[];
-END;
-$$;
-
--- Set entire collection from PostgreSQL array
-CREATE OR REPLACE FUNCTION SYS.set_package_collection(target_schema text, package_name text, var_name text, value text[]) 
-RETURNS void LANGUAGE plpgsql AS $$
-DECLARE
-  table_name text;
-BEGIN
-  table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
-  
-  -- Clear and repopulate table (same as PackageCollectionHelper epilogue)
-  EXECUTE format('DELETE FROM %I', table_name);
-  EXECUTE format('INSERT INTO %I (value) SELECT unnest(%L)', table_name, value);
-EXCEPTION
-  WHEN undefined_table THEN
-    RAISE WARNING 'Package collection table does not exist: %', table_name;
-  WHEN others THEN
-    RAISE WARNING 'Error writing package collection %.%: %', package_name, var_name, SQLERRM;
-END;
-$$;
-
--- Get collection element by index (1-based, Oracle-style)
-CREATE OR REPLACE FUNCTION SYS.get_package_collection_element(target_schema text, package_name text, var_name text, index_pos integer) 
-RETURNS text LANGUAGE plpgsql AS $$
-DECLARE
-  table_name text;
-  result text;
-BEGIN
-  table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
-  
-  -- Get element at specific position (1-based indexing)
-  EXECUTE format('SELECT value FROM (SELECT value, row_number() OVER () as rn FROM %I) t 
-                  WHERE rn = %L', table_name, index_pos) INTO result;
-  
-  RETURN result;
-EXCEPTION
-  WHEN undefined_table THEN
-    RETURN NULL;
-  WHEN others THEN
-    RAISE WARNING 'Error reading package collection element %.%[%]: %', package_name, var_name, index_pos, SQLERRM;
-    RETURN NULL;
-END;
-$$;
-
--- Set collection element by index (1-based, Oracle-style)
-CREATE OR REPLACE FUNCTION SYS.set_package_collection_element(target_schema text, package_name text, var_name text, index_pos integer, value text) 
-RETURNS void LANGUAGE plpgsql AS $$
-DECLARE
-  table_name text;
-BEGIN
-  table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
-  
-  -- Update element at specific position using ctid for direct row access
-  EXECUTE format('UPDATE %I SET value = %L WHERE ctid = (
-                    SELECT ctid FROM (SELECT ctid, row_number() OVER () as rn FROM %I) t 
-                    WHERE rn = %L
-                  )', table_name, value, table_name, index_pos);
-EXCEPTION
-  WHEN undefined_table THEN
-    RAISE WARNING 'Package collection table does not exist: %', table_name;
-  WHEN others THEN
-    RAISE WARNING 'Error writing package collection element %.%[%]: %', package_name, var_name, index_pos, SQLERRM;
-END;
-$$;
-
--- Collection COUNT method (Oracle arr.COUNT equivalent)
-CREATE OR REPLACE FUNCTION SYS.get_package_collection_count(target_schema text, package_name text, var_name text) 
-RETURNS integer LANGUAGE plpgsql AS $$
-DECLARE
-  table_name text;
-  result integer;
-BEGIN
-  table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
-  
-  EXECUTE format('SELECT COUNT(*) FROM %I', table_name) INTO result;
-  
-  RETURN result;
-EXCEPTION
-  WHEN undefined_table THEN
-    RETURN 0;
-  WHEN others THEN
-    RAISE WARNING 'Error counting package collection %.%: %', package_name, var_name, SQLERRM;
-    RETURN 0;
-END;
-$$;
-
--- Collection EXTEND method (Oracle arr.EXTEND equivalent)
-CREATE OR REPLACE FUNCTION SYS.extend_package_collection(target_schema text, package_name text, var_name text, value text DEFAULT NULL) 
-RETURNS void LANGUAGE plpgsql AS $$
-DECLARE
-  table_name text;
-BEGIN
-  table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
-  
-  -- Add new element to end of collection
-  EXECUTE format('INSERT INTO %I (value) VALUES (%L)', table_name, value);
-EXCEPTION
-  WHEN undefined_table THEN
-    RAISE WARNING 'Package collection table does not exist: %', table_name;
-  WHEN others THEN
-    RAISE WARNING 'Error extending package collection %.%: %', package_name, var_name, SQLERRM;
-END;
-$$;
-
--- Collection FIRST method (Oracle arr.FIRST equivalent) - always returns 1
-CREATE OR REPLACE FUNCTION SYS.get_package_collection_first(target_schema text, package_name text, var_name text) 
-RETURNS integer LANGUAGE plpgsql AS $$
-DECLARE
-  table_name text;
-  count_result integer;
-BEGIN
-  table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
-  
-  EXECUTE format('SELECT COUNT(*) FROM %I', table_name) INTO count_result;
-  
-  -- Return 1 if collection has elements, NULL if empty
-  IF count_result > 0 THEN
-    RETURN 1;
+  IF jsonb_typeof(json_array) = 'array' AND jsonb_array_length(json_array) >= index_pos THEN
+    RETURN json_array -> (index_pos - 1);
   ELSE
     RETURN NULL;
   END IF;
 EXCEPTION
   WHEN undefined_table THEN
     RETURN NULL;
+  WHEN others THEN
+    RAISE WARNING 'Error reading package variable element %.%[%]: %', package_name, var_name, index_pos, SQLERRM;
+    RETURN NULL;
 END;
 $$;
 
--- Collection LAST method (Oracle arr.LAST equivalent) - returns count
-CREATE OR REPLACE FUNCTION SYS.get_package_collection_last(target_schema text, package_name text, var_name text) 
+-- Set collection element by index (1-based, Oracle-style, accepts JSONB)
+CREATE OR REPLACE FUNCTION SYS.set_package_var_element(
+  target_schema text, 
+  package_name text, 
+  var_name text, 
+  index_pos integer, 
+  value jsonb
+) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE
+  table_name text;
+  json_value text;
+  json_array jsonb;
+  new_array jsonb;
+BEGIN
+  table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
+  
+  -- Get current JSONB array from the package variable table
+  EXECUTE format('SELECT value FROM %I LIMIT 1', table_name) INTO json_value;
+  
+  IF json_value IS NULL THEN
+    -- Initialize as empty array if NULL
+    json_array := '[]'::jsonb;
+  ELSE
+    json_array := json_value::jsonb;
+  END IF;
+  
+  -- Ensure it's an array
+  IF jsonb_typeof(json_array) != 'array' THEN
+    json_array := '[]'::jsonb;
+  END IF;
+  
+  -- Extend array if needed (fill with nulls up to index_pos)
+  WHILE jsonb_array_length(json_array) < index_pos LOOP
+    json_array := json_array || 'null'::jsonb;
+  END LOOP;
+  
+  -- Update the element at index_pos (convert to 0-based indexing)
+  new_array := jsonb_set(json_array, ARRAY[(index_pos - 1)::text], value);
+  
+  -- Update the package variable table with new array
+  EXECUTE format('UPDATE %I SET value = %L', table_name, new_array::text);
+EXCEPTION
+  WHEN undefined_table THEN
+    RAISE WARNING 'Package variable table does not exist: %', table_name;
+  WHEN others THEN
+    RAISE WARNING 'Error writing package variable element %.%[%]: %', package_name, var_name, index_pos, SQLERRM;
+END;
+$$;
+
+-- Collection COUNT method (Oracle arr.COUNT equivalent)
+CREATE OR REPLACE FUNCTION SYS.get_package_var_count(target_schema text, package_name text, var_name text) 
+RETURNS integer LANGUAGE plpgsql AS $$
+DECLARE
+  table_name text;
+  json_value text;
+  json_array jsonb;
+BEGIN
+  table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
+  
+  -- Get the JSONB array from the package variable table
+  EXECUTE format('SELECT value FROM %I LIMIT 1', table_name) INTO json_value;
+  
+  IF json_value IS NULL THEN
+    RETURN 0;
+  END IF;
+  
+  json_array := json_value::jsonb;
+  
+  IF jsonb_typeof(json_array) = 'array' THEN
+    RETURN jsonb_array_length(json_array);
+  ELSE
+    RETURN 0;
+  END IF;
+EXCEPTION
+  WHEN undefined_table THEN
+    RETURN 0;
+  WHEN others THEN
+    RAISE WARNING 'Error counting package variable %.%: %', package_name, var_name, SQLERRM;
+    RETURN 0;
+END;
+$$;
+
+-- Collection FIRST method (Oracle arr.FIRST equivalent) - returns 1 or NULL
+CREATE OR REPLACE FUNCTION SYS.get_package_var_first(target_schema text, package_name text, var_name text) 
 RETURNS integer LANGUAGE plpgsql AS $$
 BEGIN
-  RETURN SYS.get_package_collection_count(target_schema, package_name, var_name);
-END;
-$$;
-
--- Type-safe collection wrappers for common data types
-
--- Numeric collection element getter/setter
-CREATE OR REPLACE FUNCTION SYS.get_package_collection_element_numeric(target_schema text, package_name text, var_name text, index_pos integer) 
-RETURNS numeric LANGUAGE plpgsql AS $$
-DECLARE
-  value text;
-BEGIN
-  value := SYS.get_package_collection_element(target_schema, package_name, var_name, index_pos);
-  IF value IS NULL THEN
+  IF SYS.get_package_var_count(target_schema, package_name, var_name) > 0 THEN
+    RETURN 1;
+  ELSE
     RETURN NULL;
   END IF;
-  RETURN value::numeric;
-EXCEPTION
-  WHEN invalid_text_representation THEN
-    RAISE WARNING 'Invalid numeric value for package collection element %.%[%]: %', package_name, var_name, index_pos, value;
-    RETURN NULL;
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION SYS.set_package_collection_element_numeric(target_schema text, package_name text, var_name text, index_pos integer, value numeric) 
-RETURNS void LANGUAGE plpgsql AS $$
+-- Collection LAST method (Oracle arr.LAST equivalent) - returns count or NULL
+CREATE OR REPLACE FUNCTION SYS.get_package_var_last(target_schema text, package_name text, var_name text) 
+RETURNS integer LANGUAGE plpgsql AS $$
+DECLARE
+  count_result integer;
 BEGIN
-  PERFORM SYS.set_package_collection_element(target_schema, package_name, var_name, index_pos, value::text);
+  count_result := SYS.get_package_var_count(target_schema, package_name, var_name);
+  IF count_result > 0 THEN
+    RETURN count_result;
+  ELSE
+    RETURN NULL;
+  END IF;
 END;
 $$;
 
--- Collection DELETE operations - Oracle collection.DELETE equivalent
--- These functions provide DELETE method support for package collection variables
+-- Collection EXISTS method (Oracle arr.EXISTS(i) equivalent)
+CREATE OR REPLACE FUNCTION SYS.get_package_var_exists(
+  target_schema text, 
+  package_name text, 
+  var_name text, 
+  index_pos integer
+) RETURNS boolean LANGUAGE plpgsql AS $$
+DECLARE
+  count_result integer;
+BEGIN
+  count_result := SYS.get_package_var_count(target_schema, package_name, var_name);
+  RETURN index_pos > 0 AND index_pos <= count_result;
+END;
+$$;
 
--- Delete collection element by index (Oracle arr.DELETE(i) equivalent)
-CREATE OR REPLACE FUNCTION SYS.delete_package_collection_element(
+-- Collection EXTEND method (Oracle arr.EXTEND equivalent)
+CREATE OR REPLACE FUNCTION SYS.extend_package_var(
+  target_schema text, 
+  package_name text, 
+  var_name text, 
+  value jsonb DEFAULT NULL
+) RETURNS void LANGUAGE plpgsql AS $$
+DECLARE
+  table_name text;
+  json_value text;
+  json_array jsonb;
+  new_array jsonb;
+BEGIN
+  table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
+  
+  -- Get current JSONB array
+  EXECUTE format('SELECT value FROM %I LIMIT 1', table_name) INTO json_value;
+  
+  IF json_value IS NULL THEN
+    json_array := '[]'::jsonb;
+  ELSE
+    json_array := json_value::jsonb;
+  END IF;
+  
+  -- Ensure it's an array
+  IF jsonb_typeof(json_array) != 'array' THEN
+    json_array := '[]'::jsonb;
+  END IF;
+  
+  -- Append new element
+  IF value IS NULL THEN
+    new_array := json_array || 'null'::jsonb;
+  ELSE
+    new_array := json_array || jsonb_build_array(value);
+  END IF;
+  
+  -- Update package variable
+  EXECUTE format('UPDATE %I SET value = %L', table_name, new_array::text);
+EXCEPTION
+  WHEN undefined_table THEN
+    RAISE WARNING 'Package variable table does not exist: %', table_name;
+  WHEN others THEN
+    RAISE WARNING 'Error extending package variable %.%: %', package_name, var_name, SQLERRM;
+END;
+$$;
+
+-- Collection DELETE operations
+CREATE OR REPLACE FUNCTION SYS.delete_package_var_element(
   target_schema text, 
   package_name text, 
   var_name text, 
@@ -504,24 +432,45 @@ CREATE OR REPLACE FUNCTION SYS.delete_package_collection_element(
 ) RETURNS void LANGUAGE plpgsql AS $$
 DECLARE
   table_name text;
+  json_value text;
+  json_array jsonb;
+  new_array jsonb := '[]'::jsonb;
+  i integer;
 BEGIN
   table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
   
-  -- Delete element at specific position using row_number for 1-based indexing
-  EXECUTE format('DELETE FROM %I WHERE ctid = (
-                    SELECT ctid FROM (SELECT ctid, row_number() OVER () as rn FROM %I) t 
-                    WHERE rn = %L
-                  )', table_name, table_name, index_pos);
+  -- Get current array
+  EXECUTE format('SELECT value FROM %I LIMIT 1', table_name) INTO json_value;
+  
+  IF json_value IS NULL THEN
+    RETURN; -- Nothing to delete
+  END IF;
+  
+  json_array := json_value::jsonb;
+  
+  IF jsonb_typeof(json_array) != 'array' THEN
+    RETURN; -- Not an array
+  END IF;
+  
+  -- Rebuild array without the element at index_pos
+  FOR i IN 1..jsonb_array_length(json_array) LOOP
+    IF i != index_pos THEN
+      new_array := new_array || jsonb_build_array(json_array -> (i - 1));
+    END IF;
+  END LOOP;
+  
+  -- Update package variable
+  EXECUTE format('UPDATE %I SET value = %L', table_name, new_array::text);
 EXCEPTION
   WHEN undefined_table THEN
-    RAISE WARNING 'Package collection table does not exist: %', table_name;
+    RAISE WARNING 'Package variable table does not exist: %', table_name;
   WHEN others THEN
-    RAISE WARNING 'Error deleting package collection element %.%[%]: %', package_name, var_name, index_pos, SQLERRM;
+    RAISE WARNING 'Error deleting package variable element %.%[%]: %', package_name, var_name, index_pos, SQLERRM;
 END;
 $$;
 
--- Delete all collection elements (Oracle arr.DELETE equivalent)
-CREATE OR REPLACE FUNCTION SYS.delete_package_collection_all(
+-- Delete all elements (clear array)
+CREATE OR REPLACE FUNCTION SYS.delete_package_var_all(
   target_schema text, 
   package_name text, 
   var_name text
@@ -531,21 +480,18 @@ DECLARE
 BEGIN
   table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
   
-  -- Clear all elements
-  EXECUTE format('DELETE FROM %I', table_name);
+  -- Set to empty array
+  EXECUTE format('UPDATE %I SET value = %L', table_name, '[]'::jsonb::text);
 EXCEPTION
   WHEN undefined_table THEN
-    RAISE WARNING 'Package collection table does not exist: %', table_name;
+    RAISE WARNING 'Package variable table does not exist: %', table_name;
   WHEN others THEN
-    RAISE WARNING 'Error deleting all package collection elements %.%: %', package_name, var_name, SQLERRM;
+    RAISE WARNING 'Error clearing package variable %.%: %', package_name, var_name, SQLERRM;
 END;
 $$;
 
--- Collection TRIM operations - Oracle collection.TRIM equivalent  
--- These functions provide TRIM method support for package collection variables
-
--- Trim N elements from end of collection (Oracle arr.TRIM(n) equivalent)
-CREATE OR REPLACE FUNCTION SYS.trim_package_collection(
+-- Collection TRIM method
+CREATE OR REPLACE FUNCTION SYS.trim_package_var(
   target_schema text, 
   package_name text, 
   var_name text, 
@@ -553,57 +499,47 @@ CREATE OR REPLACE FUNCTION SYS.trim_package_collection(
 ) RETURNS void LANGUAGE plpgsql AS $$
 DECLARE
   table_name text;
-  current_count integer;
-  keep_count integer;
+  json_value text;
+  json_array jsonb;
+  current_length integer;
+  new_length integer;
+  new_array jsonb := '[]'::jsonb;
+  i integer;
 BEGIN
   table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
   
-  -- Get current count
-  EXECUTE format('SELECT COUNT(*) FROM %I', table_name) INTO current_count;
+  -- Get current array
+  EXECUTE format('SELECT value FROM %I LIMIT 1', table_name) INTO json_value;
   
-  -- Calculate how many to keep
-  keep_count := current_count - trim_count;
-  IF keep_count < 0 THEN
-    keep_count := 0;
+  IF json_value IS NULL THEN
+    RETURN; -- Nothing to trim
   END IF;
   
-  -- Delete elements beyond keep_count (trim from the end)
-  EXECUTE format('DELETE FROM %I WHERE ctid NOT IN (
-                    SELECT ctid FROM (SELECT ctid, row_number() OVER () as rn FROM %I) t 
-                    WHERE rn <= %L
-                  )', table_name, table_name, keep_count);
+  json_array := json_value::jsonb;
+  
+  IF jsonb_typeof(json_array) != 'array' THEN
+    RETURN; -- Not an array
+  END IF;
+  
+  current_length := jsonb_array_length(json_array);
+  new_length := current_length - trim_count;
+  
+  IF new_length <= 0 THEN
+    new_array := '[]'::jsonb;
+  ELSE
+    -- Keep only the first new_length elements
+    FOR i IN 1..new_length LOOP
+      new_array := new_array || jsonb_build_array(json_array -> (i - 1));
+    END LOOP;
+  END IF;
+  
+  -- Update package variable
+  EXECUTE format('UPDATE %I SET value = %L', table_name, new_array::text);
 EXCEPTION
   WHEN undefined_table THEN
-    RAISE WARNING 'Package collection table does not exist: %', table_name;
+    RAISE WARNING 'Package variable table does not exist: %', table_name;
   WHEN others THEN
-    RAISE WARNING 'Error trimming package collection %.%: %', package_name, var_name, SQLERRM;
-END;
-$$;
-
--- Enhanced EXISTS method (Oracle arr.EXISTS(i) equivalent)
-CREATE OR REPLACE FUNCTION SYS.package_collection_exists(
-  target_schema text, 
-  package_name text, 
-  var_name text, 
-  index_pos integer
-) RETURNS boolean LANGUAGE plpgsql AS $$
-DECLARE
-  table_name text;
-  element_count integer;
-BEGIN
-  table_name := lower(target_schema) || '_' || lower(package_name) || '_' || lower(var_name);
-  
-  -- Check if element exists at specific position (1-based indexing)
-  EXECUTE format('SELECT COUNT(*) FROM (SELECT row_number() OVER () as rn FROM %I) t 
-                  WHERE rn = %L', table_name, index_pos) INTO element_count;
-  
-  RETURN element_count > 0;
-EXCEPTION
-  WHEN undefined_table THEN
-    RETURN FALSE;
-  WHEN others THEN
-    RAISE WARNING 'Error checking package collection existence %.%[%]: %', package_name, var_name, index_pos, SQLERRM;
-    RETURN FALSE;
+    RAISE WARNING 'Error trimming package variable %.%: %', package_name, var_name, SQLERRM;
 END;
 $$;
 
