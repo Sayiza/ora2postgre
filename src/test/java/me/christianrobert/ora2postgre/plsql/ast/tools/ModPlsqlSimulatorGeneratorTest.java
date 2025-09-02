@@ -1,7 +1,8 @@
 package me.christianrobert.ora2postgre.plsql.ast.tools;
 
 import me.christianrobert.ora2postgre.global.Everything;
-import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.ModPlsqlSimulatorGenerator;
+import me.christianrobert.ora2postgre.writing.ModPlsqlSimulatorGenerator;
+
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;

@@ -1,7 +1,6 @@
 package me.christianrobert.ora2postgre.plsql.ast.tools;
 
 import me.christianrobert.ora2postgre.global.Everything;
-import me.christianrobert.ora2postgre.plsql.ast.tools.helpers.ModPlsqlSimulatorGenerator;
 import me.christianrobert.ora2postgre.plsql.ast.OraclePackage;
 import me.christianrobert.ora2postgre.plsql.ast.Procedure;
 import me.christianrobert.ora2postgre.plsql.ast.Variable;
@@ -18,6 +17,8 @@ import me.christianrobert.ora2postgre.plsql.ast.VarrayType;
 import me.christianrobert.ora2postgre.plsql.ast.NestedTableType;
 import me.christianrobert.ora2postgre.plsql.ast.Function;
 import me.christianrobert.ora2postgre.writing.ExportModPlsqlSimulator;
+import me.christianrobert.ora2postgre.writing.ModPlsqlSimulatorGenerator;
+
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
